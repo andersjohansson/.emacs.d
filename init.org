@@ -1803,8 +1803,8 @@ overriding it, but you should know before you do.
          ("C-x C-r" . aj/rename-current-buffer-file)
          ("C-S-<return>" . ergoemacs-open-in-external-app))
   :init (bind-key "C-a" 'aj/beginning-or-indentation prog-mode-map)
-  (with-eval-after-load
-      "dired" (bind-key "<s-return>" 'sudo-edit-current-file dired-mode-map)))
+  (with-eval-after-load "dired"
+    (bind-key "<s-return>" 'sudo-edit-current-file dired-mode-map)))
 #+end_src
 
 ** Editing. Marking, killing, yanking, etc.
