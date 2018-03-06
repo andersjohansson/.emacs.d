@@ -171,9 +171,7 @@ Is it really neccesary to redefine the functions below?
         "maildir:/uu/Inbox AND flag:unread"
         mu4e-alert-set-window-urgency nil
         mu4e-alert-email-notification-types '(subjects)
-        mu4e-alert-group-by :maildir
-        ;; mu4e-alert-modeline-formatter
-        )
+        mu4e-alert-group-by :maildir)
   :config
   ;; (with-eval-after-load "spaceline-segments"
   ;;   (spaceline-toggle-mu4e-alert-segment-on))

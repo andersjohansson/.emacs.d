@@ -2914,7 +2914,6 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
   (with-eval-after-load 'pdf-view
     (setq-default pdf-view-display-size 'fit-page))
   (add-hook 'pdf-view-mode-hook (lambda () (auto-revert-mode -1) (whole-line-or-region-local-mode -1)))
-  (add-hook 'pdf-view-mode-hook #'pdf-view-auto-slice-minor-mode t)
 
   (delight 'pdf-view-midnight-minor-mode " ☾" "pdf-misc")
   (defvar aj/pdf-view-midnight-list
