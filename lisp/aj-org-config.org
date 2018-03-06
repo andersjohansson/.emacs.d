@@ -1964,43 +1964,52 @@ AUCTeX it has better error messages and better async running of file. I have als
                          :complete #'aj/org-paperref-complete
                          :face 'font-lock-keyword-face)
 
-(defun aj/org-paperref-export (path _desc backend)
-  (if (or (eq backend 'latex)
-          (org-export-derived-backend-p backend '(latex)))
-      (format (if (aj/org-paperref-find path)
-                  "\\paperref{%s}"
-                "\\textbf{%s}")
-              path)
-    path))
-
-(defun aj/org-paperref-find (&optional ref)
-  (save-excursion
-    (save-match-data
-      (goto-char (point-min))
-      (when (search-forward "\\begin{listofpapers}" nil t)
-        (let ((limit (save-excursion (search-forward "\\end{listofpapers}" nil t))))
-          (if ref
-              (search-forward (format "\\label{%s}" ref) limit t)
-            (cl-loop
-             while (search-forward-regexp "\\\\label{\\([^}]+\\)}" limit t)
-             collect (match-string 1))))))))
+(defun aj/org-paperref-export (refs _desc backend)
+  (if (org-export-derived-backend-p backend 'latex)
+      (let ((psp (split-string refs "," t)))
+        (format
+         (if (cl-set-difference psp (aj/org-paperref-find)
+                                :test 'string=)
+             ;; some label was not found
+             "\\textbf{%s}"
+           "\\paperref{%s}")
+         refs))
+    refs))
 
 (defun aj/org-paperref-complete (&optional _arg)
   (concat "paper:"
-          (completing-read "Paperref: "
-                           (save-restriction
-                             (widen)
-                             (aj/org-paperref-find)))))
+          (mapconcat #'identity (helm-comp-read
+                                 "Paperrefs: "
+                                 (aj/org-paperref-find nil t)
+                                 :marked-candidates t)
+                     ",")))
 
-(defun aj/org-paperref-show (path)
+(defun aj/org-paperref-show (refs)
+  (message
+   (cl-loop for p in (cl-loop for ref in (split-string refs "," t)
+                              collect (aj/org-paperref-find ref t))
+            concat
+            (concat (if p
+                        (save-excursion
+                          (goto-char p)
+                          (buffer-substring-no-properties
+                           (point-at-bol) (point-at-eol)))
+                      "Not found!") "\n"))))
+
+(defun aj/org-paperref-find (&optional ref wide)
   (save-restriction
-    (widen)
-    (message (if-let ((pos (aj/org-paperref-find path)))
-                 (save-excursion
-                   (goto-char pos)
-                   (buffer-substring-no-properties
-                    (point-at-bol) (point-at-eol)))
-               "Not found"))))
+    (when wide (widen))
+    (save-excursion
+      (save-match-data
+        (goto-char (point-min))
+        (when (search-forward "\\begin{listofpapers}" nil t)
+          (let ((limit (save-excursion (search-forward "\\end{listofpapers}" nil t))))
+            (if ref
+                (search-forward (format "\\label{%s}" ref) limit t)
+              (cl-loop
+               while (search-forward-regexp "\\\\label{\\([^}]+\\)}" limit t)
+               collect (match-string 1)))))))))
+
 #+END_SRC
 
 ***** Latin abbreviations for thesis
