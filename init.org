@@ -2763,7 +2763,7 @@ personal dictionaries into a combined personal dictionary."
 #+BEGIN_SRC emacs-lisp
 (use-package helm-flyspell
   :ensure t
-  :commands help-flyspell-correct
+  :commands helm-flyspell-correct
   :init (with-eval-after-load 'flyspell
           (bind-key "C-ö" 'helm-flyspell-correct flyspell-mode-map)))
 #+END_SRC
