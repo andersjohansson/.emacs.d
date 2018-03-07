@@ -1962,7 +1962,7 @@ AUCTeX it has better error messages and better async running of file. I have als
                          :follow #'aj/org-paperref-show
                          :export #'aj/org-paperref-export
                          :complete #'aj/org-paperref-complete
-                         :face 'font-lock-keyword-face)
+                         :face 'org-scheduled)
 
 (defun aj/org-paperref-export (refs _desc backend)
   (if (org-export-derived-backend-p backend 'latex)

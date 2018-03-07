@@ -2770,7 +2770,7 @@ personal dictionaries into a combined personal dictionary."
 **** Extra words to skip in org-mode
 #+BEGIN_SRC emacs-lisp
 (defun aj/org-flyspell-skip-links (fun)
-  (if (memq (face-at-point) '(org-link org-date))
+  (if (memq (face-at-point) '(org-link org-date org-scheduled))
       nil
     (funcall fun)))
 
