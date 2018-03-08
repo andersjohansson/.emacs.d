@@ -1073,7 +1073,6 @@ Can be passed any ox BACKEND in a non-interactive call"
 #+end_src
 ** Org-annotate :org_async:
 From https://github.com/girzel/org-annotate
-But now, [2018-03-01], I have an unmerged fork here: https://github.com/andersjohansson/org-annotate/tree/fix-export
 #+BEGIN_SRC emacs-lisp
 (use-package org-annotate
   :load-path "~/kodat/elisp/org-annotate"
@@ -1102,7 +1101,8 @@ But now, [2018-03-01], I have an unmerged fork here: https://github.com/andersjo
                 (format "<office:annotation><dc:creator>%%s</dc:creator><dc:date>%%s</dc:date><text:list><text:list-item><text:p>%s</text:p></text:list-item></text:list></office:annotation>"
                         path))
               (user-full-name)
-              (aj/odt-timestamp))))
+              (let ((ct (current-time)))
+                (concat (format-time-string "%FT%T." ct) (number-to-string (nth 2 ct)))))))
   
   (setq org-annotate-odt-export-function
         #'aj/org-annotate-export-odt-annotation-or-inline)
@@ -1868,30 +1868,36 @@ AUCTeX it has better error messages and better async running of file. I have als
 (with-eval-after-load 'ox-latex
   (org-export-define-derived-backend 'auctex 'latex
     :menu-entry
-    '(?l 5
-         ((?m "As PDF (AUCTeX Master)"
-              aj/org-export-tex-auctex-master)
-          (?a "As PDF (AUCTeX this file)"
-              aj/org-export-tex-auctex-this-file)))))
+    '(?a "AUCTeX export"
+         ((?a "As PDF (AUCTeX)"
+              aj/org-export-tex-auctex)
+          (?f "As PDF (AUCTeX this file)"
+              aj/org-export-tex-auctex-subfile)))))
 
-(defun aj/org-export-tex-auctex-master (async subtreep visible-only body-only)
+(defun aj/org-export-tex-auctex (_async subtreep visible-only _body-only)
+  "Export to pdf with auctex. Ignores async since running tex is
+usually what takes time and that is called async through
+auctex (and there are so many hacks needed for to get my other
+hacks working for async)"
   (interactive)
-  (org-with-wide-buffer
-   (let ((outfile (org-export-output-file-name ".tex" subtreep))
-         (aj/ot-regionfile nil))
-     (org-export-to-file 'latex outfile
-       async subtreep visible-only t nil
-       #'aj/org-export-tex-auctex-run-tex-master))))
+  (org-export-to-file 'latex (org-export-output-file-name ".tex" subtreep)
+    nil subtreep visible-only nil nil
+    #'aj/org-export-tex-auctex-run-tex))
 
-(defun aj/org-export-tex-auctex-run-tex-master (file)
-  (require 'tex)
-  (require 'latex)
-  ;;TeX-master should be available as local variable in this temp org buffer
-  (hack-local-variables)
-  (TeX-command "latexmk" #'TeX-master-file -1)
+(autoload #'TeX-command "tex-buf")
+(defvar aj/org-export-tex-auctex-curr-file nil)
+
+(defun aj/org-export-tex-auctex-run-tex (file)
+  (setq aj/org-export-tex-auctex-curr-file file) ; stupid
+  (setq TeX-master file)
+  (TeX-command-sequence '("latexmk" "View") t #'aj/org-export-tex-auctex-curr-file)
+  ;; (TeX-command "latexmk" #'aj/org-export-tex-auctex-curr-file -1)
   file)
 
-(defun aj/org-export-tex-auctex-this-file (async subtreep visible-only body-only)
+(defun aj/org-export-tex-auctex-curr-file (&optional  _ext nondir)
+  (TeX-strip-extension aj/org-export-tex-auctex-curr-file nil t)) 
+
+(defun aj/org-export-tex-auctex-subfile (async subtreep visible-only body-only)
   (interactive)
   (let ((outfile (org-export-output-file-name ".tex" subtreep))
         ;;use with cl-letf
@@ -1901,6 +1907,9 @@ AUCTeX it has better error messages and better async running of file. I have als
       async subtreep visible-only t nil
       #'aj/org-export-tex-auctex-run-tex-region)))
 
+(autoload #'TeX-master-file "tex")
+(autoload #'TeX-region-create "tex-buf")
+(autoload #'TeX-region-file "tex-buf")
 (defun aj/org-export-tex-auctex-run-tex-region (file)
   (require 'tex)
   (require 'latex)
@@ -1908,19 +1917,15 @@ AUCTeX it has better error messages and better async running of file. I have als
   ;;buffer (but not neccessarily if we missed to export the local
   ;;variables section for some reason (subtree, narrowing, etc))
 
-  ;; TODO, can we add a guessed TeX-master-file?
-
   ;; bind + local seems to work with org-export--generate-copy-script
   ;; as it adds the bound ones as local
   (hack-local-variables)
   (let ((texm (TeX-master-file)))
     (with-current-buffer (find-file-noselect file t)
       (latex-mode)
-      (let ((begin (point-min))
-            (end (point-max))
-            (TeX-master texm))
+      (let ((TeX-master texm))
         (TeX-region-create (TeX-region-file TeX-default-extension)
-                           (buffer-substring begin end)
+                           (buffer-string)
                            (file-name-nondirectory (buffer-file-name))
                            (TeX-current-offset begin)))
       (TeX-command "latexmk" #'TeX-region-file -1)))
