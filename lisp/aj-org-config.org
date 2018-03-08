@@ -2291,9 +2291,10 @@ is defined the subtree during org subtree export."
        (concat "\\begin{document}\n"
                (cl-loop for sn in secnames
                         concat
-                        (format "\\setcounter{%s}{%s}"
+                        (format "\\setcounter{%s}{%d}"
                                 sn
-                                (pop aj/org-latex-numbering-start)))) 
+                                (1- (string-to-int
+                                     (pop aj/org-latex-numbering-start))))))
        string t t))))
 
 
