@@ -1082,12 +1082,16 @@ From https://github.com/girzel/org-annotate
              ("C-c C-Ä" . org-annotate-delete-note)
              ("C-c C-x C-ä" . org-annotate-display-notes))
 
-  (defun aj/org-annotate-export-latex-fixme (path desc)
-    (if desc
-        (format "\\fxnote*{%s}{%s}" path desc)
-      (format "\\fxnote{%s}" path)))
+  (defun aj/org-annotate-export-latex-fixme-and-inline (path desc)
+    (let ((inl ""))
+      (when (string-match "^inline:\\(.+\\)" path)
+        (setq inl "[inline,notodonotesbw,nomargin]")
+        (setq path (match-string 1 path)))
+      (if desc
+          (format "\\fxnote*%s{%s}{%s}" inl path desc)
+        (format "\\fxnote%s{%s}" inl path))))
   (setq org-annotate-latex-export-function
-        #'aj/org-annotate-export-latex-fixme)
+        #'aj/org-annotate-export-latex-fixme-and-inline)
 
   (defun aj/org-annotate-export-odt-annotation-or-inline (path desc)
     "Let notes prefixed with \"inline:\" just be set in italics.
