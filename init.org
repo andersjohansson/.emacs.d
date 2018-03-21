@@ -1265,35 +1265,12 @@ already narrowed."
 
   (setq helm-echo-input-in-header-line t)
 
-  (defvar aj/helm-source-header-fg nil)
-  (defvar aj/helm-source-header-bg nil)
-  (defvar aj/helm-source-header-box nil)
-  ;; (defvar aj/helm-selection-fg nil)
-  (defvar aj/helm-selection-bg nil)
-  (defun aj/helm-set-faces ()
-    (setq aj/helm-source-header-fg (face-attribute 'helm-source-header :foreground)
-          aj/helm-source-header-bg (face-attribute 'helm-source-header :background)
-          aj/helm-source-header-box (face-attribute 'helm-source-header :box)
-          ;; aj/helm-selection-fg (face-attribute 'helm-selection :foreground)
-          aj/helm-selection-bg (face-attribute 'helm-selection :background)))
-
-  (add-hook 'aj/face-definitions-hook 'aj/helm-set-faces)
-
-  ;; from: https://www.reddit.com/r/emacs/comments/2z7nbv/lean_helm_window/
+  ;; from:
+  ;; https://www.reddit.com/r/emacs/comments/2z7nbv/lean_helm_window/
   (defun helm-toggle-header-line ()
-    (if (> (length helm-sources) 1)
-        (set-face-attribute 'helm-source-header
-                            nil
-                            :foreground aj/helm-source-header-fg
-                            :background aj/helm-source-header-bg
-                            :box aj/helm-source-header-box
-                            :height 1.0)
-      (set-face-attribute 'helm-source-header
-                          nil
-                          :foreground aj/helm-selection-bg
-                          :background aj/helm-selection-bg
-                          :box nil
-                          :height 0.1)))
+    (if (eq 1 (length (ignore-errors (with-helm-buffer helm-sources))))
+        (set-face-attribute 'helm-source-header nil :height 1)
+      (set-face-attribute 'helm-source-header nil :height 1.0)))
 
   (add-hook 'helm-before-initialize-hook #'helm-toggle-header-line)
 
