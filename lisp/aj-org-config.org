@@ -1086,7 +1086,8 @@ From https://github.com/girzel/org-annotate
 #+BEGIN_SRC emacs-lisp
 (use-package org-annotate
   :load-path "~/kodat/elisp/org-annotate"
-  :config  
+  :config
+  (setq org-annotate-special-brackets '("《" " ‖ " "》"))
   (bind-keys :map org-mode-map
              ("C-c C-ä" . org-annotate-add-note)
              ("C-c C-Ä" . org-annotate-delete-note)
