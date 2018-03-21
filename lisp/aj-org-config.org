@@ -733,28 +733,38 @@ current buffer but don’t limit accepted values."
 
 (bind-key "C-c C-x C-d" #'aj/org-add-auto-deadline org-mode-map)
 #+END_SRC
-*** Clocking + pomodoro
+
+
+*** Clocking
+**** Standard variables
 #+begin_src emacs-lisp
 (setq org-clock-persist 'history
       org-clock-history-length 10
       org-clock-x11idle-program-name "xprintidle"
       org-clock-idle-time 10
-      org-clock-string-limit 25
-      org-pomodoro-time-format "%.2m"
-      org-pomodoro-format "P~%s"
-      org-pomodoro-keep-killed-pomodoro-time t
-      org-pomodoro-play-sounds nil)
+      org-clock-string-limit 25)
 
 (org-clock-persistence-insinuate)
-(with-eval-after-load 'org-pomodoro
+
+;; don’t want unsafe variable complaints about this
+(put 'org-clock-in-switch-to-state 'safe-local-variable 'stringp)
+#+END_SRC
+
+**** org-pomodoro
+#+BEGIN_SRC emacs-lisp
+(use-package org-pomodoro
+  :init (setq org-pomodoro-time-format "%.2m"
+              org-pomodoro-format "P~%s"
+              org-pomodoro-keep-killed-pomodoro-time t
+              org-pomodoro-play-sounds nil)
+  :config (alert-add-rule
+           :category "org-pomodoro"
+           :style 'libnotify
+           :continue t)
   (set-face-attribute 'org-pomodoro-mode-line nil :inverse-video nil :foreground 'unspecified :inherit 'mode-line-emphasis)
   (set-face-attribute 'org-pomodoro-mode-line-break nil :inverse-video nil :foreground 'unspecified :inherit 'mode-line-emphasis))
 #+end_src
 
-**** Clock in switch to state, safe local
-#+begin_src emacs-lisp
-(put 'org-clock-in-switch-to-state 'safe-local-variable 'stringp)
-#+end_src
 *** Clocksum variables
 #+BEGIN_SRC emacs-lisp
 (setq org-duration-units
