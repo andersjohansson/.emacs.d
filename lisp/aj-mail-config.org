@@ -376,6 +376,10 @@ I want to use a single binding to switch (cycle through) contexts when composing
 #+END_SRC
 *** Let flyspell only check relevant regions
 #+BEGIN_SRC emacs-lisp
+(put 'mu4e-compose-mode 'flyspell-mode-predicate #'mail-mode-flyspell-verify)
+#+END_SRC
+**** Home grown  :ARCHIVE:
+#+BEGIN_SRC emacs-lisp
 (defun aj/mu4e-compose-flyspell-ignore ()
   "Function used for `flyspell-generic-check-word-predicate' to ignore headers in message-mode"
   (or (and (message-in-body-p) (not (aj/message-in-signature-p)))
