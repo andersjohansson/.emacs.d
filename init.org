@@ -2964,17 +2964,23 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
   (bind-keys
    :map pdf-view-mode-map
    ("s a" . pdf-view-auto-slice-minor-mode)
-   ("q" . aj/pdf-hl-and-copy)
+   ("q" . aj/pdf-quit)
+   ("w" . aj/pdf-hl-and-copy)
    ;;("w" . aj/pdf-hl-and-copy)
-   ("w" . aj/pdf-ul)
-   ("e" . aj/pdf-ol)
-   ("r" . aj/pdf-sq)
-   ("t" . aj/pdf-hl-note)
-   ("Q" . (lambda () (interactive) (aj/pdf-hl t)))
-   ("W" . (lambda () (interactive) (aj/pdf-ul t)))
-   ("E" . (lambda () (interactive) (aj/pdf-ol t)))
-   ("R" . (lambda () (interactive) (aj/pdf-sq t)))
+   ("e" . aj/pdf-ul)
+   ("r" . aj/pdf-ol)
+   ("t" . aj/pdf-sq)
+   ("y" . aj/pdf-hl-note)
+   ("w" . (lambda () (interactive) (aj/pdf-hl t)))
+   ("e" . (lambda () (interactive) (aj/pdf-ul t)))
+   ("r" . (lambda () (interactive) (aj/pdf-ol t)))
+   ("t" . (lambda () (interactive) (aj/pdf-sq t)))
    ("<C-S-mouse-1>" . aj/pdf-text))
+
+  (defun aj/pdf-quit ()
+    (interactive)
+    (cl-case (read-char "Really close pdf? ")
+      ((?q ?y) (kill-buffer))))
 
   ;; advice count-words
   (advice-add 'count-words :before-while #'aj/pdf-count-words)
