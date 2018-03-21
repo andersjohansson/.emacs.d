@@ -1260,6 +1260,13 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
       nil)))
 #+END_SRC
 
+*** Converting back from latex
+Some hackish functions
+#+BEGIN_SRC emacs-lisp
+(use-package biblatex-to-zotxt
+  :load-path "~/kodat/elisp/biblatex-to-zotxt/"
+  :commands biblatex-to-zotxt)
+#+END_SRC
 ** Export :org_async:
 *** New link types for special exports
 **** Video
