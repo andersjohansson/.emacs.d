@@ -2753,6 +2753,17 @@ personal dictionaries into a combined personal dictionary."
 (advice-add 'org-mode-flyspell-verify :around #'aj/org-flyspell-skip-links)
 
 #+END_SRC
+
+**** Avoid unneccesary messages
+#+BEGIN_SRC emacs-lisp
+(defun aj/message-off-advice (oldfun &rest args)
+  "Quiet down messages in adviced OLDFUN."
+  (let ((inhibit-message t))
+    (apply oldfun args)))
+
+(advice-add #'ispell-init-process :around #'aj/message-off-advice)
+#+END_SRC
+
 **** COMMENT Med wcheck :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (setq ispell-really-hunspell t)
