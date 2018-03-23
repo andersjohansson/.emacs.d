@@ -753,10 +753,16 @@ current buffer but don’t limit accepted values."
 **** org-pomodoro
 #+BEGIN_SRC emacs-lisp
 (use-package org-pomodoro
-  :init (setq org-pomodoro-time-format "%.2m"
-              org-pomodoro-format "P~%s"
-              org-pomodoro-keep-killed-pomodoro-time t
-              org-pomodoro-play-sounds nil)
+  :init (let ((samesound
+               "/usr/share/sounds/freedesktop/stereo/complete.oga"))
+          (setq
+           org-pomodoro-audio-player "paplay"
+           org-pomodoro-finished-sound samesound
+           org-pomodoro-long-break-sound samesound
+           org-pomodoro-short-break-sound samesound
+           org-pomodoro-time-format "%.2m"
+           org-pomodoro-format "P~%s"
+           org-pomodoro-keep-killed-pomodoro-time t))
   :config (alert-add-rule
            :category "org-pomodoro"
            :style 'libnotify
