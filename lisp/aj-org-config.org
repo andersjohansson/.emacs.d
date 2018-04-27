@@ -1725,31 +1725,39 @@ should be relativized or not. Returns the possibly relativized filename"
 #+begin_src emacs-lisp
 (defun aj/org-latex-inlinetask (todo todotype prio name tags cont info)
   "Export inlinetasks with tags and some other stuff"
-  (let*
-      ((name (unless (or (string= "" name) (string= "∈" name)) name))
-       (cont (unless (string= "" cont) cont))
-       (taglist (when tags (replace-regexp-in-string
-                            "_" "\\textunderscore{}"
-                            (format "\\ajtags{%s}" (mapconcat 'identity tags ", "))
-                            t t))))
-    (concat
-     taglist
-     (when (or name cont)
-       (apply
-        #'format "\\begin{anfxnote}{%s}%s\\end{anfxnote}"
-        (cond
-         ((and name cont)
-          (list name cont))
-         ((and name (not cont))
-          (list "Note:" name))
-         ((and (not name) cont)
-          (list "Note:" cont))))
-       ;; (format "\\ajtnote{%s}"
-       ;;         (progn
-       ;;           (when (and cont name)
-       ;;             (setq name (format "\\textbf{%s}\\\\" name)))
-       ;;           (concat name cont)))
-       ))))
+  todo todotype prio name tags cont info
+  (if (string= "∈" name)
+      (aj/org-coding-inlinetask tags)
+    (let*
+        ((name (unless (or (string= "" name) (string= "∈" name)) name))
+         (cont (unless (string= "" cont) cont))
+         (taglist (when tags (replace-regexp-in-string
+                              "_" "\\textunderscore{}"
+                              (format "\\ajtags{%s}" (mapconcat 'identity tags ", "))
+                              t t))))
+      (concat
+       taglist
+       (when (or name cont)
+         (apply
+          #'format "\\begin{anfxnote}{%s}%s\\end{anfxnote}"
+          (cond
+           ((and name cont)
+            (list name cont))
+           ((and name (not cont))
+            (list "Note" name))
+           ((and (not name) cont)
+            (list "Note" cont)))))))))
+
+(defun aj/org-coding-inlinetask (tags)
+  (format "\\codingtags{%s}"
+          (mapconcat (lambda (tag)
+                       (let ((case-fold-search nil))
+                         (replace-regexp-in-string
+                          "_" "\\(\\ni\\)"
+                          (downcase
+                           (replace-regexp-in-string "\\([a-z]\\)\\([A-Z]\\)" "\\1 \\2" tag t))
+                          t t)))
+                     tags "; ")))
 
 
 (setq org-latex-format-inlinetask-function 'aj/org-latex-inlinetask)
