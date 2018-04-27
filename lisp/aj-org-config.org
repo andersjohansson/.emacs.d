@@ -1284,7 +1284,37 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
   :after zotxt)
 
 (use-package zotxt-helm
-  :after zotxt)
+  :after zotxt
+  :config
+  ;; this could be added to zotxt-helm, but it’s depending so much on
+  ;; orgqda and I don’t want to require or copy that to zotxt-helm
+  (require 'orgqda)
+  (defvar-local zotxt-helm-citation-files nil)
+  (put 'zotxt-helm-citation-files 'safe-local-variable
+       #'orgqda--string-or-list-of-strings-p)
+
+  (defun zotxt-helm-get-current-refs ()
+    (let* ((orgqda-tag-files zotxt-helm-citation-files)
+           (manyfiles (and zotxt-helm-citation-files
+                           (orgqda-tag-files))))
+      (cl-remove-duplicates
+       (if manyfiles
+           (cl-loop for file in manyfiles
+                    append
+                    (orgqda--inhibit-org-startups
+                     (with-current-buffer (find-file-noselect file)
+                       (zotxt-helm-get-current-refs-in-buffer))))
+         (zotxt-helm-get-current-refs-in-buffer))
+       :test 'equal)))
+
+  (defun zotxt-helm-get-current-refs-in-buffer ()
+    (org-element-map
+        (if zotxt-helm-current-refs-in-widened-buffer
+            (save-restriction
+              (widen)
+              (org-element-parse-buffer))
+          (org-element-parse-buffer))
+        'link #'zotxt-helm-link-to-disp-real)))
 
 (use-package org-zotxt
   :commands org-zotxt-mode
