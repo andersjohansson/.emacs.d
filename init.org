@@ -1745,6 +1745,27 @@ overriding it, but you should know before you do.
             t))
 #+end_src
 
+*** Dired display of untracked git files
+#+BEGIN_SRC emacs-lisp
+(defvar-local aj/dired-untracked-filter nil)
+(put 'aj/dired-untracked-filter 'safe-local-variable #'stringp)
+
+(defun aj/dired-untracked ()
+  "List untracked git files with dired"
+  (interactive)
+  (switch-to-buffer (get-buffer-create "*untracked*"))
+  (let ((dired-mode-hook
+         (remq 'dired-collapse-mode dired-mode-hook))
+        (filter (if aj/dired-untracked-filter
+                    (concat "| grep -ve \"" aj/dired-untracked-filter "\" ")
+                  "")))
+    (shell-command (concat "git ls-files --others " filter "| xargs ls -lL")
+                   (current-buffer))
+    (dired-mode)
+    (setq-local dired-subdir-alist
+                (list (cons default-directory (point-min-marker))))))
+
+#+END_SRC
 ** visible-bookmarks (bm)
 #+begin_src emacs-lisp
 (use-package bm
