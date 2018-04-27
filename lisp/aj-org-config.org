@@ -2325,6 +2325,16 @@ I’m trying out ox-reveal, but they have different ways of adding notes (subtre
 :END:
 
 #+BEGIN_SRC emacs-lisp
+;; this is what I most often want, so I don’t bind
+;; aj/org-export-parent-subtree
+
+(defun aj/org-export-parent-subtree-infile (arg)
+  (interactive "P")
+  (aj/org-export-parent-subtree arg t))
+
+(bind-key "C-S-c C-S-e" #'aj/org-export-parent-subtree-infile org-mode-map)
+
+
 (defun aj/org-export-parent-subtree (arg &optional narrowed-export)
   "Launch `org-export-dispatch' at a parent subtree.
 By default goes to level 1. Numeric prefix argument means go to
@@ -2332,16 +2342,19 @@ that level. Repeated prefix arguments means go up that many
 levels."
   (interactive "P")
   (let ((level (cond ((not arg) 1)
-                     ((listp arg) (- (org-current-level) (/ (car arg) 4)))
+                     ((listp arg) (floor (1+ (- (org-current-level)
+                                                (log (car arg) 4)))))
                      ((integerp arg) arg)))
         (org-export-initial-scope (if narrowed-export
                                       org-export-initial-scope
                                     'subtree)))
     (if (<= 1 level (org-current-level))
         (save-mark-and-excursion
-         (while (let ((current (org-up-heading-safe)))
-                  (and current
-                       (not (eq current level)))))
+         (if (equal level (org-current-level))
+             (org-back-to-heading)
+           (while (let ((current (org-up-heading-safe)))
+                    (and current
+                         (not (eq current level))))))
          (if narrowed-export
              (progn
                (save-restriction
@@ -2408,14 +2421,6 @@ is defined the subtree during org subtree export."
        string t t))))
 
 
-;; this is what I most often want, so I don’t bind
-;; aj/org-export-parent-subtree
-
-(defun aj/org-export-parent-subtree-infile (arg)
-  (interactive "P")
-  (aj/org-export-parent-subtree arg t))
-
-(bind-key "C-S-c C-S-e" #'aj/org-export-parent-subtree-infile org-mode-map)
 #+END_SRC
 
 
