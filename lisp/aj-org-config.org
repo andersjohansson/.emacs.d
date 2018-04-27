@@ -2155,6 +2155,17 @@ Add as a filter in `org-export-filter-plain-list-functions'"
        (replace-regexp-in-string "{enumerate}" "{numberedlist}" translist t t))
     translist))
 #+END_SRC
+***** Convert ref to autoref (from hyperref)
+#+BEGIN_SRC emacs-lisp
+(defun aj/org-latex-ref-to-autoref (string backend info)
+  (if (org-export-derived-backend-p backend 'latex)
+      (replace-regexp-in-string "\\\\ref{" "\\autoref{" string t t)
+    string))
+
+(add-to-list 'org-export-filter-final-output-functions
+             #'aj/org-latex-ref-to-autoref)
+#+END_SRC
+
 ***** Thesischapter, for old thesis :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (with-eval-after-load "ox-latex"
