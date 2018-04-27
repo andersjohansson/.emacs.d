@@ -3161,7 +3161,7 @@ Also runs hook aj/face-definitions-hook."
       (set-face-attribute 'org-block-end-line nil :inherit '(org-drawer) :underline t :height 0.9)
       (setq org-fontify-quote-and-verse-blocks t)
       ;;(set-face-attribute 'org-block nil :inherit ??)
-      (set-face-attribute 'org-quote nil  :family "Cantarell" :inherit 'default)
+      (set-face-attribute 'org-quote nil :weight 'normal :family "Cantarell" :inherit 'default)
       (set-face-attribute 'org-date nil :inherit 'undefined)
       (set-face-attribute 'org-verse nil :inherit 'org-table)
       (set-face-attribute 'org-tag nil :weight 'normal :inherit 'show-paren-match)
