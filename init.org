@@ -2230,6 +2230,10 @@ Argument SYM-NAME is the thing to find."
   (setq nameless-private-prefix t
         nameless-affect-indentation-and-filling nil))
 #+END_SRC
+**** Electric-quote-mode
+#+BEGIN_SRC emacs-lisp
+(add-hook 'emacs-lisp-mode-hook #'electric-quote-local-mode)
+#+END_SRC
 
 *** aggressive-indent
 #+begin_src emacs-lisp
