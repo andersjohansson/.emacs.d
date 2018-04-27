@@ -2286,25 +2286,6 @@ I’m trying out ox-reveal, but they have different ways of adding notes (subtre
 	(compile (format "lacheck %s" fn))))
 #+end_src
 
-*** Export a subtree of a specific level above current :ARCHIVE:
-#+begin_src emacs-lisp
-(defvar aj/org-export-subtree-level 2)
-(put 'aj/org-export-subtree-level 'safe-local-variable 'integerp)
-
-(defun aj/org-export-dispatcher-subtree (prefix &optional level)
-  (interactive "P")
-  (save-excursion
-	(let ((level (or level aj/org-export-subtree-level))
-		  (org-export-initial-scope 'subtree))
-	  (search-backward-regexp (concat "^"  (apply 'concat (make-list level "\\*")) " "))
-	  (org-export-dispatch prefix))))
-#+end_src
-
-(define-key org-mode-map (kbd "C-c C-S-e") '(lambda (arg) (interactive "P") (aj/org-export-dispatcher-subtree 2 arg)))
-#+begin_src emacs-lisp
-(define-key org-mode-map (kbd "C-c C-S-e") 'aj/org-export-dispatcher-subtree)
-#+end_src
-
 *** Export without headlines (list-outline)
 #+begin_src emacs-lisp
 (defun aj/org-export-opt-no-hl (opt backend)
