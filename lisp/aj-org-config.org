@@ -1705,6 +1705,12 @@ should be relativized or not. Returns the possibly relativized filename"
 (setq org-odt-inline-image-rules '(("file" . "\\.\\(jpeg\\|jpg\\|png\\|gif\\|svg\\|pdf\\)\\'")))
 #+END_SRC
 *** LaTeX-export
+**** Risky variable fix for ~org-latex-title-command~
+~org-latex-title-command~ is treated as a risky variable since it ends in "-command" (see [[info:elisp#File%20Local%20Variables][info:elisp#File Local Variables]]). This means annoying dialogs in files where it is set (and that appearently can’t be fixed by adding values to ~safe-local-variable-values~ either). This fixes it.
+ #+BEGIN_SRC emacs-lisp
+(put 'org-latex-title-command 'safe-local-variable #'stringp)
+#+END_SRC
+
 **** Latex drawers
 #+BEGIN_SRC emacs-lisp
 (with-eval-after-load "ox-latex"
