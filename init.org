@@ -3232,11 +3232,9 @@ Also runs hook aj/face-definitions-hook."
 (advice-add 'enable-theme :after #'aj/apply-face-definitions)
 #+END_SRC
 **** bbatsov’s solarized
-With some yet ([2018-03-01]) unmerged modification for all-the-icons: https://github.com/andersjohansson/solarized-emacs/tree/all-the-icons
 #+begin_src emacs-lisp
 (use-package solarized-theme
-  ;; :ensure t
-  :load-path "~/kodat/elisp/.solarized-emacs"
+  :ensure t
   :init
   (setq solarized-scale-org-headlines nil
         solarized-distinct-fringe-background t
