@@ -959,6 +959,41 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2015-04/msg00052.html
         :buffer "*helm org headings*"))
 #+END_SRC
 
+** Visibility, folding, display etc.
+*** Make visibility property "folded" behave as if subtree was archived, i.e. always hidden after visibility cycling
+This is based on ~org-cycle-hide-archived-trees~.
+#+BEGIN_SRC emacs-lisp
+(add-hook 'org-cycle-hook #'aj/org-cycle-hide-folded-trees)
+
+(defun aj/org-cycle-hide-folded-trees (state)
+  "Re-hide all trees with visibility folded after a visibility state change.
+STATE should be one of the symbols listed in the docstring of
+`org-cycle-hook'."
+  (when (and (not org-cycle-open-archived-trees) ;; just re-use this
+             (not (memq state '(overview folded))))
+    (save-excursion
+      (let* ((globalp (memq state '(contents all)))
+             (beg (if globalp (point-min) (point)))
+             (end (if globalp (point-max) (org-end-of-subtree t))))
+        (aj/org-hide-folded-trees beg end)
+        (goto-char beg)
+        (when (looking-at-p (concat ".*:" org-archive-tag ":"))
+          (message "%s" (substitute-command-keys
+                         "Subtree is archived and stays closed.  Use \
+`\\[org-force-cycle-archived]' to cycle it anyway.")))))))
+
+(defun aj/org-hide-folded-trees (beg end)
+  "Re-hide all subtrees with visibility folded after a visibility state change."
+  (org-with-wide-buffer
+   (let ((case-fold-search nil)
+         (re ":VISIBILITY: folded"))
+     (goto-char beg)
+     ;; Include headline point is currently on.
+     (beginning-of-line)
+     (while (and (< (point) end) (re-search-forward re end t))
+       (org-set-visibility-according-to-property)))))
+#+END_SRC
+
 ** Org capture
 *** Capture templates
 (private and kept in custom.el)
