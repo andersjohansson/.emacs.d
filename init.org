@@ -2356,12 +2356,6 @@ _d_: subtree     _<tab>_: toggle
 ;; sista sabbar mitt skrivande, borde bara kopplas till org-mode, men vet inte hur)
 #+end_src
 
-varför är detta problem?
-(eval-after-load 'latex
-  '(progn
-	 (define-key LaTeX-mode-map "(" nil)
-	 (define-key LaTeX-mode-map "{" nil)
-	 (define-key LaTeX-mode-map "[" nil)))
 *** Comment-dwim-2
 #+begin_src emacs-lisp
 (use-package comment-dwim-2
