@@ -2603,8 +2603,8 @@ parent."
 
 *** by-backend, macro for some exports
 #+begin_src emacs-lisp
-(defmacro by-backend (&rest body)
-  `(case (if (boundp 'backend) (org-export-backend-name backend) nil) ,@body))
+(defmacro org-by-backend (&rest body)
+  `(case org-export-current-backend ,@body))
 #+end_src
 
 *** Ignore or include trees with backend specific tags
