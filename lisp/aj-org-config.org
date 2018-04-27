@@ -1210,10 +1210,10 @@ From https://github.com/girzel/org-annotate
               (user-full-name)
               (let ((ct (current-time)))
                 (concat (format-time-string "%FT%T." ct) (number-to-string (nth 2 ct)))))))
-  
+
   (setq org-annotate-odt-export-function
         #'aj/org-annotate-export-odt-annotation-or-inline)
-  
+
   ;; some notes are more private and don’t need to go with the export
   (defcustom aj/org-annotate-ignored-prefixes '("noexport")
     "Prefixes for avoiding export of org-annotate-notes.
@@ -1234,7 +1234,7 @@ List of prefix strings or regex."
         (funcall oldfun path desc format))))
 
   (advice-add 'org-annotate-export-note :around #'aj/org-annotate-maybe-ignore)
-  
+
   (set-face-attribute 'org-annotate-bracket-face nil :inherit 'font-lock-function-name-face)
   (set-face-attribute 'org-annotate-face nil
                       :weight 'normal :underline nil :italic t :inherit '(default))
