@@ -663,6 +663,8 @@ This works for instance in ~dired-do-rename~ or ~mu4e-view-save-attachment~ (als
 ;; Also auto refresh dired, but be quiet about it
 (setq global-auto-revert-non-file-buffers t)
 (setq auto-revert-verbose nil)
+;; I’m always on a reasonable system
+(setq auto-revert-use-notify t)
 #+end_src
 
 A function for reverting all opened files, even remote files (because auto-revert doesn’t work there)
