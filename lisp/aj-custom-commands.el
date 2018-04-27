@@ -359,4 +359,66 @@ other parameters."
         (mapc (lambda (fPath) (let ((process-connection-type nil)) (start-process "" nil "xdg-open" fPath))) myFileList))))) )
 
 
+;;; Texdoc loading and retrieval. (don’t have complete texdoc installed)
+(require 'helm)
+(require 'request)
+
+(defvar aj/texdoc-history nil)
+
+;;;###autoload
+(defun aj/texdoc ()
+  (interactive)
+  (let* ((helm-boring-file-regexp-list
+          (append '("/\\.$" "/\\.\\.$")
+                  helm-boring-file-regexp-list))
+         (doc
+          (helm :sources
+                (list (helm-build-sync-source "Texdoc"
+                        :candidates #'aj/texdoc-cands
+                        :action 'identity
+                        :fuzzy-match t
+                        :candidate-transformer #'helm-skip-boring-files
+                        :filtered-candidate-transformer #'helm-highlight-files
+                        :pattern-transformer #'helm-recentf-pattern-transformer)
+                      (helm-build-dummy-source "Search and download"
+                        :action 'aj/texdoc-search-and-download))
+                :buffer "*helm-texdoc*"
+                :history 'aj/texdoc-history
+                :ff-transformer-show-only-basename t))
+         (mtime (nth 5 (file-attributes doc)))
+         (too-old (< 200 (time-to-number-of-days (time-subtract (current-time) mtime)))))
+
+    (when too-old
+      (aj/texdoc-search-and-download (file-name-base doc)))
+    (ergoemacs-open-in-external-app doc)))
+
+(defun aj/texdoc-search-and-download (doc)
+  (let ((fn (format "~/texdoc/%s.pdf" doc))
+        retval)
+    (request
+     (format "http://texdoc.net/pkg/%s" doc)
+     :timeout 5
+     :parser 'buffer-string
+     :sync t
+     :error (cl-function (lambda (&key _data &allow-other-keys)
+                           (message "Failed contacting texdoc.net")))
+     :success (cl-function
+               (lambda (&key data response &allow-other-keys)
+                 (if (string= "application/pdf"
+                              (request-response-header response "content-type"))
+                     (progn
+                       (with-temp-buffer
+                         (setq buffer-file-coding-system 'raw-text)
+                         (insert data)
+                         (write-file fn))
+                       (setq retval fn))
+                   (user-error "Not found")))))
+    retval))
+
+(defun aj/texdoc-cands ()
+  (when (file-accessible-directory-p "~/texdoc")
+    (directory-files "~/texdoc" t)))
+
+
+
 (provide 'aj-custom-commands)
