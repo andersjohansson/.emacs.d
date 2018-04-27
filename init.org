@@ -441,7 +441,7 @@ Use mu4e, the extensive config is in an [[file:lisp/aj-mail-config.org][external
 	:defer t
 	:init
 	(setq mu4e-get-mail-command "mbsync -qqa"
-		  mu4e-update-interval 1800
+		  ;; mu4e-update-interval 1800
 		  mu4e-view-show-images t
 		  mu4e-use-fancy-chars t
 		  mu4e-attachment-dir "~/Hämtningar"
