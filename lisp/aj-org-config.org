@@ -1186,8 +1186,10 @@ From https://github.com/girzel/org-annotate
       (when (string-match "^inline:\\(.+\\)" path)
         (setq inl "[inline,notodonotesbw,nomargin]")
         (setq path (match-string 1 path)))
+      (setq path (org-export-data-with-backend path 'latex nil))
       (if desc
-          (format "\\fxnote*%s{%s}{%s}" inl path desc)
+          (format "\\fxnote*%s{%s}{%s}" inl
+                  path (org-export-data-with-backend desc 'latex nil))
         (format "\\fxnote%s{%s}" inl path))))
   (setq org-annotate-latex-export-function
         #'aj/org-annotate-export-latex-fixme-and-inline)
@@ -1195,6 +1197,8 @@ From https://github.com/girzel/org-annotate
   (defun aj/org-annotate-export-odt-annotation-or-inline (path desc)
     "Let notes prefixed with \"inline:\" just be set in italics.
     Otherwise export as odt annotation"
+    (setq path (org-export-data-with-backend path 'odt nil)
+          desc (org-export-data-with-backend desc 'odt nil))
     (if (string-match "^inline:\\(.+\\)" path)
         (format "<text:span text:style-name=\"Emphasis\">%s</text:span> %s" (match-string 1 path) (or desc "<text:line-break/>"))
       (format (if desc
