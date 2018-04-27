@@ -1698,6 +1698,12 @@ should be relativized or not. Returns the possibly relativized filename"
                                      (2 'bold prepend t)
                                      (3 'helm-buffer-process prepend))))
 #+END_SRC
+
+*** ODT-export
+**** ODT has no problem including a pdf file, let it do that
+#+BEGIN_SRC emacs-lisp
+(setq org-odt-inline-image-rules '(("file" . "\\.\\(jpeg\\|jpg\\|png\\|gif\\|svg\\|pdf\\)\\'")))
+#+END_SRC
 *** LaTeX-export
 **** Latex drawers
 #+BEGIN_SRC emacs-lisp
