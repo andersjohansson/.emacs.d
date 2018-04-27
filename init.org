@@ -1739,7 +1739,10 @@ overriding it, but you should know before you do.
   (magit-auto-revert-mode -1) ;; I use global-auto-revert
   (setq magit-diff-refine-hunk t)
   (add-hook 'git-commit-setup-hook #'git-commit-turn-on-flyspell)
-  (add-hook 'git-commit-setup-hook (lambda () (setq fill-column 70))))
+  (add-hook 'git-commit-setup-hook
+            (lambda () (setq fill-column 70)
+              (ispell-change-dictionary "en_GB,sv_SE"))
+            t))
 #+end_src
 
 ** visible-bookmarks (bm)
