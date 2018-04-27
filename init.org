@@ -210,7 +210,7 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 #+begin_src emacs-lisp
 (require 'package)
 (setq package-enable-at-startup nil)
-;; (add-to-list 'package-archives '("melpa-stable" . "http://stable.melpa.org/packages/") t)
+(add-to-list 'package-archives '("melpa-stable" . "https://stable.melpa.org/packages/") t)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
 (add-to-list 'package-archives '("org" . "https://orgmode.org/elpa/") t)
 (package-initialize) ;; early, so the right org gets loaded
@@ -1731,9 +1731,13 @@ overriding it, but you should know before you do.
 #+begin_src emacs-lisp
 (use-package magit
   :ensure t
+  :pin melpa-stable
   :bind ("C-x g" . magit-status)
-  :config (add-hook 'git-commit-mode-hook (lambda () (setq fill-column 70)))
-  (setq magit-diff-refine-hunk t))
+  :config
+  (magit-auto-revert-mode -1) ;; I use global-auto-revert
+  (setq magit-diff-refine-hunk t)
+  (add-hook 'git-commit-setup-hook #'git-commit-turn-on-flyspell)
+  (add-hook 'git-commit-setup-hook (lambda () (setq fill-column 70))))
 #+end_src
 
 ** visible-bookmarks (bm)
