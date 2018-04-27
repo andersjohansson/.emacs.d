@@ -335,50 +335,39 @@ From: http://kitchingroup.cheme.cmu.edu/blog/2014/09/13/Make-some-org-sections-r
 
 (add-hook 'org-mode-hook 'aj/org-mark-readonly)
 #+END_SRC
-** Navigation
-*** helm-org-rifle
-Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entries.
-#+BEGIN_SRC emacs-lisp
-(use-package helm-org-rifle
-  :ensure t
-  :commands helm-org-rifle helm-org-rifle-current-buffer
-  :init (bind-keys :map org-mode-map
-                   :prefix "<f2>"
-                   :prefix-map org-f2-prefix
-                   ("b" . helm-org-rifle-current-buffer)
-                   ("r" . helm-org-rifle))
-  (setq helm-org-rifle-show-path t
-        helm-org-rifle-show-tags t))
-#+END_SRC
+** Navigation etc. (helm-org)
 *** helm-org
 #+BEGIN_SRC emacs-lisp
 (use-package helm-org
-  :init (setq helm-org-headings-fontify t
-              helm-org-format-outline-path t)
-  (bind-key "<f2> <f2>" 'helm-org-in-buffer-headings org-mode-map)
+  :init (setq helm-org-format-outline-path t)
+  (bind-key "<f2>" 'helm-org-in-buffer-headings org-mode-map)
   :config
+  (bind-key "C-c C-x b" 'helm-org-run-open-heading-in-indirect-buffer helm-org-headings-map)
+
   (advice-add 'helm-org-insert-link-to-heading-at-marker :override
               #'aj/helm-org-insert-link-to-heading-at-marker)
 
   (defun aj/helm-org-insert-link-to-heading-at-marker (marker)
     "Alternative to `helm-org-insert-link-to-heading-at-marker'
 Uses CUSTOM_ID or `org-store-link' for linking."
-    (with-current-buffer (marker-buffer marker)
-      (save-excursion
-        (goto-char (marker-position marker))
-        (let* ((heading-id (org-entry-get nil "CUSTOM_ID"))
-               (file-name (buffer-file-name)) 
-               (link (if heading-id
-                         (org-make-link-string
-                          (if (string= (with-helm-current-buffer
-                                         (buffer-file-name))
-                                       file-name)
-                              (concat "#" heading-id)
-                            (concat "file:" (abbreviate-file-name
-                                             file-name) "::#" custom-id)))
-                       (org-store-link nil))))
-          (with-helm-current-buffer
-            (insert link))))))
+    (let (link)
+      (with-current-buffer (marker-buffer marker)
+        (save-excursion
+          (goto-char (marker-position marker))
+          (let ((heading-id (org-entry-get nil "CUSTOM_ID"))
+                (file-name (buffer-file-name)))
+            (setq link
+                  (if heading-id
+                      (org-make-link-string
+                       (if (string= (with-helm-current-buffer
+                                      (buffer-file-name))
+                                    file-name)
+                           (concat "#" heading-id)
+                         (concat "file:" (abbreviate-file-name
+                                          file-name) "::#" custom-id)))
+                    (org-store-link nil)))))
+        (with-helm-current-buffer
+          (insert link)))))
 
   (advice-add 'helm-org--open-heading-in-indirect-buffer :override
               #'aj/helm-org--open-heading-in-indirect-buffer)
@@ -386,6 +375,99 @@ Uses CUSTOM_ID or `org-store-link' for linking."
   (defun aj/helm-org--open-heading-in-indirect-buffer (marker)
     (save-excursion (helm-org-goto-marker marker)
                     (aj/org-tree-to-indirect-buffer))))
+#+END_SRC
+
+*** helm-org-rifle
+Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entries.
+#+BEGIN_SRC emacs-lisp
+(use-package helm-org-rifle
+  :ensure t
+  :commands helm-org-rifle helm-org-rifle-current-buffer
+  :init (bind-keys :map org-mode-map
+                   ("C-<f2>" . helm-org-rifle-current-buffer)
+                   ("S-<f2>" . helm-org-rifle))
+  (setq helm-org-rifle-show-path t
+        helm-org-rifle-show-tags t))
+#+END_SRC
+*** helm-org + helm-org-rifle: Make display of headings focus on first and last
+#+BEGIN_SRC emacs-lisp
+(defun aj/override-org-format-outline-path (fn &rest rest)
+  (cl-letf (((symbol-function 'org-format-outline-path)
+             #'aj/org-format-outline-path))
+    (apply fn rest)))
+
+(advice-add 'helm-org--get-candidates-in-file
+            :around
+            #'aj/override-org-format-outline-path)
+(advice-add 'helm-org-rifle--get-candidates-in-buffer
+            :around
+            #'aj/override-org-format-outline-path)
+
+
+;; This function has kind of involved and not very smart logic really.
+;; It gives a reasonable result though
+(defun aj/org-format-outline-path (path &optional width prefix separator)
+  (let* ((width (or width (window-width (helm-window)) 70))
+         (width (round (* width 1.25))) ;; var-width font gives more room
+         (path (delq nil path))
+         (separator (or separator "/"))
+         (org-odd-levels-only nil)
+         (fontified
+          (cl-loop for head in path
+                   for n from 0
+                   collect
+                   (replace-regexp-in-string
+                    "[ \t]+\\'"
+                    ""
+                    (org-add-props
+                        head nil 'face
+                        (nth (% n org-n-level-faces) org-level-faces)))))
+         (first (car fontified))
+         (last (when (< 1 (length fontified))
+                 (car (last fontified))))
+         (fwidth (length first))
+         (lwidth (length last))
+         (middle
+          (when (< 2 (length fontified))
+            (mapconcat #'identity (cl-subseq fontified 1 -1) separator)))
+         (rwidth (- width (length prefix) (* 2 (length separator) 2))) ; possible width for only first+last
+         (diff (- rwidth fwidth lwidth))
+         fpath)
+    (if (< diff 0)
+        (if (or (null last)
+                (< (* 2 rwidth) (+ fwidth lwidth)))
+            (setq fpath (car (last fontified))) ;; just use last
+          (cond
+           ((< lwidth (* .25 rwidth))
+            (setq first (substring first 0 diff)))
+           ((< fwidth (* .25 rwidth))
+            (setq last (substring last 0 diff)))
+           (t
+            (let ((lastrem (max (floor (/ (- lwidth) 2)) (floor (* 0.3 diff)))))
+              (setq last (substring last 0 lastrem))
+              (setq first (substring first 0 (- diff lastrem))))))
+          (setq fpath (concat
+                       prefix (and prefix separator)
+                       first separator ".." separator last)))
+      (if (< 2 (length fontified))
+          (let* ((remains (- width fwidth lwidth
+                             (* 2 (length separator)) (length prefix) 4)))
+            (when (> (length middle) remains)
+              (setq middle (concat (substring middle 0 remains) "..")))
+            (setq fpath (concat
+                         prefix (and prefix path separator)
+                         first separator middle separator last)))
+        (setq fpath (concat
+                     prefix (and prefix path separator)
+                     first (and last separator) last))))
+    fpath))
+
+;; (defun aj/test-op ()
+;;   (interactive)
+;;   (message
+;;    (aj/org-format-outline-path (org-get-outline-path t t))))
+
+
 #+END_SRC
 ** Redefine ~org-paste-special~  to choose from kill-ring (with helm)
 If we have inadvertantly killed something between the special kill and yank we intended, we are then given an opportunity to easily choose the right thing to yank.
