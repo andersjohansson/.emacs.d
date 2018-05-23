@@ -2567,21 +2567,21 @@ The last parts are some half-successful attempts to solve this for ox-reveal exp
   :type '(repeat string)
   :safe (lambda (x) (cl-every #'stringp x)))
 
-(defcustom aj/org-ignoreheadinglocal-tags '("ignoreheadinglocal")
-  "Tags for which the heading should be removed after output,
-but content kept in org export."
-  :group 'aj
-  :type '(repeat string)
-  :safe (lambda (x) (cl-every #'stringp x)))
+;; (defcustom aj/org-ignoreheadinglocal-tags '("ignoreheadinglocal")
+;;   "Tags for which the heading should be removed after output,
+;; but content kept in org export."
+;;   :group 'aj
+;;   :type '(repeat string)
+;;   :safe (lambda (x) (cl-every #'stringp x)))
 
 (defun aj/org-export-ignore-headlines (data backend info)
   (cond
    ((eq backend 'beamer) ; do nothing (maybe should?)
     data)
-   ((eq backend 'reveal)
-    (aj/org-mark-headline-to-be-removed
-     (aj/org-data-remove-headline data backend info)
-     backend info))
+   ;; ((eq backend 'reveal)
+   ;;  (aj/org-mark-headline-to-be-removed
+   ;;   (aj/org-data-remove-headline data backend info)
+   ;;   backend info))
    (t
     (aj/org-data-remove-headline data backend info))))
 
@@ -2592,7 +2592,8 @@ contents and promoting any children headlines to the level of the
 parent."
   (org-element-map data 'headline
     (lambda (object)
-      (when (cl-intersection aj/org-ignoreheading-tags
+      (when (cl-intersection aj/org-ignoreheading-tags ;; this is the
+                             ;; difference to the version from ox-extra
                              (org-element-property :tags object))
         (let ((level-top (org-element-property :level object))
               level-diff)
@@ -2617,24 +2618,24 @@ parent."
 
 (autoload 'org-extra--merge-sections "ox-extra")
 
-(defun aj/org-mark-headline-to-be-removed (data backend info)
-  "Mark headline to be removed in post-processing"
-  (org-element-map data 'headline
-    (lambda (hl)
-      (when (cl-intersection aj/org-ignoreheadinglocal-tags 
-                          (org-element-property :tags hl))
-        (org-element-put-property
-         hl :title '(("!!!IGNOREHEADING!!!")))))
-    info nil)
-  data)
+;; (defun aj/org-mark-headline-to-be-removed (data backend info)
+;;   "Mark headline to be removed in post-processing"
+;;   (org-element-map data 'headline
+;;     (lambda (hl)
+;;       (when (cl-intersection aj/org-ignoreheadinglocal-tags
+;;                           (org-element-property :tags hl))
+;;         (org-element-put-property
+;;          hl :title '(("!!!IGNOREHEADING!!!")))))
+;;     info nil)
+;;   data)
 
-(defun aj/org-remove-marked-ignoreheadings (string backend info)
-  (replace-regexp-in-string "<h2.*!!!IGNOREHEADING!!!.*h2>" ""
-                            string)
-  ;; string
-  )
+;; (defun aj/org-remove-marked-ignoreheadings (string backend info)
+;;   (replace-regexp-in-string "<h2.*!!!IGNOREHEADING!!!.*h2>" ""
+;;                             string)
+;;   ;; string
+;;   )
 
-(add-to-list 'org-export-filter-final-output-functions #'aj/org-remove-marked-ignoreheadings)
+;; (add-to-list 'org-export-filter-final-output-functions #'aj/org-remove-marked-ignoreheadings)
 
 
 (add-hook 'org-export-filter-parse-tree-functions #'aj/org-export-ignore-headlines)
