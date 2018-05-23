@@ -2694,7 +2694,7 @@ Adapted from code posted by John Kitchin at: https://emacs.stackexchange.com/a/3
 (use-package org-outline-numbering
   :load-path "~/kodat/elisp/org-outline-numbering"
   :init (setq org-outline-numbering-ignored-tags
-              '("noexport" "ARCHIVE" "ignoreheading" "ignoreheadinglocal")))
+              '("ignoreheading" "ignoreheadinglocal")))
 #+END_SRC
 
 ** Open org links with alternate programs :ARCHIVE:
