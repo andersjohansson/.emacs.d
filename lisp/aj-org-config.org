@@ -206,6 +206,18 @@ _h_tml    ^ ^         ^ ^
         ("AVFÖRD" . org-done)
         ("DONE" . org-done)))
 
+(defvar aj/org-prettify-symbols '(("TODO" . ?❢)
+                                  ("DONE" . ?✔)
+                                  ("STARTAD" . ?🔁)
+                                  ("VÄNTAR" . ?⌛)
+                                  ("AVFÖRD" . ?✘)))
+
+(defun aj/org-enable-prettify ()
+  (setq prettify-symbols-alist aj/org-prettify-symbols)
+  (prettify-symbols-mode))
+
+(add-hook 'org-mode-hook #'aj/org-enable-prettify)
+
 #+END_SRC
 **** Todo tree
 I often find it useful to copy in a tree from somewhere (for instance reviewer comments on a scientific paper) and make every heading a TODO. This makes it easy!
