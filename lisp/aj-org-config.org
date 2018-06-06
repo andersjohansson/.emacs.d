@@ -874,18 +874,22 @@ Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entrie
          (diff (- rwidth fwidth lwidth))
          fpath)
     (if (< diff 0)
-        (if (or (null last)
-                (< (* 2 rwidth) (+ fwidth lwidth)))
-            (setq fpath (car (last fontified))) ;; just use last
+        (if (null last)
+            (setq fpath (car (last fontified)))
           (cond
+           ((< (* 1.5 rwidth) (+ fwidth lwidth))
+            (setq last (substring last 0 (floor (min (length last) (* .6 rwidth)))))
+            (setq first (substring first 0 (floor (min (length first) (* .3 rwidth))))))
            ((< lwidth (* .25 rwidth))
             (setq first (substring first 0 diff)))
            ((< fwidth (* .25 rwidth))
             (setq last (substring last 0 diff)))
            (t
-            (let ((lastrem (max (floor (/ (- lwidth) 2)) (floor (* 0.3 diff)))))
+            (let* ((lastrem (max (floor (/ (- lwidth) 2)) (floor (* 0.3 diff))))
+                   (firstrem (- diff lastrem)))
               (setq last (substring last 0 lastrem))
-              (setq first (substring first 0 (- diff lastrem))))))
+              (unless (eq 0 firstrem) ; 0 means don’t remove!
+                (setq first (substring first 0 firstrem))))))
           (setq fpath (concat
                        prefix (and prefix separator)
                        first separator ".." separator last)))
@@ -905,7 +909,10 @@ Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entrie
 ;; (defun aj/test-op ()
 ;;   (interactive)
 ;;   (message
-;;    (aj/org-format-outline-path (org-get-outline-path t t))))
+;;    (aj/org-format-outline-path
+;;     (org-get-outline-path t t)
+;;     (window-width)
+;;     nil "/")))
 
 
 #+END_SRC
