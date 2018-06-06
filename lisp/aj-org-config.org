@@ -1329,15 +1329,15 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
   :load-path "~/kodat/elisp/zotxt-extra"
   :after zotxt)
 
+(defvar-local zotxt-helm-citation-files nil)
+(put 'zotxt-helm-citation-files 'safe-local-variable
+     #'orgqda--string-or-list-of-strings-p)
 (use-package zotxt-helm
   :after zotxt
   :config
   ;; this could be added to zotxt-helm, but it’s depending so much on
   ;; orgqda and I don’t want to require or copy that to zotxt-helm
   (require 'orgqda)
-  (defvar-local zotxt-helm-citation-files nil)
-  (put 'zotxt-helm-citation-files 'safe-local-variable
-       #'orgqda--string-or-list-of-strings-p)
 
   (defun zotxt-helm-get-current-refs ()
     (let* ((orgqda-tag-files zotxt-helm-citation-files)
