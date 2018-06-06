@@ -1194,11 +1194,9 @@ Can be passed any ox BACKEND in a non-interactive call"
   (interactive "P")
   (let* ((backend (cond
                    ((and backend (symbolp backend)) backend)
-                   (backend 'thinascii)
-                   (t 'html)))
+                   (backend 'html)
+                   (t 'thinascii)))
          (epl (org-export--get-inbuffer-options backend)))
-    ;; (when (eq backend 'ascii)
-    ;;   (setq epl (append '(:ascii-charset utf-8) epl)))
     (kill-new (org-export-string-as
                (buffer-substring (region-beginning) (region-end))
                backend t epl))))
