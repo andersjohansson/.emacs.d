@@ -2177,6 +2177,47 @@ hacks working for async)"
                  ("\\paragraph{%s}" . "\\paragraph*{%s}"))))
 #+END_SRC
 
+***** Glossaries for thesis
+#+BEGIN_SRC emacs-lisp
+(org-link-set-parameters "gls"
+                         :follow #'ignore
+                         :export #'aj/org-gls-export
+                         :complete #'aj/org-gls-complete
+                         :face 'bold)
+
+(defun aj/org-gls-export (ref _desc backend)
+  (if (org-export-derived-backend-p backend 'latex)
+      (format
+       (if (aj/org-gls-find ref)
+           "\\gls{%s}" ;; found in unwidened
+         "\\emph{%s}")
+       ref)
+    ref))
+
+(defun aj/org-gls-complete (&optional _arg)
+  (concat "gls:" (helm-comp-read "Glossary terms " (aj/org-gls-find nil t))))
+
+;;just assume we should use glossaryterms.tex if it exists in default dir.
+(defun aj/org-gls-find (&optional ref wide)
+  (with-current-buffer (or (and (file-readable-p "glossaryterms.tex")
+                                (find-file-noselect "glossaryterms.tex" t))
+                           (current-buffer))
+    (save-restriction
+      (when wide (widen))
+      (save-excursion
+        (save-match-data
+          (goto-char (point-min))
+          (if ref
+              (search-forward-regexp
+               (format "\\(newabbreviation\\|newglossaryentry\\|newacronym\\)\\(?:\[^]]+\]\\)?{%s}" ref) nil t)
+            (cl-loop
+             while (search-forward-regexp
+                    "\\(newabbreviation\\|newglossaryentry\\|newacronym\\)\\(?:\[^]]+\]\\)?{\\([^}]+\\)}"
+                    nil t)
+             collect (match-string 2))))))))
+
+
+#+END_SRC
 ***** Paper ref for thesis
 #+BEGIN_SRC emacs-lisp
 (org-link-set-parameters "paper"
