@@ -2076,7 +2076,7 @@ The detection of in-word apostrophes etc. often fails. Always using ~´~ to mean
 #+end_src
 
 **** Exporting through AUCTeX
-AUCTeX it has better error messages and better async running of file. I have also used this for putting together files through latex includes and the concept of AUCTeX master files (then you can easily just process a sub-file, or a region, like with org subtree-export).
+It has better error messages and better async running of file. I have also used this for putting together files through latex includes and the concept of AUCTeX master files (then you can easily just process a sub-file, or a region, like with org subtree-export).
 #+BEGIN_SRC emacs-lisp
 (with-eval-after-load 'ox-latex
   (org-export-define-derived-backend 'auctex 'latex
@@ -2090,7 +2090,7 @@ AUCTeX it has better error messages and better async running of file. I have als
 (defun aj/org-export-tex-auctex (_async subtreep visible-only _body-only)
   "Export to pdf with auctex. Ignores async since running tex is
 usually what takes time and that is called async through
-auctex (and there are so many hacks needed for to get my other
+auctex (and there are so many hacks needed to get my other
 hacks working for async)"
   (interactive)
   (org-export-to-file 'latex (org-export-output-file-name ".tex" subtreep)
@@ -2104,7 +2104,6 @@ hacks working for async)"
   (setq aj/org-export-tex-auctex-curr-file file) ; stupid
   (setq TeX-master file)
   (TeX-command-sequence '("latexmk" "View") t #'aj/org-export-tex-auctex-curr-file)
-  ;; (TeX-command "latexmk" #'aj/org-export-tex-auctex-curr-file -1)
   file)
 
 (defun aj/org-export-tex-auctex-curr-file (&optional  _ext _nondir)
@@ -2125,8 +2124,8 @@ hacks working for async)"
 (autoload #'TeX-region-create "tex-buf")
 (autoload #'TeX-region-file "tex-buf")
 (defun aj/org-export-tex-auctex-run-tex-region (file)
-  (require 'tex)
-  (require 'latex)
+  ;; (require 'tex)
+  ;; (require 'latex)
   ;;TeX-master should be available as local variable in this temp org
   ;;buffer (but not neccessarily if we missed to export the local
   ;;variables section for some reason (subtree, narrowing, etc))
@@ -2144,21 +2143,6 @@ hacks working for async)"
                            (TeX-current-offset begin)))
       (TeX-command "latexmk" #'TeX-region-file -1)))
   file)
-
-;;TODO ox-synctex has to work first!
-;; (defun aj/org-TeX-run-latexmk (name command file)
-;;   (interactive)
-;;   (let ((TeX-save-query nil)
-;;         (TeX-process-asynchronous nil))
-;;     (TeX-save-document "")
-;;     (TeX-run-TeX name command file)
-;;     (if (plist-get TeX-error-report-switches (intern file))
-;;         (TeX-next-error)
-;;       (progn
-;;         (demolish-tex-help)
-;;         (ox-synctex--patch-synctex file)
-;;         (with-current-buffer TeX-command-buffer (TeX-view))
-;;         (minibuffer-message "latexmk: Done")))))
 
 #+END_SRC
 
