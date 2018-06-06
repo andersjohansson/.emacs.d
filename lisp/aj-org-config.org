@@ -3,6 +3,11 @@
 #+PROPERTY: header-args :tangle yes :comments no :no-expand t
 #+TODO: CHECK TODO | DONE
 
+* Lexical-binding
+#+BEGIN_SRC emacs-lisp
+;; -*- lexical-binding: t -*-
+#+END_SRC
+
 * Org-config
 ** Customize some variables :org_async:
 #+begin_src emacs-lisp
@@ -240,9 +245,9 @@ I often find it useful to copy in a tree from somewhere (for instance reviewer c
 If  you would like a TODO entry to automatically change to DONE when
 all children are done, you can use the following setup:
 #+begin_src emacs-lisp
-(defun aj/org-summary-todo (n-done n-not-done)
+(defun aj/org-summary-todo (_n-done n-not-done)
   "Switch entry to DONE when all subentries are done, to TODO otherwise."
-  (let (org-log-done org-log-states)   ; turn off logging
+  (let (org-log-done org-todo-log-states)   ; turn off logging
     (org-todo (if (= n-not-done 0) "DONE" "TODO"))))
 
 (add-hook 'org-after-todo-statistics-hook 'aj/org-summary-todo)
@@ -527,7 +532,7 @@ current buffer but don’t limit accepted values."
 #+BEGIN_SRC emacs-lisp
 (advice-add 'org-clock-select-task :override #'aj/helm-org-clock-select-task)
 
-(defun aj/helm-org-clock-select-task (&optional prompt)
+(defun aj/helm-org-clock-select-task (&optional _prompt)
   "Select a task that was recently associated with clocking."
   (interactive)
   (or
@@ -769,6 +774,7 @@ A local variables comment block that is placed at the end of the file may be los
 
 (advice-add 'add-file-local-variable :before #'aj/org-insert-local-variable-heading)
 #+END_SRC
+
 ** Navigation etc. (helm-org)
 *** helm-org
 #+BEGIN_SRC emacs-lisp
@@ -1198,7 +1204,7 @@ Can be passed any ox BACKEND in a non-interactive call"
                backend t epl))))
 (bind-key "M-W" #'aj/org-export-copy-region-as org-mode-map)
 
-(defun aj/second-identity (first second &rest args)
+(defun aj/second-identity (_first second &rest _args)
   second)
 
 (autoload 'org-export-define-derived-backend "ox")
@@ -1560,16 +1566,18 @@ Mostly for html and reveal
              :success #'aj/org-reveal-browse-current-url
              :error #'aj/org-reveal-try-server-start)))
 
-(cl-defun aj/org-reveal-browse-current-url (&key data &allow-other-keys)
+(cl-defun aj/org-reveal-browse-current-url (&key _data &allow-other-keys)
   (browse-url
    aj/org-reveal-current-url))
 
-(cl-defun aj/org-reveal-browse-current-file (&key data &allow-other-keys)
+(cl-defun aj/org-reveal-browse-current-file (&key _data &allow-other-keys)
   (browse-url-of-file
    aj/org-reveal-current-file))
 
-(cl-defun aj/org-reveal-try-server-start (&key data &allow-other-keys)
-  (let ((proc (start-process "revealserver" (generate-new-buffer "revealserver") "startreveal")))
+(cl-defun aj/org-reveal-try-server-start (&key _data &allow-other-keys)
+  (let ((proc
+         (start-process "revealserver"
+                        (generate-new-buffer "revealserver") "startreveal")))
     (sleep-for 3)
     ;; (set-process-filter
     ;;  proc
@@ -1664,6 +1672,7 @@ should be relativized or not. Returns the possibly relativized filename"
                        (match-end 0))
           (expand-file-name path)))))))
 #+END_SRC
+
 *** My inlinecomments , Inlinekommentarer: ❰❙❱ till kommentar :ARCHIVE:
 **** Exporting
 #+BEGIN_SRC emacs-lisp
@@ -1996,7 +2005,7 @@ Used it to write this paper: http://dx.doi.org/10.1119/perc.2016.pr.040
                (cons "en-us" (cdr (assoc "en" aj/org-export-smart-quotes-alist-csquotes))))
 
 
-  (defun aj/org-export-smart-quotes-install-hook (backend)
+  (defun aj/org-export-smart-quotes-install-hook (_backend)
     (if aj/org-export-smart-quotes-use-csquotes
         (setq org-export-smart-quotes-alist
               aj/org-export-smart-quotes-alist-csquotes)
@@ -2098,10 +2107,11 @@ hacks working for async)"
   ;; (TeX-command "latexmk" #'aj/org-export-tex-auctex-curr-file -1)
   file)
 
-(defun aj/org-export-tex-auctex-curr-file (&optional  _ext nondir)
+(defun aj/org-export-tex-auctex-curr-file (&optional  _ext _nondir)
   (TeX-strip-extension aj/org-export-tex-auctex-curr-file nil t)) 
 
-(defun aj/org-export-tex-auctex-subfile (async subtreep visible-only body-only)
+;; Older stuff, not sure if this works:
+(defun aj/org-export-tex-auctex-subfile (async subtreep visible-only _body-only)
   (interactive)
   (let ((outfile (org-export-output-file-name ".tex" subtreep))
         ;;use with cl-letf
@@ -2247,7 +2257,7 @@ Add as a filter in `org-export-filter-plain-list-functions'"
 #+END_SRC
 ***** Convert ref to autoref (from hyperref)
 #+BEGIN_SRC emacs-lisp
-(defun aj/org-latex-ref-to-autoref (string backend info)
+(defun aj/org-latex-ref-to-autoref (string backend _info)
   (if (org-export-derived-backend-p backend 'latex)
       (replace-regexp-in-string "\\\\ref{" "\\autoref{" string t t)
     string))
@@ -2340,7 +2350,7 @@ Add as a filter in `org-export-filter-plain-list-functions'"
 ***** Compatibility with ox-reveal
 I’m trying out ox-reveal, but they have different ways of adding notes (subtrees vs special blocks). This makes sure a file prepared for reveal can also work with beamer
 #+BEGIN_SRC emacs-lisp
-(defun aj/org-export-reveal-note-to-beamer-note (string backend info)
+(defun aj/org-export-reveal-note-to-beamer-note (string backend _info)
   (when (eq backend 'beamer)
     (replace-regexp-in-string
      "\\\\begin{NOTES}\\(\\(?:.\\|\n\\)+\\)\\\\end{NOTES}"
@@ -2389,7 +2399,7 @@ I’m trying out ox-reveal, but they have different ways of adding notes (subtre
 
 *** Export without headlines (list-outline)
 #+begin_src emacs-lisp
-(defun aj/org-export-opt-no-hl (opt backend)
+(defun aj/org-export-opt-no-hl (opt _backend)
   (plist-put opt :headline-levels 0))
 
 (defun aj/org-export-no-sections (prefix)
