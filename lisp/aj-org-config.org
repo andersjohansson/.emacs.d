@@ -1227,16 +1227,32 @@ From https://github.com/girzel/org-annotate
              ("C-c C-Ä" . org-annotate-delete-note)
              ("C-c C-x C-ä" . org-annotate-display-notes))
 
+  (defun aj/org-annotate-extract-author (note)
+    (if (string-match "{\\([^}]+\\)}" note)
+        (list (match-string 1 note)
+              (replace-match "" t t note))
+      (list nil note)))
+
   (defun aj/org-annotate-export-latex-fixme-and-inline (path desc)
-    (let ((inl ""))
+    (let ((lb "")
+          (par "")
+          (optstring "")
+          opt)
       (when (string-match "^inline:\\(.+\\)" path)
-        (setq inl "[inline,notodonotesbw,nomargin]")
+        (setq opt '("inline" "notodonotesbw" "nomargin"))
+        (setq lb "\\\\")
+        (setq par "\\par \\noindent")
         (setq path (match-string 1 path)))
-      (setq path (org-export-data-with-backend path 'latex nil))
-      (if desc
-          (format "\\fxnote*%s{%s}{%s}" inl
-                  path (org-export-data-with-backend desc 'latex nil))
-        (format "\\fxnote%s{%s}" inl path))))
+      (cl-destructuring-bind
+          (author path) (aj/org-annotate-extract-author path)
+        (setq path (org-export-data-with-backend path 'latex nil))
+        (when author (push (concat "author=" author) opt))
+        (when opt (setq optstring (concat "[" (mapconcat #'identity opt ",") "]")))
+        (if desc
+            (format "\\fxnote*%s{%s}{%s}" optstring path
+                    (org-export-data-with-backend desc 'latex nil))
+          (format "%s\\fxnote%s{%s}%s" par optstring path lb)))))
+
   (setq org-annotate-latex-export-function
         #'aj/org-annotate-export-latex-fixme-and-inline)
 
@@ -1245,17 +1261,20 @@ From https://github.com/girzel/org-annotate
     Otherwise export as odt annotation"
     (setq path (org-export-data-with-backend path 'odt nil)
           desc (org-export-data-with-backend desc 'odt nil))
-    (if (string-match "^inline:\\(.+\\)" path)
-        (format "<text:span text:style-name=\"Emphasis\">%s</text:span> %s" (match-string 1 path) (or desc "<text:line-break/>"))
-      (format (if desc
-                  (let ((an-name (concat "__Annot_" (number-to-string (random)))))
-                    (format "<office:annotation office:name=\"%s\"><dc:creator>%%s</dc:creator><dc:date>%%s</dc:date><text:list><text:list-item><text:p>%s</text:p></text:list-item></text:list></office:annotation>%s<office:annotation-end office:name=\"%s\"/>"
-                            an-name path desc an-name))
-                (format "<office:annotation><dc:creator>%%s</dc:creator><dc:date>%%s</dc:date><text:list><text:list-item><text:p>%s</text:p></text:list-item></text:list></office:annotation>"
-                        path))
-              (user-full-name)
-              (let ((ct (current-time)))
-                (concat (format-time-string "%FT%T." ct) (number-to-string (nth 2 ct)))))))
+    (cl-destructuring-bind
+        (author path) (aj/org-annotate-extract-author path)
+      (if (string-match "^inline:\\(.+\\)" path)
+          (format "<text:span text:style-name=\"Emphasis\">%s</text:span> %s" (match-string 1 path) (or desc "<text:line-break/>"))
+        (format (if desc
+                    (let ((an-name (concat "__Annot_" (number-to-string (random)))))
+                      (format "<office:annotation office:name=\"%s\"><dc:creator>%%s</dc:creator><dc:date>%%s</dc:date><text:list><text:list-item><text:p>%s</text:p></text:list-item></text:list></office:annotation>%s<office:annotation-end office:name=\"%s\"/>"
+                              an-name path desc an-name))
+                  (format "<office:annotation><dc:creator>%%s</dc:creator><dc:date>%%s</dc:date><text:list><text:list-item><text:p>%s</text:p></text:list-item></text:list></office:annotation>"
+                          path))
+                (or author (user-full-name))
+                (let ((ct (current-time)))
+                  (concat (format-time-string "%FT%T." ct) (number-to-string (nth 2 ct))))))))
+
 
   (setq org-annotate-odt-export-function
         #'aj/org-annotate-export-odt-annotation-or-inline)
