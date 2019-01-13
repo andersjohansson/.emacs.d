@@ -20,29 +20,50 @@ Passwords are stored with ~pass~
 
 ** My custom tags
 #+BEGIN_SRC emacs-lisp
-(with-eval-after-load "solarized"
-  (defvar aj/mail-tags
-    (solarized-with-color-variables 'light
-      `(("studentkontakt" ,green "S" ("/uu/Archive/Kurser"))
-        ("fyslistor" ,blue "F")
-        ("genlistor" ,violet "G" "/uu/Archive/CFG")
-        ("uulistor" ,magenta "U")
-        ("kvklistor" ,cyan "K")
-        ("genus"  ,yellow "G")
-        ("trist" ,base1 "≈")
-        ;;("skickat" s-base1)
-        ;; ("studentkontakt" ,green "🅢" ("/uu/Archive/Kurser"))
-        ;; ("fyslistor" ,blue "🅕")
-        ;; ("genlistor" ,violet "🅖" "/uu/Archive/CFG")
-        ;; ("uulistor" ,magenta "🅤")
-        ;; ("kvklistor" ,cyan "🅚")
-        ;; ("genus"  ,yellow "🅖")
-        ;; ("trist" ,base1 "😞")
-        ))
-    "Tags I use for emails. Each element is a list with the name
+(defvar aj/mail-tags
+  ;; (gruvbox-bright_red      "#9d0006" "#870000")
+  ;; (gruvbox-bright_green    "#79740e" "#878700")
+  ;; (gruvbox-bright_yellow   "#b57614" "#af8700")
+  ;; (gruvbox-bright_blue     "#076678" "#005f87")
+  ;; (gruvbox-bright_purple   "#8f3f71" "#875f87")
+  ;; (gruvbox-bright_aqua     "#427b58" "#5f8787")
+
+  '(("studentkontakt" "#79740e" "S" ("/uu/Archive/Kurser"))
+    ("fyslistor" "#076678" "F")
+    ("genlistor" "#8f3f71" "G" "/uu/Archive/CFG")
+    ("uulistor" "#9d0006" "U")
+    ("kvklistor" "#427b58" "K")
+    ("genus"  "#b57614" "G")
+    ("trist" "#665c54" "≈")
+    )
+  "Tags I use for emails. Each element is a list with the name
 of the tag, the color, the symbol and (optionally) the default refile
 folder (if this is wrapped as a list it means the starting point
-for refile folder selection)"))
+for refile folder selection)")
+
+;; (with-eval-after-load "solarized"
+;;   (defvar aj/mail-tags
+;;     (solarized-with-color-variables 'light
+;;       `(("studentkontakt" ,green "S" ("/uu/Archive/Kurser"))
+;;         ("fyslistor" ,blue "F")
+;;         ("genlistor" ,violet "G" "/uu/Archive/CFG")
+;;         ("uulistor" ,magenta "U")
+;;         ("kvklistor" ,cyan "K")
+;;         ("genus"  ,yellow "G")
+;;         ("trist" ,base1 "≈")
+;;         ;;("skickat" s-base1)
+;;         ;; ("studentkontakt" ,green "🅢" ("/uu/Archive/Kurser"))
+;;         ;; ("fyslistor" ,blue "🅕")
+;;         ;; ("genlistor" ,violet "🅖" "/uu/Archive/CFG")
+;;         ;; ("uulistor" ,magenta "🅤")
+;;         ;; ("kvklistor" ,cyan "🅚")
+;;         ;; ("genus"  ,yellow "🅖")
+;;         ;; ("trist" ,base1 "😞")
+;;         ))
+;;     "Tags I use for emails. Each element is a list with the name
+;; of the tag, the color, the symbol and (optionally) the default refile
+;; folder (if this is wrapped as a list it means the starting point
+;; for refile folder selection)"))
 #+END_SRC
 
 
@@ -92,6 +113,7 @@ for refile folder selection)"))
 #+END_SRC
 
 ** Definition of contexts -- private settings
+(shouldn’t this be a macro)
 #+BEGIN_SRC emacs-lisp
 (defun aj/construct-match-func (emailregexp)
   "Return a match function which matches :to fields of passed msg
@@ -167,9 +189,7 @@ Is it really neccesary to redefine the functions below?
   (mu4e-alert-enable-mode-line-display)
   ;; (add-hook 'after-init-hook #'mu4e-alert-enable-notifications)
   ;; (add-hook 'after-init-hook #'mu4e-alert-enable-mode-line-display)
-  (setq mu4e-alert-interesting-mail-query
-        "maildir:/uu/Inbox AND flag:unread"
-        mu4e-alert-set-window-urgency nil
+  (setq mu4e-alert-set-window-urgency nil
         mu4e-alert-email-notification-types '(subjects)
         mu4e-alert-group-by :maildir)
   :config
@@ -240,9 +260,27 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 (setq mu4e-html2text-command 'mu4e-shr2text)
 #+END_SRC
 
+** Conversation-view
+#+BEGIN_SRC emacs-lisp
+(use-package mu4e-conversation
+  :load-path "~/kodat/elisp/mu4e-conversation"
+  :init (bind-key "C-<return>" #'mu4e-conversation 'mu4e-headers-mode-map)
+  :config
+  (set-face-attribute 'mu4e-conversation-header nil :foreground
+                      nil :background nil :inherit 'magit-branch-current)
+  (set-face-attribute 'mu4e-conversation-sender-1 nil :inherit 'org-level-1)
+  (set-face-attribute 'mu4e-conversation-sender-2 nil :inherit 'org-level-2)
+  (set-face-attribute 'mu4e-conversation-sender-3 nil :inherit 'org-level-3)
+  (set-face-attribute 'mu4e-conversation-sender-4 nil :inherit 'org-level-4)
+  (set-face-attribute 'mu4e-conversation-sender-5 nil :inherit 'org-level-5)
+  (set-face-attribute 'mu4e-conversation-sender-6 nil :inherit 'org-level-6)
+  (set-face-attribute 'mu4e-conversation-sender-7 nil :inherit 'org-level-7)
+  (set-face-attribute 'mu4e-conversation-sender-8 nil :inherit 'org-level-8))
+
+#+END_SRC
 ** Command for quick check of new mails
 #+BEGIN_SRC emacs-lisp
-(defvar aj/mu4e-get-mail-command-quick "mbsync --new -qq uu-inbox gmail-inbox")
+(defvar aj/mu4e-get-mail-command-quick "mbsync --new -qq uu-inbox gmail-inbox ajf-inbox")
 
 (defun aj/mu4e-update-mail-and-index (full?)
   (interactive "P")
@@ -251,7 +289,7 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
     (let ((mu4e-get-mail-command aj/mu4e-get-mail-command-quick))
       (mu4e-update-mail-and-index t))))
 
-(bind-key "C-S-u" #'aj/mu4e-update-mail-and-index mu4e-headers-mode-map)
+(bind-key "C-c C-u" #'aj/mu4e-update-mail-and-index mu4e-headers-mode-map)
 #+END_SRC
 
 ** Composing and sending 
@@ -323,7 +361,7 @@ message from the wrong account"
 #+END_SRC
 
 *** Signature cycling
-I have long and "official" signatures defined for my accounts, but often I want to just include my name, or nothing at all. This function allows me to cycle through signature set in the context (variable ~message-context~), and a list of shorter ones.
+I have long and "official" signatures defined for my accounts, but often I want to just include my name, or nothing at all. This function allows me to cycle through the signature set in the context (variable ~message-context~), and a list of shorter ones.
 #+BEGIN_SRC emacs-lisp
 (defvar aj/message-simple-signatures '("Anders Johansson\n" ""))
 (defvar-local aj/message-sig-cycle 0)
@@ -374,6 +412,7 @@ I want to use a single binding to switch (cycle through) contexts when composing
             (unless (yes-or-no-p "Sure you want to send this?")
               (signal 'quit nil))))
 #+END_SRC
+
 *** Let flyspell only check relevant regions
 #+BEGIN_SRC emacs-lisp
 (put 'mu4e-compose-mode 'flyspell-mode-predicate #'mail-mode-flyspell-verify)
@@ -544,6 +583,8 @@ I often invoke a compose buffer in a window where I’m doing something else, an
   (setq message-citation-line-format "On %A %-e %b %Y at %R, %f wrote:\n")
   ;; choose to use the formatted string, with some language guessing
   (setq message-citation-line-function #'aj/message-insert-formatted-citation-line)
+
+  (autoload #'guess-language "guess-language")
   (defun aj/message-insert-formatted-citation-line (&rest args)
     "Guess language and maybe force date formats to Swedish, else English"
     (let* ((sv (eq 'sv (guess-language)))
@@ -927,14 +968,13 @@ At times, I can safely refile messages without reading them and at the same time
 #+BEGIN_SRC emacs-lisp
 (add-to-list 'mu4e-marks
              '(refile-read
-               :char ("f" . "▶")
+               :char ("f" . "⧐")
                :prompt "refile"
                :dyn-target (lambda (target msg)
-                             (aj/mu4e-refile-folder msg t))
+                             (aj/mu4e-refile-folder msg))
                :action (lambda (docid msg target)
                          (mu4e~proc-move
                           docid (mu4e~mark-check-target target) "-N+S"))))
-
 
 (mu4e~headers-defun-mark-for refile-read)
 (define-key 'mu4e-headers-mode-map "ä" 'mu4e-headers-mark-for-refile-read)
@@ -1033,36 +1073,6 @@ Some of the functions are redefined.
   (aj/mu4e-defun-toggle-tags aj/mail-tags))
 
 (add-to-list 'mu4e-view-actions '("View in external browser" . mu4e-action-view-in-browser))
-#+END_SRC
-
-** Secure mail folder :ARCHIVE:
-#+BEGIN_SRC emacs-lisp
-(defun aj/browse-shf-mails ()
-  (interactive)
-  (ajf/mount-shf)
-  (setq mu4e-maildir "~/superhemligforskning/mail/Maildir"
-        mu4e-mu-home "~/superhemligforskning/mail/index/"
-        ;; mu4e-maildir-shortcuts '(("/" . ?i))
-        ;; mu4e-sent-folder "/Sent"
-        ;; mu4e-drafts-folder "/Drafts"
-        ;; mu4e-trash-folder "/Trash"
-        ;; mu4e-refile-folder "/archive"
-        )
-    (mu4e-update-index)
-    (mu4e~start)
-    (mu4e~headers-jump-to-maildir "/")
-    ;;(mu4e~stop)
-    )
-
-;; TODO: Kolla om detta funkar
-(defun aj/quit-shf-mails ()
-  (interactive)
-  (setq mu4e-maildir "~/Maildir"
-        mu4e-mu-home nil)
-  (mu4e~start)
-  (mu4e~headers-jump-to-maildir "/"))
-
-
 #+END_SRC
 
 * Provide statement
