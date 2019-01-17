@@ -1007,16 +1007,32 @@ No automatic guess if FORCE-CHOICE is non-nil."
 
 (add-hook 'mu4e-mark-execute-pre-hook #'aj/mu4e-gmail-mark-pre-hook) 
 
+
+;; For forcing gmail-refiled messages to be removed from headers listing.
+(defvar aj/mu4e-treat-as-move nil)
+
 (defun aj/mu4e-gmail-mark-pre-hook (mark msg)
   (aj/mu4e-msg-account msg
                        :mejla (aj/mu4e-gmail-retag mark msg)
                        :ajf (aj/mu4e-gmail-retag mark msg)))
 
 (defun aj/mu4e-gmail-retag (mark msg)
-  (cond ((equal mark 'refile) (mu4e-action-retag-message msg "-\\Inbox"))
+  (cond ((equal mark 'refile)
+         (setq aj/mu4e-treat-as-move t)
+         (mu4e-action-retag-message msg "-\\Inbox"))
+        ;;this moves to trash directory as well:
         ((equal mark 'trash) (mu4e-action-retag-message msg "-\\Inbox,-\\Starred"))
         ((equal mark 'flag) (mu4e-action-retag-message msg "\\Starred"))
         ((equal mark 'unflag) (mu4e-action-retag-message msg "-\\Starred"))))
+
+(setq mu4e-update-func #'aj/mu4e-headers-update-handler)
+
+(defun aj/mu4e-headers-update-handler (msg is-move maybe-view)
+  "Wrapper around ‘mu4e~headers-update-handler’ to remove
+messages “refiled” in gmail accounts from the inbox listing."
+  (unwind-protect
+      (mu4e~headers-update-handler msg (or aj/mu4e-treat-as-move is-move) maybe-view)
+    (setq aj/mu4e-treat-as-move nil)))
 #+END_SRC
 
 
