@@ -178,7 +178,7 @@ are multiple values that look like SENTINEL, the one with the
 most _ at the end is the actual sentinel value. See
 documentation for `ido-completing-read' for details on the
 other parameters."
-  (let ((sentinel (if sentinel sentinel "*done*"))
+  (let ((sentinel (or sentinel "*done*"))
         this-choice res done-reading)
 	;; uniquify the SENTINEL value
 	(while (cl-find sentinel choices)
@@ -241,6 +241,7 @@ other parameters."
 ;;; Rensa upp tex-kataloger
 ;;;###autoload
 (defun aj/clean-tex-dirs (dirs)
+  "Clean up .tex-aux directories"
   (interactive (list (list (read-directory-name "Directory: "))))
   (save-window-excursion
     (let (to-relink to-delete buf)
@@ -275,13 +276,15 @@ other parameters."
         (kill-buffer buf)))))
 
 ;;;###autoload
-(defun aj/clean-all-tex-dirs ()
-  (interactive)
-  (aj/clean-tex-dirs
-   (cl-delete-duplicates
-    (split-string
-     (shell-command-to-string "find ~/ -name '*.tex' -printf '%h\n'")
-     "\n") :test 'string=)))
+(defun aj/clean-all-tex-dirs (root)
+  (interactive "D")
+  (let ((root (or root "~/")))
+    (aj/clean-tex-dirs
+     (cl-delete-duplicates
+      (split-string
+       (shell-command-to-string
+        (format "find %s -name '*.tex'-printf '%%h\n'" root))
+       "\n") :test 'string=))))
 
 
 ;;;###autoload
@@ -368,38 +371,36 @@ other parameters."
 ;;;###autoload
 (defun aj/texdoc ()
   (interactive)
-  (let* ((helm-boring-file-regexp-list
-          (append '("/\\.$" "/\\.\\.$")
-                  helm-boring-file-regexp-list))
-         (doc
-          (helm :sources
-                (list (helm-build-sync-source "Texdoc"
-                        :candidates #'aj/texdoc-cands
-                        :action 'identity
-                        :fuzzy-match t
-                        :candidate-transformer #'helm-skip-boring-files
-                        :filtered-candidate-transformer #'helm-highlight-files
-                        :pattern-transformer #'helm-recentf-pattern-transformer)
-                      (helm-build-dummy-source "Search and download"
-                        :action 'aj/texdoc-search-and-download))
-                :buffer "*helm-texdoc*"
-                :history 'aj/texdoc-history
-                :ff-transformer-show-only-basename t))
-         (mtime (nth 5 (file-attributes doc)))
-         (too-old (< 200 (time-to-number-of-days (time-subtract (current-time) mtime)))))
+  (let ((helm-boring-file-regexp-list
+         (append '("/\\.$" "/\\.\\.$")
+                 helm-boring-file-regexp-list)))
+    (helm :sources
+          (list (helm-build-sync-source "Texdoc"
+                  :candidates #'aj/texdoc-cands
+                  :action #'aj/texdoc-open-or-download-newer
+                  :fuzzy-match t
+                  :candidate-transformer #'helm-skip-boring-files
+                  :filtered-candidate-transformer #'helm-highlight-files
+                  :pattern-transformer #'helm-recentf-pattern-transformer)
+                (helm-build-dummy-source "Search and download"
+                  :action 'aj/texdoc-search-and-download))
+          :buffer "*helm-texdoc*"
+          :history 'aj/texdoc-history
+          :ff-transformer-show-only-basename t)))
 
-    (when too-old
-      (aj/texdoc-search-and-download (file-name-base doc)))
+(defun aj/texdoc-open-or-download-newer (doc)
+  (if (< 200 (time-to-number-of-days
+              (time-subtract (current-time)
+                             (nth 5 (file-attributes doc)))))
+      (aj/texdoc-search-and-download (file-name-base doc))
     (ergoemacs-open-in-external-app doc)))
 
 (defun aj/texdoc-search-and-download (doc)
-  (let ((fn (format "~/texdoc/%s.pdf" doc))
-        retval)
+  (let ((fn (substitute-in-file-name (format "$HOME/texdoc/%s.pdf" doc))))
     (request
      (format "http://texdoc.net/pkg/%s" doc)
      :timeout 5
      :parser 'buffer-string
-     :sync t
      :error (cl-function (lambda (&key _data &allow-other-keys)
                            (message "Failed contacting texdoc.net")))
      :success (cl-function
@@ -411,14 +412,104 @@ other parameters."
                          (setq buffer-file-coding-system 'raw-text)
                          (insert data)
                          (write-file fn))
-                       (setq retval fn))
-                   (user-error "Not found")))))
-    retval))
+                       (ergoemacs-open-in-external-app fn))
+                   (user-error "Not found")))))))
 
 (defun aj/texdoc-cands ()
   (when (file-accessible-directory-p "~/texdoc")
     (directory-files "~/texdoc" t)))
 
+
+;;; whitespace cleanup
+
+;;;###autoload
+(defun aj/delete-trailing-and-double-space-org ()
+  (interactive)
+  (when (eq major-mode 'org-mode)
+    (require 'whitespace)
+    (let ((savedpoint (point)))
+      (save-excursion
+        (save-restriction
+          (widen)
+          (goto-char (point-min))
+          (while (search-forward-regexp whitespace-trailing-regexp nil t)
+            (goto-char (match-end 1))
+            (unless (eq savedpoint (point))
+              (delete-region (match-beginning 1) (match-end 1))))
+          (goto-char (point-min))
+          (while (search-forward-regexp "[[:blank:]]\\{2,\\}" nil t)
+            (unless (or (org-in-src-block-p) (org-at-table-p)
+                        (eq (match-beginning 0) (point-at-bol)))
+              (replace-match " "))))))))
+
+
+;;; org mode-stuff
+
+;;;###autoload
+(defun aj/org-table-to-tree ()
+  "Transforms an org table to a (sub)tree.
+ Each row an entry, spaces between columns"
+  (interactive)
+  (if (org-at-table-p)
+      (let ((level (1+ (org-current-level)))
+            (table (remove 'hline (org-table-to-lisp)))
+            (beg (org-table-begin))
+            (end (org-table-end)))
+        (delete-region beg end)
+        (dolist (row table)
+          (insert
+           (make-string level (string-to-char "*"))
+           " "
+           (mapconcat 'identity row " ")
+           "\n")))
+    (message "Not at a table")))
+
+
+;;; Fix org files
+(require 'xah-replace-pairs)
+
+(defun aj/anonymize-from-table ()
+  (interactive)
+  (when (org-at-table-p)
+    (random t)
+    (let* ((col (org-table-current-column))
+           (table (org-table-to-lisp))
+           (table (if (eq (nth 1 table) 'hline)
+                      (cl-subseq table 1)
+                    table))
+           (table (cl-remove 'hline table))
+           (namelist
+            (cl-loop for el in table
+                     collect
+                     (list (regexp-quote (nth (1- col) el))
+                           (regexp-quote
+                            (substring
+                             (secure-hash 'md5 (number-to-string (random))) 0 12))))) )
+
+      (xah-replace-pairs-region (point-min) (point-max) namelist t)
+      (aj/org-replace-links-by-descs))))
+
+(require 'org)
+
+(defun aj/org-replace-links-by-descs ()
+  "Replace org links by descriptions"
+  (goto-char (point-min))
+  (while (search-forward-regexp org-bracket-link-regexp nil t)
+    (let ((remove (list (match-beginning 0) (match-end 0)))
+          (description (if (match-end 3)
+                           (match-string-no-properties 3)
+                         (match-string-no-properties 1))))
+      (apply 'delete-region remove)
+      (insert description))))
+
+(defun aj/scan-org-ids ()
+  (let ((enable-local-variables nil))
+    (org-id-update-id-locations
+     (cl-loop for r in '("~/doktorandjobb" "~/doktorandjobb-arkiv/" "~/forskarjobb/" "~/org/")
+              append
+              (f-files r (lambda (f) (equal "org" (file-name-extension f)))
+                       t)))
+    (org-id-locations-save)))
 
 
 (provide 'aj-custom-commands)
