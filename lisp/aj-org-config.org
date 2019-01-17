@@ -15,6 +15,7 @@
  org-refile-allow-creating-parent-nodes 'confirm
  org-special-ctrl-a/e t
  org-special-ctrl-k t
+ org-fontify-quote-and-verse-blocks t
  org-adapt-indentation nil
  org-yank-adjusted-subtrees t
  org-catch-invisible-edits 'show
@@ -23,10 +24,12 @@
  org-blank-before-new-entry '((heading . auto) (plain-list-item . auto))
  org-cycle-separator-lines 0
  ;; we always want noexport etc. to be offered
- org-tag-persistent-alist '(("noexport" . ?n) ("outline" . ?o) ("ignoreheading" . ?i) ("ignoreheadinglocal" . ?I) ("read_only" . ?r))
- ;; but I don't really like fast-tag-selection.
- org-use-fast-tag-selection nil
- org-src-fontify-natively t
+ org-tag-persistent-alist '(("noexport") ("outline") ("ignoreheading") ("ignoreheadinglocal") ("read_only"))
+ ;; I mostly don’t use fast-tag-selection, perhaps in special files
+ ;; with specially defined tags
+ org-use-fast-tag-selection 'auto
+ ;; then it should be really quick
+ org-fast-tag-selection-single-key t
  org-pretty-entities t
  org-pretty-entities-include-sub-superscripts nil
  org-highlight-latex-and-related '(latex script entities)
@@ -55,6 +58,181 @@
 ** Save org-files every hour
 #+BEGIN_SRC emacs-lisp
 ;; (run-at-time "00:59" 3600 'org-save-all-org-buffers)
+#+END_SRC
+** Cosmetics, display, faces
+*** Fix org indent
+Redefine ~org-indent--compute-prefixes~ for better alignment
+#+begin_src emacs-lisp
+(with-eval-after-load "org-indent"
+  (defun org-indent--compute-prefixes ()
+    "Compute prefix strings for regular text and headlines."
+    (setq org-indent--heading-line-prefixes
+	      (make-vector org-indent--deepest-level nil))
+    (setq org-indent--inlinetask-line-prefixes
+	      (make-vector org-indent--deepest-level nil))
+    (setq org-indent--text-line-prefixes
+	      (make-vector org-indent--deepest-level nil))
+    (dotimes (n org-indent--deepest-level)
+      (let ((indentation (if (<= n 1) 0
+			               (* (1- org-indent-indentation-per-level)
+			                  (1- n)))))
+        ;; Headlines line prefixes.
+        (let ((heading-prefix (make-string indentation ?*)))
+	      (aset org-indent--heading-line-prefixes
+	            n
+	            (org-add-props heading-prefix nil 'face 'org-indent))
+	      ;; Inline tasks line prefixes
+	      (aset org-indent--inlinetask-line-prefixes
+	            n
+	            (cond ((<= n 1) "")
+		              ((bound-and-true-p org-inlinetask-show-first-star)
+		               (concat org-indent-inlinetask-first-star
+			                   (substring heading-prefix 1)))
+		              (t (org-add-props heading-prefix nil 'face 'org-indent)))))
+        ;; Text line prefixes.
+        (aset org-indent--text-line-prefixes
+	          n
+	          (org-add-props
+		          (concat (make-string (+ n indentation) ?*)
+			              (and (> n 0)
+			                   (char-to-string org-indent-boundary-char)))
+		          nil 'face 'org-indent))))))
+#+end_src
+*** Use prettify-symbols
+Define a variable where symbols can be added for use later and enable prettify-symbols-mode for org
+#+BEGIN_SRC emacs-lisp
+(defvar aj/org-prettify-symbols nil)
+
+(defun aj/org-enable-prettify ()
+  (setq prettify-symbols-alist aj/org-prettify-symbols)
+  (prettify-symbols-mode))
+
+(add-hook 'org-mode-hook #'aj/org-enable-prettify)
+
+
+;; helper macro to replace with longer string
+;;from: https://emacs.stackexchange.com/a/34882
+(defmacro aj/add-visual-replacement (from to alist)
+  "Make `prettify-symbols-mode' replace string FROM with string TO. 
+Add this to ALIST that is like like ‘prettify-symbols-alist’.
+
+Each character of TO is vertically aligned using the baseline,
+such that base-left of the character is aligned with base-right
+of the preceding character.  Refer to `reference-point-alist'
+for more information."
+  `(push (cons ,from (let ((composition nil))
+                       (dolist (char (string-to-list ,to)
+                                     (nreverse (cdr composition)))
+                         (push char composition)
+                         (push '(Br . Bl) composition))))
+         ,alist))
+
+
+#+END_SRC
+*** Prettify quote-blocks
+#+begin_src emacs-lisp
+(aj/add-visual-replacement "#+BEGIN_QUOTE" "▄▁▁▁▁▁▁▁▁▁▁▁▁▁▁" aj/org-prettify-symbols)
+(aj/add-visual-replacement "#+begin_quote" "▄▁▁▁▁▁▁▁▁▁▁▁▁▁▁" aj/org-prettify-symbols)
+(aj/add-visual-replacement "#+END_QUOTE" "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▀" aj/org-prettify-symbols)
+(aj/add-visual-replacement "#+end_quote" "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▀" aj/org-prettify-symbols)
+#+end_src
+*** Prettify dashes
+#+BEGIN_SRC emacs-lisp
+(dolist (kw '(("--" . ?–)
+              ("---" . ?—)))
+  (add-to-list 'aj/org-prettify-symbols kw))
+
+#+END_SRC
+
+*** Fontify src blocks natively
+#+BEGIN_SRC emacs-lisp
+(setq org-src-fontify-natively t)
+
+;; (defun aj/org-avoid-hooks-in-fontify-block (fun lang beg end)
+;;   (let* ((lang-mode (org-src--get-lang-mode lang))
+;;          (hook (intern (concat (symbol-name lang-mode) "-hook"))))
+;;     (if (and (fboundp lang-mode)
+;;              (boundp hook))
+;;         (cl-progv (list hook) (list nil)
+;;           (funcall fun lang beg end))
+;;       (funcall fun lang beg end))))
+
+;; (advice-add 'org-src-font-lock-fontify-block :around
+;;             #'aj/org-avoid-hooks-in-fontify-block)
+#+END_SRC
+
+*** Org Bullets
+#+begin_src emacs-lisp
+(use-package org-bullets
+  :init (add-hook 'org-mode-hook #'org-bullets-mode)
+  (setq org-bullets-bullet-list
+        '("✹" "✸" "✷" "✶" "✻" "✼" "✽" "✿" "❀" "❁"
+          "❈" "❉" "❊" "❆" "▹" "▹" "▹" "▹")))
+#+end_src
+*** Face redefinitions
+#+BEGIN_SRC emacs-lisp
+(with-eval-after-load "org-faces"
+  (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch))
+#+END_SRC
+
+*** Cdlatex and pretty entities sub-super don’t work well together.
+#+begin_src emacs-lisp
+(add-hook 'cdlatex-mode-hook (lambda () (when (eq major-mode 'org-mode)
+                                     (setq-local org-pretty-entities-include-sub-superscripts nil))))
+#+end_src
+
+*** Alternating bullets for plain lists
+#+begin_src emacs-lisp
+(setq org-list-demote-modify-bullet '(("+" . "-") ("-" . "+")))
+#+end_src
+*** Tags column at 0
+I use variable-width fonts, so trying to align tags to the right is useless. But in the agenda we want them right aligned and setting it in the hook means we can adapt to the current window.
+#+BEGIN_SRC emacs-lisp
+(setq org-tags-column 0
+      org-auto-align-tags nil)
+(add-hook 'org-agenda-mode-hook '(lambda ()
+                                  (setq org-agenda-tags-column (- (window-width)))))
+#+END_SRC
+*** COMMENT Indent quote-blocks
+Trying to answer: https://emacs.stackexchange.com/questions/38570/org-mode-quote-block-indentation-highlighting
+
+This works if ~org-indent-mode~ is not used. But I use it all the time so no use for me yet.
+#+BEGIN_SRC emacs-lisp
+(add-hook 'org-font-lock-hook #'aj/org-indent-quotes)
+
+(defun aj/org-indent-quotes (limit)
+  (let ((case-fold-search t))
+    (while (search-forward-regexp "^[ \t]*#\\+begin_quote" limit t)
+      (let ((beg (1+ (match-end 0))))
+        ;; on purpose, we look further than LIMTI
+        (when (search-forward-regexp "^[ \t]*#\\+end_quote" nil t)
+          (let ((end (1- (match-beginning 0)))
+                (indent (propertize "    " 'face 'org-hide)))
+            (add-text-properties beg end (list 'line-prefix indent
+                                               'wrap-prefix indent))))))))
+
+(add-hook 'org-font-lock-hook #'aj/org-indent-quotes)
+(remove-hook 'org-font-lock-hook #'aj/org-indent-quotes)
+
+;; (let ((indent
+;;        (propertize
+;;         (concat (when org-indent-mode
+;;                   (get-text-property beg 'line-prefix))
+;;                 "    ")
+;;         'face 'org-hide))))
+
+
+
+;; (defun aj/org-indent-quotes-indent-mode (beg end _)
+;;   (when org-indent-mode
+;;     (save-excursion
+;;       (goto-char beg)
+;;       (aj/org-indent-quotes end))))
+
+;; (advice-add 'org-indent-refresh-maybe :after #'aj/org-indent-quotes-indent-mode)
+
+;; (advice-remove 'org-indent-refresh-maybe #'aj/org-indent-quotes-indent-mode)
+
 #+END_SRC
 ** Keybindings and templates
 *** Disable some disturbing keybindings
@@ -92,17 +270,42 @@ An alternative to the smartparens solution.
 (defhydra hydra-org-emphasize (:color pink)
   "
 Org emphasize: _b_old  _i_talic _u_nderline _c_ode _v_erbatim _s_trikethrough  _d_elete [_?_] _q_uit"
-  ("b" (org-emphasize 42) nil)
-  ("i" (org-emphasize 47) nil)
-  ("u" (org-emphasize 95) nil)
-  ("c" (org-emphasize 126) nil)
-  ("v" (org-emphasize 61) nil)
-  ("s" (org-emphasize 43) nil)
-  ("d" (org-emphasize 32) nil)
+  ("b" (aj/org-toggle-emphasis "*") nil)
+  ("i" (aj/org-toggle-emphasis "/") nil)
+  ("u" (aj/org-toggle-emphasis "_") nil)
+  ("c" (aj/org-toggle-emphasis "~") nil)
+  ("v" (aj/org-toggle-emphasis "=") nil)
+  ("s" (aj/org-toggle-emphasis "+") nil)
+  ("*" (aj/org-toggle-emphasis "*") nil)
+  ("/" (aj/org-toggle-emphasis "/") nil)
+  ("_" (aj/org-toggle-emphasis "_") nil)
+  ("~" (aj/org-toggle-emphasis "~") nil)
+  ("=" (aj/org-toggle-emphasis "=") nil)
+  ("+" (aj/org-toggle-emphasis "+") nil)
+  ("d" (aj/org-toggle-emphasis "") nil)
   ("?" (org-info "Emphasis and monospace") nil)
   ("q" nil nil :exit t))
 
-(bind-key "C-c u" #'hydra-org-emphasize/body org-mode-map)
+(bind-keys :map org-mode-map
+           ("C-c u" . hydra-org-emphasize/body)
+           ("C-c C-x C-f" . aj/org-toggle-emphasis))
+
+(defun aj/org-toggle-emphasis (&optional wrap)
+  (interactive)
+  (let ((startpoint (point))
+        (wrap (or wrap "/")))
+    (if (org-region-active-p)
+        (sp-wrap-with-pair wrap)
+      (if (get-text-property startpoint 'org-emphasis)
+          (let ((emph (plist-get (sp-get-enclosing-sexp) :op)))
+            (if (equal emph wrap)
+                (sp-unwrap-sexp)
+              (sp-rewrap-sexp (cons wrap wrap))))
+        (if (eolp)
+            (progn (insert wrap wrap)
+                   (backward-char))
+          (er/expand-region 1)
+          (sp-wrap-with-pair wrap))))))
 #+END_SRC
 *** Templates hydra
 #+begin_src emacs-lisp
@@ -146,6 +349,7 @@ _h_tml    ^ ^         ^ ^
   ("<" self-insert-command "ins")
   ("o" nil "quit"))
 
+(autoload 'org-tempo-complete-tag "org-tempo")
 (defun hot-expand (str &optional suffix)
   "Expand org template."
   (let (text)
@@ -154,7 +358,7 @@ _h_tml    ^ ^         ^ ^
         (setq text (buffer-substring (region-beginning) (region-end)))
         (delete-region (region-beginning) (region-end))))
     (insert str)
-    (org-try-structure-completion)
+    (org-tempo-complete-tag)
     (when suffix (insert suffix "\n"))
     (when text (insert text))))
 
@@ -164,6 +368,8 @@ _h_tml    ^ ^         ^ ^
         (hydra-org-template/body)
       (self-insert-command 1))))
 #+end_src
+
+*** Speed commands at more places?
 #+BEGIN_SRC emacs-lisp
 (defun aj/org-speed-command-here-p ()
   (and (looking-at org-outline-regexp) (looking-back "^\**" (point-at-bol))))
@@ -197,32 +403,31 @@ _h_tml    ^ ^         ^ ^
 #+END_SRC
 ** Agenda, todo, scheduling etc.
 *** Todo stuff
-**** Todo keywords
+**** Todo keywords, Todo states
 #+BEGIN_SRC emacs-lisp
 (defface aj/org-waiting '((t :inherit 'org-formula :bold t)) "Face for waiting org-state" :group 'org-faces)
 (defface aj/org-started '((t :inherit 'org-sexp-date :bold t)) "Face for started org-state" :group 'org-faces)
 
-(setq org-todo-keywords '((sequence "TODO" "DONE")
-                          (sequence "|" "AVFÖRD"))
+
+;; more visible than default (cyan) in solarized (good for the small ❢)
+(defface aj/org-todo '((t :inherit 'font-lock-warning-face :bold t)) "Face for todo org-state" :group 'org-faces)
+
+(setq org-todo-keywords '((sequence "TODO(t)" "STARTAD(s)" "VÄNTAR(v)" "DONE(d)")
+                          (sequence "|" "AVFÖRD(a)"))
       org-todo-keyword-faces
-      '(("TODO" . org-todo)
+      '(("TODO" . aj/org-todo)
         ("STARTAD" . aj/org-started)
         ("VÄNTAR" . aj/org-waiting)
         ("AVFÖRD" . org-done)
         ("DONE" . org-done)))
 
-(defvar aj/org-prettify-symbols '(("TODO" . ?❢)
-                                  ("DONE" . ?✔)
-                                  ("STARTAD" . ?🔁)
-                                  ("VÄNTAR" . ?⌛)
-                                  ("AVFÖRD" . ?✘)))
 
-(defun aj/org-enable-prettify ()
-  (setq prettify-symbols-alist aj/org-prettify-symbols)
-  (prettify-symbols-mode))
-
-(add-hook 'org-mode-hook #'aj/org-enable-prettify)
-
+(dolist (kw '(("TODO" . ?❢)
+              ("DONE" . ?✔)
+              ("STARTAD" . ?🔁)
+              ("VÄNTAR" . ?⌛)
+              ("AVFÖRD" . ?✘)))
+  (add-to-list 'aj/org-prettify-symbols kw))
 #+END_SRC
 **** Todo tree
 I often find it useful to copy in a tree from somewhere (for instance reviewer comments on a scientific paper) and make every heading a TODO. This makes it easy!
@@ -236,19 +441,34 @@ I often find it useful to copy in a tree from somewhere (for instance reviewer c
   "Add TODO if not in a TODO state and a [/]-cookie if there are children"
   (unless (org-get-todo-state)
     (org-todo "TODO"))
-  (when (save-excursion (org-goto-first-child))
-    (let ((org-special-ctrl-a/e t))
+  (when (and
+         (not (re-search-forward
+		       "\\(\\[[0-9]*%\\]\\|\\[[0-9]*/[0-9]*\\]\\)"
+		       (point-at-eol) t))
+         (save-excursion (org-goto-first-child)))
+    (let ((org-special-ctrl-a/e t)
+          (visual-line-mode nil))
       (org-end-of-line)
       (insert " [/]"))))
 #+END_SRC
 **** Hierarchical TODO automatization
-If  you would like a TODO entry to automatically change to DONE when
+If you would like a TODO entry to automatically change to DONE when
 all children are done, you can use the following setup:
 #+begin_src emacs-lisp
-(defun aj/org-summary-todo (_n-done n-not-done)
+(defun aj/org-summary-todo (n-done n-not-done)
   "Switch entry to DONE when all subentries are done, to TODO otherwise."
   (let (org-log-done org-todo-log-states)   ; turn off logging
-    (org-todo (if (= n-not-done 0) "DONE" "TODO"))))
+    (org-todo (cond
+               ((= n-not-done 0) "DONE")
+               ((and (< 0 n-done) (< 0 n-not-done)
+                     (member "STARTAD" org-not-done-keywords))
+                "STARTAD")
+               ;; I would like to put "STARTAD" if any of the children
+               ;; were in a STARTAD state as well. But that would
+               ;; require iterating through and checking each of the
+               ;; children here, kind of repeating the logic in
+               ;; ‘org-update-parent-todo-statistics’ again
+               (t "TODO")))))
 
 (add-hook 'org-after-todo-statistics-hook 'aj/org-summary-todo)
 #+end_src
@@ -260,12 +480,11 @@ all children are done, you can use the following setup:
              org-agenda-mode-map
              ;; see definition below
              ("å" . aj/org-update-gcal-redo-agenda)
-             ;; I don’t use diary anyway:           
+             ;; I don’t use diary anyway:
              ("D" . aj/org-agenda-todo-to-done)
-             ))
-
-(defun aj/org-agenda-todo-to-done () (interactive) (org-agenda-todo 'done))
-
+             ("C-z" . org-agenda-undo))
+  (defun aj/org-agenda-todo-to-done () (interactive) (org-agenda-todo 'done))
+  )
 #+END_SRC
 **** Agenda configuration variables
 #+begin_src emacs-lisp
@@ -295,7 +514,7 @@ all children are done, you can use the following setup:
       '(("n" "Agenda and all TODO's"
          ((agenda "")
           (alltodo "")))
-        ("u" alltodo "Not scheduled or categorized" 
+        ("u" "Not scheduled or categorized" alltodo ""
          ((org-agenda-skip-function
            '(and
              ;; include those in the "osorterat" (unsorted) category
@@ -307,9 +526,15 @@ all children are done, you can use the following setup:
                  ;; also if subtasks are not scheduled 
                  (aj/org-subscheduled))))
           (org-agenda-overriding-header "Osorterade eller ej schemalagda: ")))
-        ("w" todo "VÄNTAR") ; waiting tasks
-        ("j" agenda "Bara jobb" ((org-agenda-files aj/org-work-agenda-files)))))
+        ("w" "Väntande" todo "VÄNTAR") ; waiting tasks
+        ("j" "Bara jobb" agenda "" ((org-agenda-files aj/org-work-agenda-files)))
+        ("d" "TODO in this dir" todo "" ((org-agenda-files (aj/org-files-in-project-dir))))))
 
+(defun aj/org-files-in-project-dir ()
+  (directory-files-recursively
+   (or (locate-dominating-file default-directory ".git")
+       default-directory)
+   "\\.org$"))
 
 (defun aj/org-return-next-hp (&optional same-level)
   "Return position of next heading, optionally on SAME-LEVEL."
@@ -378,7 +603,7 @@ In addition, eligible trees should not include TODO entries without subtasks.
              aj/org-agenda-morningplan aj/org-agenda-days-to-utv))
 #+end_src
 **** Google calendar import
-Downloads and converts ics-files from google calendar (where I keep my appointments) to org. My script ~gcal-to-org~ (not public for now) calls the conversion script from here: http://perlstalker.vuser.org/blog/2014/06/04/importing-ical-into-org-mode/
+Downloads and converts ics-files from google calendar (where I keep my appointments) to org. My script ~gcal-to-org~ calls the conversion script from here on all my calendars: http://perlstalker.vuser.org/blog/2014/06/04/importing-ical-into-org-mode/
 #+BEGIN_SRC emacs-lisp
 (defvar aj/org-dont-update-gcal nil)
 
@@ -395,6 +620,28 @@ Downloads and converts ics-files from google calendar (where I keep my appointme
 #+end_src
 
 *** Times and clocking
+**** Enable Swedish for parsing of names of weekdays and months
+The date input prompt uses functionality from ~parse-time~. I want it to be able to guess from Swedish names for months and weekdays as well as English. This just means adding a few elements to the relevant lists (some of the names or abbreviations are identical in English and Swedish, e.g. "April").
+#+BEGIN_SRC emacs-lisp
+(with-eval-after-load "parse-time"
+  (setq parse-time-months
+        '(("jan" . 1) ("feb" . 2) ("mar" . 3) ("apr" . 4) ("may" . 5) ("jun" . 6)
+          ("jul" . 7) ("aug" . 8) ("sep" . 9) ("oct" . 10) ("nov" . 11)
+          ("dec" . 12) ("january" . 1) ("february" . 2) ("march" . 3)
+          ("april" . 4) ("june" . 6) ("july" . 7) ("august" . 8) ("september" . 9)
+          ("october" . 10) ("november" . 11) ("december" . 12) ("maj" . 5)
+          ("okt" . 10) ("januari" . 1) ("februari" . 2) ("mars" . 3) ("juni" . 6)
+          ("juli" . 7) ("augusti" . 8) ("oktober" . 10)))
+
+  (setq parse-time-weekdays
+        '(("sun" . 0) ("mon" . 1) ("tue" . 2) ("wed" . 3) ("thu" . 4) ("fri" . 5)
+          ("sat" . 6) ("sunday" . 0) ("monday" . 1) ("tuesday" . 2)
+          ("wednesday" . 3) ("thursday" . 4) ("friday" . 5) ("saturday" . 6)
+          ("sön" . 0) ("mån" . 1) ("tis" . 2) ("ons" . 3) ("tor" . 4) ("fre" . 5)
+          ("lör" . 6) ("söndag" . 0) ("måndag" . 1) ("tisdag" . 2) ("onsdag" . 3)
+          ("torsdag" . 4) ("fredag" . 5) ("lördag" . 6))))
+#+END_SRC
+
 **** Calendar view, show iso-week (we often use week numbers in Sweden)
 #+BEGIN_SRC emacs-lisp
 (copy-face font-lock-constant-face 'calendar-iso-week-face)
@@ -479,7 +726,8 @@ current buffer but don’t limit accepted values."
       org-clock-history-length 10
       org-clock-x11idle-program-name "xprintidle"
       org-clock-idle-time 10
-      org-clock-string-limit 25)
+      org-clock-string-limit 25
+      org-clock-in-switch-to-state "STARTAD")
 
 (org-clock-persistence-insinuate)
 
@@ -503,7 +751,7 @@ current buffer but don’t limit accepted values."
   :config (alert-add-rule
            :category "org-pomodoro"
            :style 'libnotify
-           :continue t)
+           :continue nil)
   (set-face-attribute 'org-pomodoro-mode-line nil :inverse-video nil :foreground 'unspecified :inherit 'mode-line-emphasis)
   (set-face-attribute 'org-pomodoro-mode-line-break nil :inverse-video nil :foreground 'unspecified :inherit 'mode-line-emphasis))
 #+end_src
@@ -513,12 +761,13 @@ current buffer but don’t limit accepted values."
 (setq org-duration-units
       `(("min" . 1)
         ("h" . 60)
-        ("d" . ,(* 60 8))
-        ("w" . ,(* 60 8 5))
+        ("d" . ,(* 60 8)) ; 8 hour work day
+        ("w" . ,(* 60 8 5)) ; 5 days a week
         ("m" . ,(* 60 8 21)) ; 21 working days per month
         ("y" . ,(round (* 60 8 21 10.5)))) ;; 10.5 such working months
       org-duration-format
       '(("m") ("w") ("d") ("h") (special . h:mm)))
+(org-duration-set-regexps)
 
 ;; pre 9.1-values:
 ;; org-time-clocksum-use-effort-durations t
@@ -578,10 +827,11 @@ current buffer but don’t limit accepted values."
 
 (autoload 'helm-org-get-candidates "helm-org")
 (defun aj/helm-org-clock-agenda-headings ()
-  (helm-build-sync-source "Org agenda headings"
-    :candidates (helm-org-get-candidates (org-agenda-files))))
+  (let ((aj/helm-org-candidates-todo-only t))
+    (helm-build-sync-source "Org agenda headings"
+      :candidates (helm-org-get-candidates (org-agenda-files)))))
 #+END_SRC
-**** Agenda navigation och clocking :ARCHIVE:
+**** Agenda navigation and clocking :ARCHIVE:
 From:
 https://lists.gnu.org/archive/html/emacs-orgmode/2015-04/msg00052.html
 #+BEGIN_SRC emacs-lisp
@@ -678,39 +928,7 @@ From: http://kitchingroup.cheme.cmu.edu/blog/2014/09/13/Make-some-org-sections-r
 
 (add-hook 'org-mode-hook 'aj/org-mark-readonly)
 #+END_SRC
-*** Display and faces
-**** Org Bullets
-#+begin_src emacs-lisp
-(use-package org-bullets
-  :init (add-hook 'org-mode-hook #'org-bullets-mode)
-  (setq org-bullets-bullet-list
-        '("✹" "✸" "✷" "✶" "✻" "✼" "✽" "✿" "❀" "❁"
-          "❈" "❉" "❊" "❆" "▹" "▹" "▹" "▹")))
-#+end_src
-**** Face redefinitions
-#+BEGIN_SRC emacs-lisp
-(with-eval-after-load "org-faces"
-  (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch))
-#+END_SRC
 
-**** Cdlatex and pretty entities sub-super don’t work well together.
-#+begin_src emacs-lisp
-(add-hook 'cdlatex-mode-hook (lambda () (when (eq major-mode 'org-mode)
-                                     (setq-local org-pretty-entities-include-sub-superscripts nil))))
-#+end_src
-
-**** Alternating bullets for plain lists
-#+begin_src emacs-lisp
-(setq org-list-demote-modify-bullet '(("+" . "-") ("-" . "+")))
-#+end_src
-**** Tags column at 0
-I use variable-width fonts, so trying to align tags to the right is useless. But in the agenda we want them right aligned.
-#+BEGIN_SRC emacs-lisp
-(setq org-tags-column 0
-      org-auto-align-tags nil)
-(add-hook 'org-agenda-mode-hook '(lambda ()
-                                  (setq org-agenda-tags-column (- (window-width)))))
-#+END_SRC
 *** Version of ~org-tree-to-indirect-buffer~ that works as I want it to
 That is, always create a new buffer. (Is there anything more changed?)
 #+BEGIN_SRC emacs-lisp
@@ -720,7 +938,7 @@ That is, always create a new buffer. (Is there anything more changed?)
   (let ((cbuf (current-buffer))
         (cwin (selected-window))
         (pos (point))
-        beg end level heading ibuf)
+        beg end heading ibuf)
     (save-excursion
       (org-back-to-heading t)
       (setq beg (point)
@@ -738,6 +956,16 @@ That is, always create a new buffer. (Is there anything more changed?)
     (and (window-live-p cwin) (select-window cwin))))
 
 (bind-key "C-c C-x b" #'aj/org-tree-to-indirect-buffer org-mode-map)
+#+END_SRC
+** org-download
+#+BEGIN_SRC emacs-lisp
+(use-package org-download
+  :init (org-download-enable)
+  :config
+  (setq org-download-backend 'curl)
+  (setq-default org-download-heading-lvl nil
+                org-download-image-dir "./bilder"))
+
 #+END_SRC
 ** File-associations :org_async:
 #+BEGIN_SRC emacs-lisp
@@ -787,27 +1015,28 @@ A local variables comment block that is placed at the end of the file may be los
   (advice-add 'helm-org-insert-link-to-heading-at-marker :override
               #'aj/helm-org-insert-link-to-heading-at-marker)
 
-  (defun aj/helm-org-insert-link-to-heading-at-marker (marker)
+  (defun aj/helm-org-insert-link-to-heading-at-marker (_c)
     "Alternative to `helm-org-insert-link-to-heading-at-marker'
 Uses CUSTOM_ID or `org-store-link' for linking."
-    (let (link)
-      (with-current-buffer (marker-buffer marker)
-        (save-excursion
-          (goto-char (marker-position marker))
-          (let ((heading-id (org-entry-get nil "CUSTOM_ID"))
-                (file-name (buffer-file-name)))
-            (setq link
-                  (if heading-id
-                      (org-make-link-string
-                       (if (string= (with-helm-current-buffer
-                                      (buffer-file-name))
-                                    file-name)
-                           (concat "#" heading-id)
-                         (concat "file:" (abbreviate-file-name
-                                          file-name) "::#" custom-id)))
-                    (org-store-link nil)))))
-        (with-helm-current-buffer
-          (insert link)))))
+    (dolist (marker (helm-marked-candidates))
+      (let (link)
+        (with-current-buffer (marker-buffer marker)
+          (save-excursion
+            (goto-char (marker-position marker))
+            (let ((heading-id (org-entry-get nil "CUSTOM_ID"))
+                  (file-name (buffer-file-name)))
+              (setq link
+                    (if heading-id
+                        (org-make-link-string
+                         (if (string= (with-helm-current-buffer
+                                        (buffer-file-name))
+                                      file-name)
+                             (concat "#" heading-id)
+                           (concat "file:" (abbreviate-file-name
+                                            file-name) "::#" custom-id)))
+                      (org-store-link nil)))))
+          (with-helm-current-buffer
+            (insert link " "))))))
 
   (advice-add 'helm-org--open-heading-in-indirect-buffer :override
               #'aj/helm-org--open-heading-in-indirect-buffer)
@@ -817,6 +1046,105 @@ Uses CUSTOM_ID or `org-store-link' for linking."
                     (aj/org-tree-to-indirect-buffer))))
 #+END_SRC
 
+*** Redefine ~helm-org--get-candidates-in-file~
+Use ~org-scan-tags~ to get some exclusion tools. Note that also ~org-agenda-skip-archived-trees~, ~org-agenda-skip-comment~, and ~org-agenda-skip-function~ can be let-bound to have effects here.
+
+Should check if it’s less efficient doing this than the homegrown mapping in helm-org. Right now it actually feels snappier, maybe because it excludes unneeded headings.
+
+#+BEGIN_SRC emacs-lisp
+(defvar aj/helm-org-candidates-matcher t)
+(defvar aj/helm-org-candidates-todo-only nil)
+
+(advice-add 'helm-org--get-candidates-in-file :around
+            #'aj/helm-org--get-candidates-in-file)
+
+(defun aj/helm-org--get-candidates-in-file (fun filename &optional fontify nofname parents matcher)
+  (if parents ;; won’t handle that special case
+      (funcall fun filename fontify nofname parents)
+    (org-agenda-prepare-buffers (list filename))
+    (with-current-buffer (pcase filename
+                           ((pred bufferp) filename)
+                           ((pred stringp) (find-file-noselect filename t)))
+      (let ((match-fn (if fontify
+                          #'match-string
+                        #'match-string-no-properties))
+            (matcher (or matcher aj/helm-org-candidates-matcher))
+            (file (unless nofname
+                    (concat (helm-basename filename) ":"))))
+        (save-excursion
+          (save-restriction
+            (unless (and (bufferp filename)
+                         (buffer-base-buffer filename))
+              ;; Only widen direct buffers, not indirect ones.
+              (widen))
+            ;; (unless parents (goto-char (point-min)))
+            ;; clear cache for new version of org-get-outline-path
+            (and (boundp 'org-outline-path-cache)
+                 (setq org-outline-path-cache nil))
+            (cl-remove-if
+             #'null
+             (org-scan-tags
+              (lambda ()
+                (goto-char (point-at-bol))
+                (when (looking-at org-complex-heading-regexp)
+                  (let ((beg (point-at-bol))
+                        (end (point-at-eol))
+                        (level (length (match-string-no-properties 1)))
+                        (width (window-width (helm-window)))
+                        (heading (funcall match-fn 4)))
+                    (when (and fontify
+                               (null (text-property-any
+                                      beg end 'fontified t)))
+                      (jit-lock-fontify-now beg end))
+                    (when (and (>= level helm-org-headings-min-depth)
+                               (<= level helm-org-headings-max-depth))
+                      (cons
+                       (propertize
+                        (if helm-org-format-outline-path
+                            (org-format-outline-path
+                             (org-get-outline-path t t) width file)
+                          (if file
+                              (concat file (funcall match-fn 0))
+                            (funcall match-fn 0)))
+                        'helm-real-display heading)
+                       (set-marker (make-marker) (point-at-eol)))))))
+              matcher aj/helm-org-candidates-todo-only))))))))
+#+END_SRC
+
+**** Some tests for this  :ARCHIVE:
+#+BEGIN_SRC emacs-lisp
+(defun aj/measure-helm-org-cands (times name)
+  "Measure the time it takes to evaluate BODY."
+  (let ((time (current-time)))
+    (dotimes (i times)
+      (helm-org-get-candidates (list (buffer-file-name))))
+    (format "%s: %.06f" name (float-time (time-since time)))))
+
+(defun aj/helm-org-test (times)
+  (interactive "p")
+  (let ((times (or (and (< 1 times) times) 100))
+        listan)
+    (advice-remove 'helm-org--get-candidates-in-file
+                   #'aj/helm-org--get-candidates-in-file)
+    (push (aj/measure-helm-org-cands times "Old") listan)
+    (advice-add 'helm-org--get-candidates-in-file :around
+                #'aj/helm-org--get-candidates-in-file)
+    (push (aj/measure-helm-org-cands times "New with exclusions") listan)
+    (let ((org-agenda-skip-archived-trees nil) (org-agenda-skip-comment-trees nil))
+      (push (aj/measure-helm-org-cands times "New with archived etc.") listan))
+    (message (mapconcat #'identity listan "\n"))))
+#+END_SRC
+
+*** Redefine ~helm-org-in-buffer-preselect~
+This works better for my purposes.
+#+BEGIN_SRC emacs-lisp
+(defun aj/helm-org-in-buffer-preselect ()
+  (condition-case nil
+      (concat (org-get-heading t t t t) "$")
+    (error nil)))
+
+(advice-add 'helm-org-in-buffer-preselect :override #'aj/helm-org-in-buffer-preselect)
+#+END_SRC
 *** helm-org-rifle
 Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entries.
 #+BEGIN_SRC emacs-lisp
@@ -972,28 +1300,6 @@ See the individual commands for more information."
   (autoload fn "helm-ring"))
 #+END_SRC
 
-** Custom modification commands
-*** aj/org-table-to-tree
-#+BEGIN_SRC emacs-lisp
-(defun aj/org-table-to-tree ()
-  "Transforms an org table to a (sub)tree.
- Each row an entry, spaces between columns"
-  (interactive)
-  (if (org-at-table-p)
-      (let ((level (1+ (org-current-level)))
-            (table (remove 'hline (org-table-to-lisp)))
-            (beg (org-table-begin))
-            (end (org-table-end)))
-        (delete-region beg end)
-        (dolist (row table)
-          (insert
-           (make-string level (string-to-char "*"))
-           " "
-           (mapconcat 'identity row " ")
-           "\n")))
-    (message "Not at a table")))
-#+END_SRC
-
 ** Extra org-entities :org_async:
 #+begin_src emacs-lisp
 (add-to-list 'org-entities-user '("slash" "\\slash{}" nil "/" "/" "/" "/"))
@@ -1018,6 +1324,19 @@ https://gitlab.com/andersjohansson/org-archive-hierarchically
 #+begin_src emacs-lisp
 (setq org-default-notes-file (expand-file-name "notes.org" org-directory))
 #+end_src
+*** Ensure line break in captured section
+I often mess up and remove the last line-break in the capture buffer. This can inadvertantly include the [[file:~/.emacs.d/lisp/aj-org-config.org::*Local%20variables%20headings][Local variables heading]] that is below the last captured headline under this headline.
+This function run with ~org-capture-prepare-finalize-hook~ avoids this problem by always making sure we have at least one linebreak at the end of the capture buffer.
+
+#+BEGIN_SRC emacs-lisp
+(defun aj/ensure-linebreak-at-eob ()
+  (unless (progn (goto-char (point-max))
+                 (looking-back "
+" 1))
+    (insert "\n")))
+
+(add-hook 'org-capture-prepare-finalize-hook #'aj/ensure-linebreak-at-eob)
+#+END_SRC
 
 *** Capture help functions
 **** Insert weektree CUSTOM_ID
@@ -1174,7 +1493,7 @@ Useful for launching a small capture frame from window manager with a call like:
 
 
 ** org-protocol for linking into org files
-I keep some notes for papers in org-mode, but sort my papers in >otero. With this I can easily add a link to the specific note from zotero, which is launched and resolved through org-protocol.
+I keep some notes for papers in org-mode, but sort my papers in Zotero. With this I can easily add a link to the specific note from Zotero, which is launched and resolved through org-protocol.
 #+BEGIN_SRC emacs-lisp
 (use-package org-protocol
   :config
@@ -1239,14 +1558,10 @@ From https://github.com/girzel/org-annotate
       (list nil note)))
 
   (defun aj/org-annotate-export-latex-fixme-and-inline (path desc)
-    (let ((lb "")
-          (par "")
-          (optstring "")
+    (let ((optstring "")
           opt)
       (when (string-match "^inline:\\(.+\\)" path)
         (setq opt '("inline" "notodonotesbw" "nomargin"))
-        (setq lb "\\\\")
-        (setq par "\\par \\noindent")
         (setq path (match-string 1 path)))
       (cl-destructuring-bind
           (author path) (aj/org-annotate-extract-author path)
@@ -1256,7 +1571,7 @@ From https://github.com/girzel/org-annotate
         (if desc
             (format "\\fxnote*%s{%s}{%s}" optstring path
                     (org-export-data-with-backend desc 'latex nil))
-          (format "%s\\fxnote%s{%s}%s" par optstring path lb)))))
+          (format "\\fxnote%s{%s}" optstring path)))))
 
   (setq org-annotate-latex-export-function
         #'aj/org-annotate-export-latex-fixme-and-inline)
@@ -1317,7 +1632,27 @@ List of prefix strings or regex."
       (apply fun args)))
 
   (advice-add 'org-annotate-add-note :around #'aj/org-annotate-abbrev-insert)
-  )
+
+
+  ;; following should just edit!
+
+  (org-link-set-parameters "note" :follow #'aj/org-annotate-edit)
+
+  (defun aj/org-annotate-edit (linkstring)
+    (let ((org-link-escape-chars nil))
+      (org-insert-link)))
+
+
+  ;; ascii-export
+  (defvar org-annotate-ascii-export-function #'aj/org-annotate-export-ascii)
+
+  (defun aj/org-annotate-export-ascii (path desc)
+    (let ((path (org-export-data-with-backend path 'ascii nil)))
+      (if desc
+          (format "❰%s❱%s" path
+                  (org-export-data-with-backend desc 'ascii nil))
+        (format "❰%s❱" path))))
+    )
 #+END_SRC
 
 
@@ -1418,7 +1753,7 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
               (add-text-properties (1- end) (- end 2) inv))))))))
 #+end_src
 
-*** My own view attachment which parses page numbers
+*** My own view attachment which parses page numbers and jumps to page
 #+BEGIN_SRC emacs-lisp
 (defun aj/org-zotxt-open-attachment ()
   "Open attachment of Zotero items linked at point."
@@ -1477,8 +1812,8 @@ Mostly for html and reveal
               desc
               (cl-loop for source in sources
                        concat (format "<source src=\"%s\" type=\"%s\">"
-                                      ;; maybe not a brilliant test
-                                      (if (string-match-p "://" source)
+                                      (if (or (string-match-p "://" source)
+                                              (not (file-name-absolute-p source)))
                                           source
                                         (concat "file://" source))
                                       (mailcap-extension-to-mime
@@ -1510,9 +1845,11 @@ Mostly for html and reveal
 #+end_src
 
 *** Ox-reveal, reveal.js
+**** Settings
 #+BEGIN_SRC emacs-lisp
 (defvar aj/path-to-revealjs "~/lib/reveal.js/")
 
+;; loaded with org in init.org
 (with-eval-after-load 'ox-reveal
   (setq
    org-reveal-root "../"
@@ -1531,29 +1868,36 @@ Mostly for html and reveal
    org-reveal-keyboard t
    org-reveal-overview nil
    org-revfeal-hlevel 2
-   org-reveal-extra-js "{src: '../aj-fixes.js'}")
+   org-reveal-extra-js "{src: '../aj-fixes.js'}"))
+#+END_SRC
 
-  (defun aj/org-reveal-lazy-load-links (string backend _info)
-    (when (and (org-export-derived-backend-p backend 'reveal)
-               (string-match-p "^<\\(img\\|video\\|iframe\\)" string))
-      (replace-regexp-in-string "src=" "data-src=" string nil t)))
+**** reveal - org-annotate-style
+#+BEGIN_SRC emacs-lisp
+(with-eval-after-load "ox-reveal"
+  (defvar org-annotate-reveal-export-function
+    #'aj/org-annotate-export-html-tooltip
+    "The reveal export style for Org notes, as a symbol.")
 
-  (add-to-list 'org-export-filter-link-functions #'aj/org-reveal-lazy-load-links)
+  (defun org-annotate-export-html-tooltip (path desc)
+    (format "<span style=\"font-size:.5em;font-style:italic;color:#a00\">[%s]</span> %s" path (or desc ""))))
+#+END_SRC
 
-  (org-export-define-derived-backend
-      'reveallink 'reveal
-    :menu-entry
-    '(?R 5
-         ((?t "As file linked in reveal-folder"
-              aj/org-reveal-export-to-html-link)
-          (?T "As linked file and browse"
-              aj/org-reveal-export-to-html-link-and-browse)))))
+**** Commands for exporting, starting server, and displaying presentations via server
+#+BEGIN_SRC emacs-lisp
+(org-export-define-derived-backend
+    'reveallink 'reveal
+  :menu-entry
+  '(?R 5
+       ((?t "As file linked in reveal-folder"
+            aj/org-reveal-export-to-html-link)
+        (?T "As linked file and browse"
+            aj/org-reveal-export-to-html-link-and-browse))))
 
 (defconst aj/revealjs-base-url "http://localhost:8000/")
 
 (defun aj/org-reveal-export-to-html-link
 	(&optional async subtreep visible-only body-only ext-plist)
-  "Export current buffer to a reveal.js and browse HTML file."
+  "Export current buffer to a reveal.js and link the folder to server dir."
   (interactive)
   (let* ((fn (expand-file-name (org-reveal-export-to-html async subtreep visible-only body-only ext-plist)))
 		 (fnnd (file-name-nondirectory fn))
@@ -1567,21 +1911,32 @@ Mostly for html and reveal
 
 (defvar aj/org-reveal-current-url nil)
 (defvar aj/org-reveal-current-file nil)
+(defvar aj/org-reveal-current-slide-id nil)
 
-(defun aj/org-reveal-export-to-html-link-and-browse
-	(&optional async subtreep visible-only body-only ext-plist)
-  "Export current buffer to a reveal.js and browse HTML file."
+(defun aj/org-reveal-export-to-html-link-and-browse (&optional async subtreep visible-only body-only ext-plist)
+  "Export current buffer to a reveal.js, launch server and browse file"
   (interactive)
-  (setq aj/org-reveal-current-url nil
-        aj/org-reveal-current-file (expand-file-name
-                                    (aj/org-reveal-export-to-html-link async subtreep visible-only body-only ext-plist)))
-  (aj/org-reveal-try-server-browse-url))
+  (let (created-id)
+    (unwind-protect
+        (progn
+          (setq aj/org-reveal-current-url nil
+                aj/org-reveal-current-slide-id (unless (org-before-first-heading-p)
+                                                 (or (org-entry-get (point) "custom_id")
+                                                     (org-entry-get (point) "id")
+                                                     (progn (setq created-id t) (org-id-get-create))))
+                aj/org-reveal-current-file (expand-file-name
+                                            (aj/org-reveal-export-to-html-link async subtreep visible-only body-only ext-plist)))
+          (aj/org-reveal-try-server-browse-url))
+      (setq aj/org-reveal-current-slide-id nil)
+      (when created-id (org-entry-delete (point) "id")))))
 
 (defun aj/org-reveal-try-server-browse-url (&optional lasttry)
   (setq aj/org-reveal-current-url
         (or aj/org-reveal-current-url
             (concat aj/revealjs-base-url (file-name-nondirectory (directory-file-name (file-name-directory aj/org-reveal-current-file)))
-                    "/" (file-name-nondirectory aj/org-reveal-current-file))))
+                    "/" (file-name-nondirectory aj/org-reveal-current-file)
+                    (when aj/org-reveal-current-slide-id
+                      (concat "#slide-sec-" aj/org-reveal-current-slide-id)))))
   (if lasttry
       (request aj/org-reveal-current-url
                :success #'aj/org-reveal-browse-current-url
@@ -1614,6 +1969,73 @@ Mostly for html and reveal
     ;; (accept-process-output proc)
     ))
 #+END_SRC
+
+**** Mode for help with input
+#+BEGIN_SRC emacs-lisp
+(with-eval-after-load 'ox-reveal
+  (define-minor-mode aj/org-reveal-mode
+    "Minor mode with some custom keybindings for help in creating org-reveal presentations"
+    :keymap `((,(kbd "C-c C-ö") . aj/hydra-org-reveal-templates/body)))
+
+  (defhydra aj/hydra-org-reveal-templates (:color blue)
+    "Reveal templates"
+    ("+" (aj/org-insert-list-attributes "#+ATTR_REVEAL: :frag (t)") "Piecewise list")
+    ("f" (aj/org-insert-list-attributes "#+ATTR_REVEAL: :frag t") "Appear (frag)")
+    ("n" (hot-expand "<n") "Notes")
+    ("i" (aj/org-insert-list-attributes (format "#+ATTR_REVEAL: :frag t :frag_idx !!" )) "Frag id")
+    ("s" (insert "#+REVEAL: split") "Split frame")
+    ("F" (insert (completing-read "Frag style" '(grow shrink roll-in fade-out highlight-red highlight-green highlight-blue appear))) "Frag style")
+    ("H" (insert "#+REVEAL_HTML: ") "HTML")
+    ("b" (progn
+           (org-set-property "reveal_background"
+                             (file-relative-name
+                              (read-file-name "Background image: "
+                                              nil nil nil nil)))
+           (when (y-or-n-p "Slide instead of trans?")
+             (org-set-property "reveal_background_trans" "slide")))
+     "Background image")
+    ("s" (aj/org-insert-list-attributes "#+ATTR_HTML: :style font-size: 0.9em;") "Style element etc.")
+    ("p" (insert (format
+                  "#+ATTR_HTML: :class stretch\n%s"
+                  (with-temp-buffer (org-insert-link '(4) nil "") (buffer-string))))
+     "Picture with stretch")
+    ("z" (insert "#+HTML: <div id=\"zotxtbibliography\"></div>") "Bibliography")
+    ("N" (org-toggle-tag "notitle") "No title headline")
+    ("q" nil)))
+
+
+#+END_SRC
+
+**** Empty headline
+#+BEGIN_SRC emacs-lisp
+(add-hook 'org-export-filter-parse-tree-functions #'aj/org-reveal-empty-headline-title)
+
+(defun aj/org-reveal-empty-headline-title (data backend info)
+  (org-element-map data 'headline
+    (lambda (h)
+      (when (member "notitle" (org-element-property :tags h))
+        (org-element-put-property h :title nil)
+        (org-element-put-property
+         h :tags (delete "notitle" (org-element-property :tags h)))))
+    info nil)
+  data)
+#+END_SRC
+
+**** Use ~data-src~ instead of ~src~ for images etc.
+#+BEGIN_SRC emacs-lisp
+(defun aj/org-reveal-lazy-load-links (string backend info)
+  (when (and (org-export-derived-backend-p backend 'reveal)
+             (not (plist-get info :reveal-single-file))
+             (string-match-p "^<\\(img\\|video\\|iframe\\)" string))
+    (replace-regexp-in-string "src=" "data-src=" string nil t)))
+
+(add-to-list 'org-export-filter-link-functions #'aj/org-reveal-lazy-load-links)
+
+
+
+
+#+END_SRC
+
 *** Ignored drawers
 #+begin_src emacs-lisp
 (with-eval-after-load 'ox
@@ -1639,15 +2061,12 @@ There are two mechanisms for getting filenames, ~org-export--get-subtree-options
 
 (defun aj/org-export-return-subtree-filename (fun ext &optional subtreep pub-dir)
   "Adds a filename derived from the heading name if no filename
-is defined the subtree during org subtree export."
-  (let* ((origname (funcall fun ext subtreep pub-dir))
-         (orbase (file-name-base origname))
-         (bufbase (file-name-base (or (buffer-file-name) origname)))) ;;Rimligt?
-    (if (and (not pub-dir) subtreep (string= orbase bufbase)) ;; varför = ?
-        (concat (aj/org-export-headline-filename
-                 (org-get-heading t t t t))
-                ext)
-      origname)))
+is defined for the subtree during org subtree export."
+  (if (and (not pub-dir) subtreep (not (org-entry-get nil "EXPORT_FILE_NAME")))
+      (concat (aj/org-export-headline-filename
+               (org-get-heading t t t t))
+              ext)
+    (funcall fun ext subtreep pub-dir)))
 
 (autoload 'reftex-string-to-label "reftex-ref")
 (defun aj/org-export-headline-filename (headline)
@@ -1660,6 +2079,18 @@ is defined the subtree during org subtree export."
 
 #+END_SRC
 *** Helper functions
+**** For inserting list attributes
+#+BEGIN_SRC emacs-lisp
+(defun aj/org-insert-list-attributes (attr)
+  (if-let ((p (org-in-item-p))
+           (tp (org-list-get-top-point (org-list-struct))))
+      (save-excursion
+        (goto-char tp)
+        (open-line 1)
+        (insert attr))
+    (insert attr)))
+#+END_SRC
+
 **** CHECK For special completion in custom link types
 #+BEGIN_SRC emacs-lisp
 (defun aj/org-complete-link (rep)
@@ -1801,7 +2232,6 @@ should be relativized or not. Returns the possibly relativized filename"
                                      (2 'bold prepend t)
                                      (3 'helm-buffer-process prepend))))
 #+END_SRC
-
 *** ODT-export
 **** ODT has no problem including a pdf file, let it do that
 #+BEGIN_SRC emacs-lisp
@@ -2109,7 +2539,9 @@ It has better error messages and better async running of file. I have also used 
          ((?a "As PDF (AUCTeX)"
               aj/org-export-tex-auctex)
           (?f "As PDF (AUCTeX this file)"
-              aj/org-export-tex-auctex-subfile)))))
+              aj/org-export-tex-auctex-subfile)
+          (?l "Show tex process"
+              aj/TeX-recenter-output-buffer)))))
 
 (defun aj/org-export-tex-auctex (_async subtreep visible-only _body-only)
   "Export to pdf with auctex. Ignores async since running tex is
@@ -2132,6 +2564,13 @@ hacks working for async)"
 
 (defun aj/org-export-tex-auctex-curr-file (&optional  _ext _nondir)
   (TeX-strip-extension aj/org-export-tex-auctex-curr-file nil t)) 
+
+(defun aj/TeX-recenter-output-buffer (&rest _ignore)
+  (interactive)
+  (TeX-recenter-output-buffer nil))
+
+;; (defun aj/org-export-tex-auctex-show-process ()
+;;   (interactive))
 
 ;; Older stuff, not sure if this works:
 (defun aj/org-export-tex-auctex-subfile (async subtreep visible-only _body-only)
@@ -2195,11 +2634,16 @@ hacks working for async)"
 
 (defun aj/org-gls-export (ref _desc backend)
   (if (org-export-derived-backend-p backend 'latex)
-      (format
-       (if (aj/org-gls-find ref)
-           "\\gls{%s}" ;; found in unwidened
-         "\\emph{%s}")
-       ref)
+      (let* ((sp (split-string ref ":" t))
+             (mod (cadr sp))
+             (cmd (cond
+                   ((equal mod "inheading") "ajglsinheading")
+                   ((equal mod "nolink") "glsentrytext")
+                   ((stringp mod) mod)
+                   (t "gls"))))
+        (if (aj/org-gls-find (car sp))  ;; found in unwidened
+            (format "\\%s{%s}" cmd (car sp))
+          (format "\\emph{%s}" (car sp))))
     ref))
 
 (defun aj/org-gls-complete (&optional _arg)
@@ -2217,10 +2661,10 @@ hacks working for async)"
           (goto-char (point-min))
           (if ref
               (search-forward-regexp
-               (format "\\(newabbreviation\\|newglossaryentry\\|newacronym\\)\\(?:\[^]]+\]\\)?{%s}" ref) nil t)
+               (format "\\(newabbreviation\\|longnewglossaryentry\\|newglossaryentry\\|newacronym\\)\\(?:\[^]]+\]\\)?{%s}" ref) nil t)
             (cl-loop
              while (search-forward-regexp
-                    "\\(newabbreviation\\|newglossaryentry\\|newacronym\\)\\(?:\[^]]+\]\\)?{\\([^}]+\\)}"
+                    "\\(newabbreviation\\|longnewglossaryentry\\|newglossaryentry\\|newacronym\\)\\(?:\[^]]+\]\\)?{\\([^}]+\\)}"
                     nil t)
              collect (match-string 2))))))))
 
@@ -2236,7 +2680,7 @@ hacks working for async)"
 
 (defun aj/org-paperref-export (refs _desc backend)
   (if (org-export-derived-backend-p backend 'latex)
-      (let ((psp (split-string refs "," t)))
+      (let ((psp (split-string refs "," t "[[:space:]]+")))
         (format
          (if (cl-set-difference psp (aj/org-paperref-find)
                                 :test 'string=)
@@ -2252,7 +2696,7 @@ hacks working for async)"
                                  "Paperrefs: "
                                  (aj/org-paperref-find nil t)
                                  :marked-candidates t)
-                     ",")))
+                     ", ")))
 
 (defun aj/org-paperref-show (refs)
   (message
@@ -2294,25 +2738,73 @@ hacks working for async)"
 #+END_SRC
 ***** Lists in thesis
 #+BEGIN_SRC emacs-lisp
-(defun aj/org-latex-thesis-lists (translist backend info)
+(defun aj/org-latex-thesis-lists-data (data backend info)
   "Use thesis environments for plain lists.
-Add as a filter in `org-export-filter-plain-list-functions'"
-  (if (and (org-export-derived-backend-p backend 'latex)
-           (string= (plist-get info :latex-class) "uuthesis"))
-      (replace-regexp-in-string
-       "{itemize}" "{bulletlist}"
-       (replace-regexp-in-string "{enumerate}" "{numberedlist}" translist t t))
-    translist))
+Add as a filter in ‘org-export-filter-parse-tree-functions’."
+  (when (eq backend 'latex)
+    (org-element-map data '(plain-list)
+      #'aj/org-latex-thesis-list-set-environment
+      info))
+  data)
+
+(defun aj/org-latex-thesis-list-set-environment (plain-list)
+  (unless (plist-get (org-export-read-attribute :attr_latex plain-list)
+                     :environment)
+    (org-element-put-property
+     plain-list :attr_latex
+     (cons (format ":environment %s"
+                   (cl-case (org-element-property :type plain-list)
+                     ('ordered "numberedlist-aj")
+			         ('descriptive "description")
+			         (t "bulletlist-aj")))
+           (org-element-property :attr_latex plain-list)))))
+
+;; (defun aj/org-latex-thesis-lists (translist backend info)
+;;   "Use thesis environments for plain lists.
+;; Add as a filter in `org-export-filter-plain-list-functions'"
+;;   (if (and (org-export-derived-backend-p backend 'latex)
+;;            (string= (plist-get info :latex-class) "uuthesis"))
+;;       (replace-regexp-in-string
+;;        "{itemize}" "{bulletlist}"
+;;        (replace-regexp-in-string "{enumerate}" "{numberedlist}" translist t t))
+;;     translist))
+
 #+END_SRC
-***** Convert ref to autoref (from hyperref)
+***** Convert ref to cref (from cleverref)
 #+BEGIN_SRC emacs-lisp
 (defun aj/org-latex-ref-to-autoref (string backend _info)
-  (if (org-export-derived-backend-p backend 'latex)
-      (replace-regexp-in-string "\\\\ref{" "\\autoref{" string t t)
+  (if (and
+       (org-export-derived-backend-p backend 'latex)
+       (string-match-p "avhandling" default-directory))
+      (zotxt-extra--replace-consecutive
+       (replace-regexp-in-string "\\\\ref{" "\\cref{" string t t)
+       "\\\\cref{\\([^}]+\\)}"
+       "[[:space:],]*\\(?:and\\)*[[:space:],]*"
+       "\\cref{%s}" ",")
     string))
 
 (add-to-list 'org-export-filter-final-output-functions
              #'aj/org-latex-ref-to-autoref)
+#+END_SRC
+
+***** Replace references
+Very specific code for replacing certain references that get exported in a format that biblatex can’t handle correctly from zotero with manually crafted bib-entries (often using workarounds).
+
+#+BEGIN_SRC emacs-lisp
+(autoload 'bibtex-parse-keys "bibtex")
+
+(defun aj/replace-fixed-references (string backend _info)
+  (when (and
+         (org-export-derived-backend-p backend 'latex)
+         (string-match-p "avhandling" default-directory))
+    (when-let ((bbuf (find-file-noselect "fixreferenser.bib")))
+      (with-current-buffer bbuf
+        (xah-replace-pairs-in-string
+         string
+         (cl-loop for x in (bibtex-parse-keys)
+                  collect (list (substring (car x) 0 -4) (car x))))))))
+
+(add-to-list 'org-export-filter-final-output-functions #'aj/replace-fixed-references)
 #+END_SRC
 
 ***** Thesischapter, for old thesis :ARCHIVE:
@@ -2350,9 +2842,6 @@ Add as a filter in `org-export-filter-plain-list-functions'"
                  ("\\section{%s}" . "\\section*{%s}")
                  ("\\subsection{%s}" . "\\subsection*{%s}")
                  ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))))
-
-
-(add-to-list 'org-structure-template-alist '("B" "#+BEAMER: "  "<literal style=\"latex\">?</literal>"))
 #+end_src
 
 ***** New link types for beamer
@@ -2373,7 +2862,7 @@ Add as a filter in `org-export-filter-plain-list-functions'"
                          :complete #'org-vframe-complete-link)
 #+end_src
 
-****** full-screen image i beamer
+****** full-screen image in beamer
 #+begin_src emacs-lisp
 (autoload 'xah-replace-pairs-in-string "xah-replace-pairs")
 
@@ -2425,14 +2914,7 @@ I’m trying out ox-reveal, but they have different ways of adding notes (subtre
     ("s" (insert "#+BEAMER: \\small") "Small")
     ("+" (aj/org-insert-list-attributes "#+ATTR_BEAMER: :overlay +-") "Overlay +-")
     ("T" (aj/org-insert-list-attributes "#+ATTR_BEAMER: :environment tightitemize") "Tightitemize"))
-
-  (defun aj/org-insert-list-attributes (attr)
-    (if (org-in-item-p)
-        (save-excursion
-          (org-beginning-of-item-list)
-          (open-line 1)
-          (insert attr))
-      (insert attr))))
+)
 #+END_SRC
 **** Latex-check
 #+begin_src emacs-lisp
@@ -2446,7 +2928,7 @@ I’m trying out ox-reveal, but they have different ways of adding notes (subtre
 	(compile (format "lacheck %s" fn))))
 #+end_src
 
-*** Export without headlines (list-outline)
+*** Export without headlines (list-outline, h:0)
 #+begin_src emacs-lisp
 (defun aj/org-export-opt-no-hl (opt _backend)
   (plist-put opt :headline-levels 0))
@@ -2557,7 +3039,7 @@ is defined the subtree during org subtree export."
                         concat
                         (format "\\setcounter{%s}{%d}"
                                 sn
-                                (1- (string-to-int
+                                (1- (string-to-number
                                      (pop aj/org-latex-numbering-start))))))
        string t t))))
 
@@ -2637,10 +3119,7 @@ The last parts are some half-successful attempts to solve this for ox-reveal exp
   (cond
    ((eq backend 'beamer) ; do nothing (maybe should?)
     data)
-   ;; ((eq backend 'reveal)
-   ;;  (aj/org-mark-headline-to-be-removed
-   ;;   (aj/org-data-remove-headline data backend info)
-   ;;   backend info))
+
    (t
     (aj/org-data-remove-headline data backend info))))
 
@@ -2701,6 +3180,19 @@ parent."
 
 #+END_SRC
 
+*** stripheading, pre-parsing alternative to ignoreheading
+Does not promote children so gives a sometimes different effect on the tree.
+
+#+BEGIN_SRC emacs-lisp
+(defun aj/org-export-strip-headings (_backend)
+  "Strip lines containing \"stripheadings\" tag."
+  (save-excursion
+    (flush-lines ":stripheading:" )))
+
+(add-hook 'org-export-before-parsing-hook #'aj/org-export-strip-headings)
+
+#+END_SRC
+
 *** by-backend, macro for some exports
 #+begin_src emacs-lisp
 (defmacro org-by-backend (&rest body)
@@ -2744,7 +3236,9 @@ This one is based on regex walking and skipping though. And that is quite fast.
 #+BEGIN_SRC emacs-lisp
 (use-package org-wc
   :load-path "~/kodat/elisp/org-wc"
-  :commands (org-word-count org-wc-count-subtrees org-wc-display org-wc-remove-overlays))
+  :commands (org-word-count org-wc-count-subtrees org-wc-display org-wc-remove-overlays)
+  :bind (:map org-mode-map
+              ("C-c C-=" . org-wc-display)))
 #+END_SRC
 ** org-outline-numbering
 Small mode for showing a numbered outline as overlays at beginning of headlines.
