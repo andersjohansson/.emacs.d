@@ -89,18 +89,18 @@ for refile folder selection)")
 
 ;; Only symbols that are in Ubuntu mono font, to avoid width problems
 (defconst aj/mu4e-symbols-override
-  '((mu4e-headers-draft-mark     . ("D" . "∆")) ;; ✒ ✏
+  '((mu4e-headers-draft-mark     . ("D" . "□")) ;; ✒ ✏
     (mu4e-headers-flagged-mark   . ("F" . "†"))
     (mu4e-headers-new-mark       . ("N" . " "))
     (mu4e-headers-passed-mark    . ("P" . "»")) ;; ↪ "→"
     (mu4e-headers-replied-mark   . ("R" . "«")) ;; "→"
     (mu4e-headers-seen-mark      . ("S" . "")) ;; ✓ 🗸 ✔
     (mu4e-headers-trashed-mark   . ("T" . "∏")) ;; 🗑
-    (mu4e-headers-attach-mark    . ("a" . "∞"))
+    (mu4e-headers-attach-mark    . ("a" . "■"))
     (mu4e-headers-encrypted-mark . ("x" . "🔐"))
     (mu4e-headers-signed-mark    . ("s" . "🔏"))
     (mu4e-headers-unread-mark    . ("u" . "•")) ;; ★
-))
+    ))
 
 
 (cl-loop for (var . (letter . symbol)) in aj/mu4e-symbols-override
