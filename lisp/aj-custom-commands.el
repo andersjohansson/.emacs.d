@@ -511,5 +511,32 @@ other parameters."
                        t)))
     (org-id-locations-save)))
 
+;;; Center frame
+;; Code adapted from ime-frame
+;;;###autoload
+(defun aj/center-frame (&optional frame)
+  "Center a frame on the screen."
+  (interactive)
+  (apply 'set-frame-position
+         (let* ((frame (or (and (boundp 'frame) frame) (selected-frame)))
+                (center (aj/center-frame--get-center frame)))
+           `(,frame ,@center))))
+
+(defun aj/center-frame--get-center (frame)
+  "Return the center position of FRAME on it's display."
+  (let ((screengeometry (assq 'geometry (frame-monitor-attributes frame))))
+    (aj/center-frame--box-get-center
+     (frame-pixel-width frame)
+     (frame-pixel-height frame)
+     (nth 3 screengeometry)
+     (nth 4 screengeometry))))
+
+(defun aj/center-frame--box-get-center (w h cw ch)
+  "Center a box inside another box.
+
+Returns a list of `(TOP LEFT)' representing the centered position
+of the box `(w h)' inside the box `(cw ch)'."
+  (list (/ (- cw w) 2) (/ (- ch h) 2)))
+
 
 (provide 'aj-custom-commands)

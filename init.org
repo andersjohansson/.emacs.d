@@ -274,12 +274,6 @@ Some variables are not suitable to keep in the init-file, I add these via custom
   :demand t
   :ensure t)
 #+END_SRC
-*** Frame config package, used later
-#+BEGIN_SRC emacs-lisp
-(use-package ime-frame
-  :commands ime-frame-center)
-#+END_SRC
-
 *** org-mode
 **** org init
 #+begin_src emacs-lisp
@@ -1495,7 +1489,7 @@ configure frame size."
         (set-face-attribute 'header-line (selected-frame)
                             :background nil :foreground 'unspecified :height 1.15
                             :inherit 'default)
-        (ime-frame-center))
+        (aj/center-frame))
       (helm-log-run-hook 'helm-window-configuration-hook)))
 
   ;; Only show headers if several sources
@@ -1667,7 +1661,7 @@ Differnt fuzzy search algorithm, is this needed?
           (helm-full-frame t)
           (aj/zoterofiles-frame-manage t))
       (select-frame-set-input-focus ocframe)
-      (ime-frame-center)
+      (aj/center-frame)
       (aj/helm-open-zoterofile)))
 
   (defun aj/helm-open-zoterofile ()
