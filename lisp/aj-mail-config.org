@@ -723,7 +723,6 @@ From: http://mbork.pl/2015-11-28_Fixing_mml-attach-file_using_advice
 #+END_SRC
 
 ** Headers settings
-
 *** Headers fields
 **** Set headers fields to view depending on what maildir is viewed
 #+BEGIN_SRC emacs-lisp
@@ -925,12 +924,6 @@ date. The formats used for date and time are
             ))))))
 #+END_SRC
 
-
-
-*** Face customization
-#+begin_src emacs-lisp
-(add-hook 'aj/face-definitions-hook (lambda (_th) (set-face-attribute 'mu4e-replied-face nil :inherit 'default :weight 'unspecified)))
-#+end_src
 ** Dynamic folders for refile etc.
 One could think that it would be reasonable to put this in the contexts, but no, these settings are mostly per message, and is therefore better dynamically matched on the current message.
 
