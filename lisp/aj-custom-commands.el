@@ -117,6 +117,8 @@ Interactively, N is the prefix arg."
 
 
 ;;; aj/org-commit-template
+(require 'org-inlinetask)
+
 ;;;###autoload
 (defun aj/org-commit-template (&optional prepend dir level)
   "Antar att DIR är ett git-rep. Om level ges så bara headlines av den leveln, annars alla nya. Prepend läggs längst fram i filen."
@@ -423,6 +425,7 @@ other parameters."
 ;;; whitespace cleanup
 
 ;;;###autoload
+(defvar whitespace-trailing-regexp)
 (defun aj/delete-trailing-and-double-space-org ()
   (interactive)
   (when (eq major-mode 'org-mode)
@@ -467,7 +470,9 @@ other parameters."
 
 ;;; Fix org files
 (require 'xah-replace-pairs)
+(require 'org-table)
 
+;;;###autoload
 (defun aj/anonymize-from-table ()
   (interactive)
   (when (org-at-table-p)
@@ -502,6 +507,7 @@ other parameters."
       (apply 'delete-region remove)
       (insert description))))
 
+(require 'org-id)
 (defun aj/scan-org-ids ()
   (let ((enable-local-variables nil))
     (org-id-update-id-locations
