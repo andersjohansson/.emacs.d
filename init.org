@@ -137,13 +137,13 @@ To be loaded [[*Load custom loaddefs][at the end of init]].
 ** Early settings
 *** garbage-collection settings
 Avoid garbage collection when initializing and in minibuffer.
-What is the source of this suggestion?
+https://bling.github.io/blog/2016/01/18/why-are-you-changing-gc-cons-threshold/
 #+BEGIN_SRC emacs-lisp
 (defun aj/set-no-gc ()
   (setq gc-cons-threshold most-positive-fixnum))
 
 (defun aj/set-normal-gc ()
-  (setq gc-cons-threshold 80000000))
+  (setq gc-cons-threshold 8000000))
 
 (add-hook 'minibuffer-setup-hook #'aj/set-no-gc)
 (add-hook 'minibuffer-exit-hook #'aj/set-normal-gc)
@@ -158,7 +158,7 @@ What is the source of this suggestion?
 
 (when window-system
   (setq frame-title-format '(buffer-file-name "%f" ("%b")))
-  
+
   (defun aj/deactivate-gui (mode on)
     "Activate or deactivate MODE depending on ON, and defines a variable stating my choice."
     (when (fboundp mode)
@@ -184,10 +184,10 @@ I never get this to work really well, the issue is with special (fancy) symbols 
 
 *** Determine which of my two computers we are running on
 #+begin_src emacs-lisp
-(defvar aj/ajjb (string= "ajjb" (system-name)))
+(defvar aj/ajeb (string= "ajeb" (system-name)))
 #+end_src
 
-*** My own custom variables etc.
+*** My own custom variables, utility hooks and functions
 Some variables are not suitable to keep in the init-file, I add these via customize to the custom-file, which is not checked in.
 #+BEGIN_SRC emacs-lisp
 (defgroup aj nil "Group for my private variables"
@@ -196,8 +196,15 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 (defvar aj/large-screen-min-width 1500
   "The minimum pixel-width for a screen to be considered large.
   Used by `aj/frame-to-left'")
+
 (defvar aj/face-definitions-hook nil
   "Extra functions for defining faces after loading themes etc.")
+
+(defun aj/solarized-theme-p (&optional theme)
+  (or (and theme (member theme '(solarized-light solarized-dark)))
+      (custom-theme-enabled-p 'solarized-light)
+      (custom-theme-enabled-p 'solarized-dark)))
+
 #+END_SRC
 
 *** Add /lisp to load-path :org_async:
@@ -213,8 +220,14 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 (add-to-list 'package-archives '("melpa-stable" . "https://stable.melpa.org/packages/") t)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
 (add-to-list 'package-archives '("org" . "https://orgmode.org/elpa/") t)
+(setq package-archive-priorities
+      '(("gnu" . 10)
+        ("org" . 8)
+        ("melpa-stable" . 6)
+        ("melpa" . 4)))
+
 (package-initialize) ;; early, so the right org gets loaded
-;;(require 'org) ;; temporary, should not be needed eventually
+
 #+end_src
 
 *** Bootstrap ~use-package~ :org_async:
@@ -270,6 +283,11 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 *** org-mode
 **** org init
 #+begin_src emacs-lisp
+;;load local org-reveal
+(use-package ox-reveal
+  :defer t
+  :load-path "~/kodat/elisp/org-reveal")
+
 (use-package org
   :ensure org-plus-contrib
   :pin "org"
@@ -289,7 +307,7 @@ Some variables are not suitable to keep in the init-file, I add these via custom
     "Agenda files connected to work"
     :group 'aj
     :type '(repeat file))
-  :config 
+  :config
   (require 'helm-mode)
   (require 'aj-org-config))
 #+end_src
@@ -379,12 +397,11 @@ Some variables are not suitable to keep in the init-file, I add these via custom
   :commands (global-flycheck-mode)
   :init (add-hook 'after-init-hook #'global-flycheck-mode)
   :defer 5
-  :delight
+  :delight ""
   :config (progn
             (setq-default flycheck-emacs-lisp-load-path 'inherit)
             (setq-default flycheck-disabled-checkers '(emacs-lisp-checkdoc))
-            (add-hook 'text-mode-hook (lambda ()(flycheck-mode -1)))
-            (flycheck-package-setup)))
+            (add-hook 'text-mode-hook (lambda ()(flycheck-mode -1)))))
 #+end_src
 
 *** Save-hist (don't use session, but save many useful history variables)
@@ -432,21 +449,20 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 ** Mail-config (mu4e)
 Use mu4e, the extensive config is in an [[file:lisp/aj-mail-config.org][external file]].
 #+BEGIN_SRC emacs-lisp
-(when aj/ajjb
+(when aj/ajeb
   (use-package mu4e
 	:bind (("C-x ö" . mu4e)
 		   ("C-x m" . mu4e-compose-new)
 		   ("C-x i" . mu4e~headers-jump-to-maildir)
 		   ("C-x å" . mu4e-headers-search-bookmark))
 	:defer t
-	:init
-	(setq mu4e-get-mail-command "mbsync -qqa"
-		  ;; mu4e-update-interval 1800
-		  mu4e-view-show-images t
-		  mu4e-use-fancy-chars t
-		  mu4e-attachment-dir "~/Hämtningar"
-		  mu4e-change-filenames-when-moving t ;;for mbsync
-		  mu4e-completing-read-function #'completing-read)
+	:init (setq mu4e-get-mail-command "mailsync" ; bash script running 3 offlineimap
+		        mu4e-update-interval 1800
+		        mu4e-view-show-images t
+		        mu4e-use-fancy-chars t
+		        mu4e-attachment-dir "~/Hämtningar"
+		        ;; mu4e-change-filenames-when-moving t ;;for mbsync
+		        mu4e-completing-read-function #'completing-read) ; hands it to helm
 	:config (require 'aj-mail-config)))
 #+END_SRC
 *** Fix parse-time-string :ARCHIVE:
@@ -466,16 +482,26 @@ Disable it for now.
 
 (advice-add 'parse-time-string :around #'aj/parse-time-string)
 #+END_SRC
+** Elfeed (feed-reader)
+#+BEGIN_SRC emacs-lisp
+(use-package elfeed
+  :bind ("C-x y" . elfeed))
+
+;; just the split-pane part extracted from the elfeed-goodies package
+(use-package elfeed-goodies-split-pane
+  :after elfeed
+  :demand t
+  :bind (:map elfeed-show-mode-map
+              ("n" . elfeed-goodies/split-show-next)
+              ("p" . elfeed-goodies/split-show-prev))
+  :config
+  (setq elfeed-goodies/entry-pane-size 0.5
+        elfeed-show-entry-switch #'elfeed-goodies/switch-pane
+        elfeed-show-entry-delete #'elfeed-goodies/delete-pane))
+#+END_SRC
 ** News :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (setq gnus-select-method '(nntp "news.gmane.org"))
-#+END_SRC
-** AUR
-#+BEGIN_SRC emacs-lisp
-(use-package aurel
-  :commands aurel-package-search
-  :config (setq aurel-download-directory "~/.cache/pacaur/"
-                aurel-list-download-function #'aurel-download-unpack-dired))
 #+END_SRC
 ** Unicode-fonts :ARCHIVE:
 Don’t remember the point of this package
@@ -523,7 +549,14 @@ But why do I need to compress pdf-files this way? Shouldn’t pdf-files have rea
   :defer t
   :init (add-hook 'dired-mode-hook #'dired-collapse-mode))
 #+END_SRC
-
+**** dired-hide-dotfiles
+#+BEGIN_SRC emacs-lisp
+(use-package dired-hide-dotfiles
+  :ensure t
+  :init
+  (with-eval-after-load 'dired
+    (bind-key "å" #'dired-hide-dotfiles-mode dired-mode-map)))
+#+END_SRC
 **** Dired subtree
 #+BEGIN_SRC emacs-lisp
 (use-package dired-subtree
@@ -559,7 +592,7 @@ But why do I need to compress pdf-files this way? Shouldn’t pdf-files have rea
 
 **** Sorting and listing-switches (dired-quick-sort)
 https://gitlab.com/xuhdev/dired-quick-sort/
-But also my yet ([2018-03-01 tor]) unmerged fixes:
+But also my yet ([2018-03-01]) unmerged fixes:
 https://gitlab.com/andersjohansson/dired-quick-sort/tree/ajfixes
 #+begin_src emacs-lisp
 (use-package dired-quick-sort
@@ -593,11 +626,49 @@ But some of the options for listing-switches doesn’t work with remote sessions
     (bind-key "C-c C-s" 'dired-toggle-sudo dired-mode-map)))
 #+end_src
 
+**** Dired-recent
+Store visited directories in a list, make it accessible from helm
+#+BEGIN_SRC emacs-lisp
+(use-package dired-recent
+  :after (:all dired)
+  :config
+  (dired-recent-mode 1)
+  (setq dired-recent-mode-map nil)
+  (with-eval-after-load "helm-for-files"
+    (defun aj/remove-dired-recent-dir (_c)
+      ;; to be run from helm
+      (cl-loop for c in (helm-marked-candidates)
+               do (setq dired-recent-directories (delete c dired-recent-directories))))
+
+    (defclass aj/helm-dired-recent-source (helm-source-sync helm-type-file)
+      ((candidates :initform (lambda () dired-recent-directories))
+       (pattern-transformer :initform 'helm-recentf-pattern-transformer)
+       (match-part :initform (lambda (candidate)
+                               (if (or helm-ff-transformer-show-only-basename
+                                       helm-recentf--basename-flag)
+                                   (helm-basename candidate) candidate)))
+       (fuzzy-match :initform t)))
+
+    (defmethod helm--setup-source :after ((source aj/helm-dired-recent-source))
+      (setf (slot-value source 'action)
+            (append (symbol-value (helm-actions-from-type-file))
+                    '(("Delete file(s) from aj/favourite-files" .
+                       aj/remove-dired-recent-dir))))
+      (setf (slot-value source 'filtered-candidate-transformer)
+            (append (slot-value source 'filtered-candidate-transformer)
+                    '(aj/helm-recentf-filtered-candidates-shorten))))
+
+    (defvar aj/helm-source-dired-recent
+      (helm-make-source "Recent directories" 'aj/helm-dired-recent-source))))
+
+
+#+END_SRC
+
 *** Recentf
 #+begin_src emacs-lisp
 (use-package recentf
   :demand t
-  :init (setq-default recentf-exclude '("xhtml-loader\\.rnc$" "\\.elc$" 
+  :init (setq-default recentf-exclude '("xhtml-loader\\.rnc$" "\\.elc$"
                                         "elpa.*-autoloads.el"
                                         "/tmp/org-init-tangle"
                                         aj/recentf-exclude)
@@ -613,10 +684,16 @@ But some of the options for listing-switches doesn’t work with remote sessions
                 (concat reg "$"))
               filename)
              return t))
-  
+
   (recentf-mode 1))
 #+end_src
 
+*** Zeitgeist
+#+BEGIN_SRC emacs-lisp
+(use-package zeitgeist
+  :load-path "~/kodat/elisp/zeitgeist/"
+  :demand t)
+#+END_SRC
 *** Ignore more files for normal completion
 #+BEGIN_SRC emacs-lisp
 (with-eval-after-load 'latex
@@ -653,7 +730,7 @@ This works for instance in ~dired-do-rename~ or ~mu4e-view-save-attachment~ (als
 #+end_src
 
 
-*** Auto reverting 
+*** Auto reverting
 #+begin_src emacs-lisp
 (global-auto-revert-mode t)
 ;; Don't update pdfs in process of being built though:
@@ -680,16 +757,113 @@ A function for reverting all opened files, even remote files (because auto-rever
 #+end_src
 
 ** Password-store
+Customizations for ~password-store~ and ~pass-mode.~
+In particular, I want good completion when generating a password, so, inspired by the directory-completion in ~helm-find-files~, I define a helm source which lists the password directories and allows completion on them.
+
+I also want a function that places the newly generated password in the kill ring: ~aj/password-store-generate-and-copy.~
+
+Last, a few functions to git push, pull and run ~magit~ on the password store.
+
 #+BEGIN_SRC emacs-lisp
 (use-package password-store
   :defer t
-  :config (setq password-store-password-length 47))
+  :config (setq password-store-password-length 47)
+
+  (defun aj/password-store-generate (oldfun entry &optional password-length no-symbols)
+    (interactive (list (aj/password-store-get-new-entry-with-completion)
+                       (when current-prefix-arg
+                         (abs (prefix-numeric-value current-prefix-arg)))))
+    ;;we get nil when everything is fine, otherwise probably an error
+    ;;is signalled
+    (unless (apply oldfun entry password-length) entry))
+
+  (advice-add 'password-store-generate :around #'aj/password-store-generate)
+
+  (defun aj/password-store-generate-and-copy ()
+    (interactive)
+    (password-store-copy
+     (call-interactively #'password-store-generate)))
+
+  (defun aj/password-store-generate-and-copy-simpler ()
+    (interactive)
+    (let ((entry (aj/password-store-get-new-entry-with-completion)))
+      (password-store--run-generate entry 19 t t)
+      (password-store-copy entry)))
+
+  (defun aj/password-store-get-new-entry-with-completion ()
+    (helm
+     :prompt: "Password entry:"
+     :sources
+     (list (helm-build-sync-source "Pass dirs"
+             :candidates #'aj/password-store-list-dirs
+             :action #'identity
+             :persistent-action #'aj/password-helm-complete-persistent)
+           (helm-build-dummy-source "Insert"))))
+
+  (defun aj/password-helm-complete-persistent (candidate)
+    (with-selected-window (or (active-minibuffer-window)
+                              (minibuffer-window))
+      (delete-minibuffer-contents)
+      (set-text-properties 0 (length candidate)
+                           nil candidate)
+      (insert candidate)))
+
+  (defun aj/password-store-list-dirs (&optional subdir)
+    "List password entries under SUBDIR."
+    (unless subdir (setq subdir ""))
+    (let ((dir (f-join (password-store-dir) subdir)))
+      (when (f-directory-p dir)
+        (-reject
+         (lambda (d) (string-match-p "\\(/\\.\\|^\\.\\)" d))
+         (mapcar (lambda (f) (file-name-as-directory (password-store--file-to-entry f)))
+                 (f-directories dir nil t))))))
+  )
+
+
+(use-package pass
+  :defer t
+  :config
+  (bind-keys :map pass-mode-map
+             ("P" . aj/pass-git-push)
+             ("F" . aj/pass-git-pull)
+             ("m" . aj/pass-magit)
+             ("W" . aj/password-store-generate-and-copy)
+             ("V" . aj/password-store-generate-and-copy-simpler))
+
+  (defun aj/pass-git-push ()
+    (interactive)
+    (password-store--run-git "push"))
+  (defun aj/pass-git-pull ()
+    (interactive)
+    (password-store--run-git "pull"))
+  (defun aj/pass-magit ()
+    (interactive)
+    (magit-status "~/.password-store"))
+
+  (defun aj/pass-display-header-extra ()
+    (pass--display-keybindings '((aj/password-store-generate-and-copy . "Generate and copy")
+                                 (aj/password-store-generate-and-copy-simpler . "Generate and copy simpler")))
+    (insert "\n")
+    (pass--display-keybindings '((aj/pass-git-push . "Git push")
+                                 (aj/pass-git-pull . "Git pull")
+                                 (aj/pass-magit . "Launch magit")))
+    (newline)
+    (newline))
+
+  (advice-add 'pass-display-header :after #'aj/pass-display-header-extra)
+  )
+
+
+
+
+
 #+END_SRC
 ** LaTeX
 *** Config variables for latex :org_async:
 #+BEGIN_SRC emacs-lisp
 (with-eval-after-load 'tex
-  (setq TeX-auto-save t
+  (setq TeX-process-asynchronous t
+        TeX-auto-save t
         TeX-parse-self t ;parse on load
         TeX-auto-save t ;parse on save
         TeX-auto-local ".auctex-auto" ; more sensible directory name
@@ -792,7 +966,6 @@ A function for reverting all opened files, even remote files (because auto-rever
         flyspell-tex-command-regexp
         "\\(\\(begin\\|end\\)[ 	]*{\\|\\(cite[a-z*]*\\|label\\|ref\\|eqref\\|input\\|usepackage\\|documentclass\\)[ 	]*\\(\\[[^]]*\\]\\)?{[^{}]*\\)"
         font-latex-math-environments
-        
         '("display" "displaymath" "equation" "eqnarray" "gather" "multline" "align" "alignat" "xalignat" "dmath")
         font-latex-user-keyword-classes
         '(("fxnote"
@@ -817,19 +990,11 @@ A function for reverting all opened files, even remote files (because auto-rever
 
 (setq-default TeX-master 'dwim
               TeX-PDF-mode t) ;PDF by default
-#+END_SRC
-*** Open pdf in emacsclient in async mode :org_async:no_default_tangle:
-DONE?:
-skriva wrapper/alternativ funktion till TeX-pdf-tools-sync-view, som tar ett filnamn och sedan binder den så att TeX-pdf-tools-sync-view ser den, alt gör motsvarande saker. Denna funktion ska köras i normala emacsclient.
 
-Filnamnet måste skickas med till "processen" emacsclient, hur inline en emacsvariabel i ett emacs-process-call?
 
-#+BEGIN_SRC emacs-lisp
-(with-eval-after-load 'tex
-  (setq TeX-view-program-list
-        '(("emacsclient pdft"
-           "emacsclient -e \"(progn (pop-to-buffer (or (find-buffer-visiting \\\"%o\\\") (find-file-noselect \\\"%o\\\"))) (revert-buffer) (notify \\\"Org export latexmk\\\" \\\"Latexmk klar\\\"))\"")))
-  (setq TeX-view-program-selection '((output-pdf "emacsclient pdft"))))
+;; replacing \\par with a non-displaying character is just stupid
+(with-eval-after-load "tex-mode"
+  (setq tex--prettify-symbols-alist (delete '("\\par" . ? ) tex--prettify-symbols-alist)))
 #+END_SRC
 
 *** Use pdf-tools
@@ -867,6 +1032,19 @@ Filnamnet måste skickas med till "processen" emacsclient, hur inline en emacsva
 ;;              (expand-file-name (concat "\"" basename "\"" ".synctex")))))))
 
 ;;   (add-hook 'pdf-sync-locate-synctex-file-functions #'aj/locate-synctex-file))
+#+END_SRC
+*** Open pdf in emacsclient in async mode :org_async:no_default_tangle:
+DONE?:
+skriva wrapper/alternativ funktion till TeX-pdf-tools-sync-view, som tar ett filnamn och sedan binder den så att TeX-pdf-tools-sync-view ser den, alt gör motsvarande saker. Denna funktion ska köras i normala emacsclient.
+
+Filnamnet måste skickas med till "processen" emacsclient, hur inline en emacsvariabel i ett emacs-process-call?
+
+#+BEGIN_SRC emacs-lisp
+(with-eval-after-load 'tex
+  (setq TeX-view-program-list
+        '(("emacsclient pdft"
+           "emacsclient -e \"(progn (pop-to-buffer (or (find-buffer-visiting \\\"%o\\\") (find-file-noselect \\\"%o\\\"))) (revert-buffer) (alert \\\"Latexmk klar\\\" :title \\\"Org export latexmk\\\" :style 'libnotify))\"")))
+  (setq TeX-view-program-selection '((output-pdf "emacsclient pdft"))))
 #+END_SRC
 
 *** Extra latex bindings
@@ -938,8 +1116,7 @@ Filnamnet måste skickas med till "processen" emacsclient, hur inline en emacsva
 (with-eval-after-load 'tex-buf
   (defun aj/TeX-run-latexmk (name command file)
     (interactive)
-    (let ((TeX-save-query nil)
-          (TeX-process-asynchronous t))
+    (let ((TeX-save-query nil))
       (TeX-save-document "")
       (TeX-run-TeX name command file)))
 
@@ -1220,6 +1397,16 @@ already narrowed."
 *** Helm
 (Really too much in config section here. Should probably move it to another file)
 #+begin_src emacs-lisp
+(defcustom aj/shortened-helm-paths nil
+  "List of replacements to do in `helm-recentf-source' and
+`helm-source-files-in-current-dir' lists of files
+Order is important! Only the first matching entry will be replaced.
+
+Example of alist entry:
+\(\"^~/my/favorite/path\" . \"MFP\"\)"
+  :group 'aj
+  :type '(alist :key-type regexp :value-type string))
+
 (use-package helm
   :defer 0.5
   :bind (("<f2>" . helm-imenu))
@@ -1247,7 +1434,7 @@ already narrowed."
         helm-mode-fuzzy-match t
         helm-M-x-fuzzy-match t
         helm-semantic-fuzzy-match t
-        elm-imenu-fuzzy-match t
+        helm-imenu-fuzzy-match t
         helm-apropos-fuzzy-match t
         helm-lisp-fuzzy-completion t)
   (helm-adaptive-mode 1)
@@ -1255,19 +1442,63 @@ already narrowed."
   ;; display
   (setq helm-split-window-inside-p t)
   ;; from: https://www.reddit.com/r/emacs/comments/3asbyn/new_and_very_useful_helm_feature_enter_search/
-  (defun helm-hide-minibuffer-maybe ()
-    (when (with-helm-buffer helm-echo-input-in-header-line)
-      (let ((ov (make-overlay (point-min) (point-max) nil nil t)))
-        (overlay-put ov 'window (selected-window))
-        (overlay-put ov 'face (let ((bg-color (face-background 'default nil)))
-                                `(:background ,bg-color :foreground ,bg-color)))
-        (setq-local cursor-type nil))))
+  ;; (defun helm-hide-minibuffer-maybe ()
+  ;;   (when (with-helm-buffer helm-echo-input-in-header-line)
+  ;;     (let ((ov (make-overlay (point-min) (point-max) nil nil t)))
+  ;;       (overlay-put ov 'window (selected-window))
+  ;;       (overlay-put ov 'face (let ((bg-color (face-background 'default nil)))
+  ;;                               `(:background ,bg-color :foreground ,bg-color)))
+  ;;       (setq-local cursor-type nil))))
 
-  (add-hook 'helm-minibuffer-set-up-hook 'helm-hide-minibuffer-maybe)
+  ;; (add-hook 'helm-minibuffer-set-up-hook
+  ;; 'helm-hide-minibuffer-maybe)
 
-  (setq helm-echo-input-in-header-line t)
+  (setq helm-display-function #'aj/helm-display-child-frame
+        helm-display-buffer-reuse-frame t
+        helm-display-buffer-width 100
+        helm-display-buffer-height 30
+        helm-echo-input-in-header-line t)
 
-  ;; from:
+  (defun aj/helm-display-child-frame (buffer &optional resume)
+    "Display `helm-buffer' in a separate frame.
+Function suitable for `helm-display-function',
+`helm-completion-in-region-display-function'
+and/or `helm-show-completion-default-display-function'.
+See `helm-display-buffer-height' and `helm-display-buffer-width' to
+configure frame size."
+    (if (not (display-graphic-p))
+        ;; Fallback to default when frames are not usable.
+        (helm-default-display-buffer buffer)
+      (setq helm--buffer-in-new-frame-p t)
+      (let ((default-frame-alist
+              `((parent . ,(selected-frame))
+                (width . ,helm-display-buffer-width)
+                (height . ,helm-display-buffer-height)
+                (undecorated . t)
+                (left-fringe . 2)
+                (right-fringe . 2)
+                (tool-bar-lines . 0)
+                (line-spacing . 0)
+                (desktop-dont-save . t)
+                (no-special-glyphs . t)
+                (tool-bar-lines . 0)
+                (left . 0)
+                (top . 0)
+                (title . "Helm")
+                (vertical-scroll-bars . nil)
+                (menu-bar-lines . 0)
+                (fullscreen . nil)
+                (visibility . ,(null helm-display-buffer-reuse-frame))
+                (minibuffer . nil)))
+            display-buffer-alist)
+        (helm-display-buffer-popup-frame buffer default-frame-alist)
+        (set-face-attribute 'header-line (selected-frame)
+                            :background nil :foreground 'unspecified :height 1.15
+                            :inherit 'default)
+        (ime-frame-center))
+      (helm-log-run-hook 'helm-window-configuration-hook)))
+
+  ;; Only show headers if several sources
   ;; https://www.reddit.com/r/emacs/comments/2z7nbv/lean_helm_window/
   (defun helm-toggle-header-line ()
     (if (eq 1 (length (ignore-errors (with-helm-buffer helm-sources))))
@@ -1276,16 +1507,10 @@ already narrowed."
 
   (add-hook 'helm-before-initialize-hook #'helm-toggle-header-line)
 
+
+  ;;; bindings
   (define-key global-map [remap execute-extended-command] #'helm-M-x)
   (global-set-key (kbd "M-y") 'helm-show-kill-ring)
-
-  (setq helm-mini-default-sources
-        '(helm-source-buffers-list
-          helm-source-recentf
-          helm-source-files-in-current-dir
-          ;;     helm-source-locate 
-          helm-source-buffer-not-found
-          ))
 
   (bind-key "<f1> a" #'helm-apropos)
 
@@ -1295,16 +1520,20 @@ already narrowed."
   (global-set-key (kbd "C-x C-f") 'helm-find-files)
   (global-set-key (kbd "C-c h g") 'helm-google-suggest)
 
-  ;; shorten paths in some helm sources
-  (defcustom aj/shortened-helm-paths nil
-    "List of replacements to do in `helm-recentf-source' and
-`helm-source-files-in-current-dir' lists of files
-Order is important! Only the first matching entry will be replaced.
+;;; Helm mini:
 
-Example of alist entry:
-\(\"^~/my/favorite/path\" . \"MFP\"\)"
-    :group 'aj
-    :type '(alist :key-type regexp :value-type string))
+  (setq helm-mini-default-sources
+        '(helm-source-buffers-list
+          aj/helm-source-favourite-files
+          helm-source-recentf
+          helm-source-files-in-current-dir
+          aj/helm-source-dired-recent
+          helm-source-buffer-not-found))
+  (defvar aj/helm-source-dired-recent
+    (helm-build-sync-source "Recent directories"
+      :candidates 'dired-recent-directories
+      :action '(("Open directory" . dired)
+                ("Delete from dired-recent list" . aj/helm-action-dired-recent-delete))))
 
   (defun aj/shorten-helm-path (path)
     (cl-loop
@@ -1332,7 +1561,7 @@ Example of alist entry:
   (setq helm-grep-ag-command "rg -u --color=never --smart-case --no-heading --line-number %s %s %s"
         helm-grep-file-path-style 'relative)
   (bind-key "C-s" #'helm-ff-run-grep-ag helm-find-files-map)
-  
+
   (defun aj/helm-rg-org-files ()
     "Function for searching through all org files in home directory."
     (interactive)
@@ -1355,14 +1584,14 @@ Example of alist entry:
                               (helm-search-suggest-perform-additional-action
                                "http://tyda.se/search/%s" candidate))) t))
 
-  ;; more candidates for helm-ucs
+  ;;; more candidates for helm-ucs
   (defun aj/helm-500-candidates (fn &rest args)
     (let ((helm-candidate-number-limit 500))
       (apply fn args)))
 
   (advice-add 'helm-ucs :around #'aj/helm-500-candidates)
 
-  ;; mark-ring extra
+  ;;; mark-ring extra
   (defun aj/pop-to-mark-invoke-helm (fun)
     (interactive)
     (if (eq last-command 'pop-to-mark-command)
@@ -1379,6 +1608,31 @@ Example of alist entry:
   (with-eval-after-load 'helm-ring
     (add-to-list 'helm-source-mark-ring `(keymap . ,helm-mark-ring-map)))
   (advice-add 'pop-to-mark-command :around #'aj/pop-to-mark-invoke-helm)
+
+
+  ;; Don’t want launched processes lying around being children to
+  ;; emacs (and being killed when I have to kill emacs). Therefore I
+  ;; use ‘call-process-shell-command’ instead of
+  ;; ‘start-process-shell-command’.
+
+  (defun aj/helm-run-or-raise (exe &optional file)
+    (let ((real-com (car (split-string exe))))
+      (when (member real-com helm-external-commands-list)
+        (message "Starting %s..." real-com)
+        (if file
+            (call-process-shell-command
+             (format "%s %s"
+                     real-com
+                     (shell-quote-argument
+                      (if (eq system-type 'windows-nt)
+                          (helm-w32-prepare-filename file)
+                        (expand-file-name file))))
+             nil 0)
+          (call-process-shell-command real-com nil 0)))))
+
+  (advice-add 'helm-run-or-raise :override #'aj/helm-run-or-raise)
+
+
   )
 
 
@@ -1539,12 +1793,52 @@ Differnt fuzzy search algorithm, is this needed?
 #+END_SRC
 
 
-**** Helm-recoll
+**** Helm-recoll :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package helm-recoll
   :commands helm-recoll
   :config (helm-recoll-create-source "default" "~/.recoll/"))
 #+end_src
+
+**** Favourite files (to mark files which should be prioritized in helm matches)
+#+BEGIN_SRC emacs-lisp
+(defvar aj/favourite-files nil)
+(add-to-list 'savehist-additional-variables 'aj/favourite-files)
+
+(defun aj/add-favourite-file ()
+  (interactive)
+  (when (buffer-file-name)
+    (add-to-list 'aj/favourite-files (buffer-file-name) nil #'string=)))
+
+(with-eval-after-load "helm-for-files"
+  (defun aj/remove-favourite-file (_candidate)
+    ;; to be run from helm
+    (cl-loop for file in (helm-marked-candidates)
+             do (setq aj/favourite-files (delete file aj/favourite-files))))
+
+  (defclass aj/helm-favourite-files-source (helm-source-sync helm-type-file)
+    ((candidates :initform (lambda () aj/favourite-files))
+     (pattern-transformer :initform 'helm-recentf-pattern-transformer)
+     (match-part :initform (lambda (candidate)
+                             (if (or helm-ff-transformer-show-only-basename
+                                     helm-recentf--basename-flag)
+                                 (helm-basename candidate) candidate)))
+     (persistent-action :initform 'helm-ff-kill-or-find-buffer-fname)
+     (fuzzy-match :initform t)))
+
+  (defmethod helm--setup-source :after ((source aj/helm-favourite-files-source))
+    (setf (slot-value source 'action)
+          (append (symbol-value (helm-actions-from-type-file))
+                  '(("Delete file(s) from aj/favourite-files" .
+                     aj/remove-favourite-file))))
+    (setf (slot-value source 'filtered-candidate-transformer)
+          (append (slot-value source 'filtered-candidate-transformer)
+                  '(aj/helm-recentf-filtered-candidates-shorten))))
+
+  (defvar aj/helm-source-favourite-files
+    (helm-make-source "Favourite files" 'aj/helm-favourite-files-source)))
+
+#+END_SRC
 
 **** Favorite directories
 http://endlessparentheses.com/visit-directory-inside-a-set-of-directories.html
@@ -1641,6 +1935,21 @@ overriding it, but you should know before you do.
                           :inherit (cdr f)))))
 
 #+END_SRC
+
+*** Company
+#+BEGIN_SRC emacs-lisp
+(use-package company
+  :defer 3
+  :delight ""
+  :config (global-company-mode))
+
+(use-package company-box
+  :load-path "~/kodat/elisp/company-box" ;; fork from https://github.com/a13/company-box
+  :ensure t
+  :delight ""
+  :hook (company-mode . company-box-mode)
+  :config (setq company-box-icons-alist company-box-icons-all-the-icons))
+#+END_SRC
 *** hippie-expand and yasnippet
 #+begin_src emacs-lisp
 (use-package yasnippet
@@ -1720,7 +2029,7 @@ overriding it, but you should know before you do.
   :defer 3
   :bind (("C-z" . undo-tree-undo) ("S-C-z" . undo-tree-redo))
   :config (global-undo-tree-mode)
-  (setq undo-tree-auto-save-history t
+  (setq undo-tree-auto-save-history nil
         undo-tree-visualizer-timestamps t
         undo-tree-visualizer-diff t)
   (defun aj/undo-tree-compress (filename)
@@ -1737,13 +2046,28 @@ overriding it, but you should know before you do.
   :bind ("C-x g" . magit-status)
   :config
   (magit-auto-revert-mode -1) ;; I use global-auto-revert
-  (setq magit-diff-refine-hunk t)
+  (setq magit-diff-refine-hunk t
+        magit-bury-buffer-function #'magit-mode-quit-window)
+
   (add-hook 'git-commit-setup-hook #'git-commit-turn-on-flyspell)
   (add-hook 'git-commit-setup-hook
             (lambda () (setq fill-column 70)
               (ispell-change-dictionary "en_GB,sv_SE"))
             t))
 #+end_src
+
+*** Use visual-line-mode in magit for repositories with mostly prose text
+#+BEGIN_SRC emacs-lisp
+(defvar-local aj/magit-visual-line-mode nil
+  "Enable visual-line-mode for magit if non-nil.")
+(put 'aj/magit-visual-line-mode 'safe-local-variable #'booleanp)
+
+(add-hook 'magit-mode-hook #'aj/magit-maybe-enable-visual-line-mode)
+(defun aj/magit-maybe-enable-visual-line-mode ()
+  "Enables ‘visual-line-mode’ for repositories with mostly prose."
+  (when aj/magit-visual-line-mode
+    (visual-line-mode)))
+#+END_SRC
 
 *** Dired display of untracked git files
 #+BEGIN_SRC emacs-lisp
@@ -1822,7 +2146,7 @@ overriding it, but you should know before you do.
   :config (whole-line-or-region-global-mode)
   :delight whole-line-or-region-local-mode)
 #+END_SRC
-*** Volatile-highlight 
+*** Volatile-highlight
 Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
 #+BEGIN_SRC emacs-lisp
 (use-package volatile-highlights
@@ -1830,15 +2154,23 @@ Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
   :delight
   :commands volatile-highlights-mode
   :init (volatile-highlights-mode t)
-  :config (with-eval-after-load 'undo-tree
-            (vhl/define-extension 'undo-tree 'undo-tree-yank 'undo-tree-move)
-            (vhl/install-extension 'undo-tree))
+  :config
+  (with-eval-after-load 'undo-tree
+    (vhl/define-extension 'undo-tree 'undo-tree-yank 'undo-tree-move)
+    (vhl/install-extension 'undo-tree))
   (vhl/define-extension 'abbrev 'expand-abbrev)
   (vhl/install-extension 'abbrev)
   (vhl/define-extension 'helm-yank 'helm-kill-ring-action-yank)
   (vhl/install-extension 'helm-yank)
   (vhl/define-extension 'flyspell-prev 'flyspell-auto-correct-previous-word)
-  (vhl/install-extension 'flyspell-prev))
+  (vhl/install-extension 'flyspell-prev)
+
+  (defun aj/vhl-face (&optional theme)
+    (when (aj/solarized-theme-p theme)
+      (set-face-attribute 'vhl/default-face nil :background nil :foreground nil :inherit 'flycheck-info)))
+
+  (aj/vhl-face)
+  (add-hook 'aj/face-definitions-hook #'aj/vhl-face))
 #+END_SRC
 *** [[https://github.com/rejeep/drag-stuff.el][Drag stuff]]
 #+BEGIN_SRC emacs-lisp
@@ -1848,10 +2180,10 @@ Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
   :config
   (defhydra aj/hydra-drag-stuff (:color pink)
     "Drag stuff"
-    ("<right>" drag-stuff-right)
-    ("<left>" drag-stuff-left)
-    ("<up>" drag-stuff-up)
-    ("<down>" drag-stuff-down)
+    ("f" drag-stuff-right)
+    ("b" drag-stuff-left)
+    ("p" drag-stuff-up)
+    ("n" drag-stuff-down)
     ("q" nil nil))
   (bind-key [f9] #'aj/hydra-drag-stuff/body))
 #+END_SRC
@@ -1868,8 +2200,10 @@ Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
 
 *** Join line is my favourite command
 #+begin_src emacs-lisp
-(global-set-key (kbd "M-j") ;;var comment-indent-new-line men det använder jag inte
-                (lambda () (interactive) (join-line -1)))
+(bind-key "M-j" #'aj/join-following)  ;; no use for comment-indent-new-line
+(defun aj/join-following ()
+  (interactive)
+  (join-line -1))
 #+end_src
 
 *** cycle-spacing
@@ -1878,6 +2212,11 @@ Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
 #+end_src
 
 ** Various key binding customizations
+*** Kill emacs instead of terminal
+I often have more use for killing emacs (including all GUI-windows).
+#+BEGIN_SRC emacs-lisp
+(global-set-key [remap save-buffers-kill-terminal] #'save-buffers-kill-emacs)
+#+END_SRC
 *** No shift select
 #+BEGIN_SRC emacs-lisp
 (setq shift-select-mode nil)
@@ -2034,6 +2373,10 @@ _v_ variable-pitch:
   ("-" text-scale-decrease "out")
   ("´" variable-pitch-mode "variable-pitch")
   ("0" (text-scale-increase 0) "reset"))
+
+;; also zoom with C-scroll (like in Firefox)
+(bind-key "<C-down-mouse-4>" #'text-scale-increase)
+(bind-key "<C-down-mouse-5>" #'text-scale-decrease)
 #+end_src
 
 ** Movement
@@ -2089,16 +2432,17 @@ This could perhaps be sorted better.
 
 *** Print to pdf
 #+begin_src emacs-lisp
-(defun aj/print-to-pdf ()
-  (interactive)
+(defun aj/print-to-pdf (filename)
+  (interactive "F")
   (ps-spool-buffer-with-faces)
   (switch-to-buffer "*PostScript*")
   (write-file "/tmp/tmp.ps")
   (kill-buffer "tmp.ps")
-  (let ((cmd (concat "ps2pdf14 /tmp/tmp.ps " (buffer-name) ".pdf")))
+  (let ((cmd (format "ps2pdf14 /tmp/tmp.ps \"%s\"" filename )))
     (shell-command cmd)
     (shell-command "rm /tmp/tmp.ps")
-    (message (concat "Saved to:  " (buffer-name) ".pdf"))))
+    (message (concat "Saved to:  " filename))))
+
 #+end_src
 
 *** No pictures for speedbar
@@ -2146,12 +2490,6 @@ ediff expects diff to return results in C-locale, I’ve made a wrapper script
 (defalias 'yes-or-no-p 'y-or-n-p)
 #+end_src
 
-*** Use the right browser
-#+begin_src emacs-lisp
-(setq browse-url-browser-function 'browse-url-firefox
-	  browse-url-generic-program "firefox")
-#+end_src
-
 *** Source my ~.bash_env~.
 Needed when starting in a non-interactive shell.
 #+begin_src emacs-lisp
@@ -2172,16 +2510,28 @@ Needed when starting in a non-interactive shell.
 #+end_src
 
 ** prog-modes
+
+*** eldoc
+#+BEGIN_SRC emacs-lisp
+(global-eldoc-mode t)
+#+END_SRC
+
 *** Some settings for whitespace and ediff
 #+BEGIN_SRC emacs-lisp
 (setq whitespace-style '(face trailing lines-tail tabs)
       whitespace-line-column 80
       ediff-window-setup-function 'ediff-setup-windows-plain)
 #+END_SRC
+*** paren-face
+Dims parantheses in lisp modes.
+#+BEGIN_SRC emacs-lisp
+(use-package paren-face
+  :ensure t
+  :init (global-paren-face-mode))
+#+END_SRC
 *** Elisp
 **** Some settings from ESK
 #+begin_src emacs-lisp
-(add-hook 'emacs-lisp-mode-hook 'turn-on-eldoc-mode)
 (add-hook 'emacs-lisp-mode-hook 'aj/remove-elc-on-save)
 
 (defun aj/remove-elc-on-save ()
@@ -2257,6 +2607,7 @@ Argument SYM-NAME is the thing to find."
 **** Electric-quote-mode
 #+BEGIN_SRC emacs-lisp
 (add-hook 'emacs-lisp-mode-hook #'electric-quote-local-mode)
+(setq electric-quote-context-sensitive t)
 #+END_SRC
 
 *** aggressive-indent
@@ -2388,30 +2739,19 @@ To only activate it in prog-mode, we define a minor mode with the binding.
   :init
   (defvar comment-dwim-2-mode-map
     (let ((map (make-sparse-keymap)))
-      (define-key map (kbd "C-c c-;") #'comment-dwim-2)
+      (define-key map (kbd "C-c C-;") #'comment-dwim-2)
       map))
 
   (define-minor-mode comment-dwim-2-mode
     "Binds ‘comment-dwim-2’"
     :keymap comment-dwim-2-mode-map)
 
-  (add-hook 'prog-mode-hook #'comment-dwim-2-mode))
 
-;; (global-set-key (kbd "C-c C-;") 'comment-or-uncomment-region-or-line)
-;; (defun comment-or-uncomment-region-or-line ()
-;;   "Comments or uncomments the region or the current line if there's no active region."
-;;   (interactive)
-;;   (let (beg end)
-;; 	(if (region-active-p)
-;; 		(setq beg (region-beginning) end (region-end))
-;; 	  (setq beg (line-beginning-position) end (line-end-position)))
-;; 	(comment-or-uncomment-region beg end)
-;; 	(if (not (region-active-p)) (forward-line))))
+  (add-hook 'prog-mode-hook #'comment-dwim-2-mode))
 #+end_src
 
 *** Minibuffer evaluation
 #+BEGIN_SRC emacs-lisp
-(add-hook 'eval-expression-minibuffer-setup-hook #'eldoc-mode)
 (add-hook 'eval-expression-minibuffer-setup-hook #'smartparens-mode)
 #+END_SRC
 *** CPERL
@@ -2446,7 +2786,6 @@ cperl instead of perl-mode
   (add-to-list 'compilation-finish-functions 'aj/compile-notify)
 #+end_src
 
-
 *** Prettify
 #+BEGIN_SRC emacs-lisp
 (global-prettify-symbols-mode t)
@@ -2469,10 +2808,9 @@ cperl instead of perl-mode
 #+end_src
 
 ** Text-modes and spelling
-*** Text-mode uses variable-pitch and visual-line
+*** Text-mode uses visual-line-mode
 #+begin_src emacs-lisp
 (add-hook 'text-mode-hook 'turn-on-visual-line-mode)
-(add-hook 'text-mode-hook 'variable-pitch-mode)
 #+end_src
 *** No, sentences don’t end with double space
 That’s a stupid convention from the days of the typewriter.
@@ -2487,7 +2825,7 @@ However, sometimes I put every sentence on it’s own line (good for version con
 The minor mode defined below takes care of this. I advice ~fill-region-as-paragraph~ which is called by ~org-fill-paragraph~ (which is the most common way for me of invoking it), but perhaps there can be some invocations that are not matched by this. It would probably be cleaner to remap some keys, but this covers many cases in one go.
 
 #+BEGIN_SRC emacs-lisp
-(add-hook 'text-mode-hook (lambda () (setq fill-column 99999))) 
+(add-hook 'text-mode-hook (lambda () (setq fill-column 99999)))
 
 (define-minor-mode aj/one-sentence-per-line-mode
   "Minor mode that overrides `fill-region-as-paragraph' to
@@ -2508,13 +2846,13 @@ should be kept together."
   (setq-local
    sentence-end
    (format
-    "\\(?9:[.?!…‽][]\"'”’)}]*\\(?8:%s\\)?\\(?2:$\\|[	  ]\\)\\|[。．？！]+\\)[  	
+    "\\(?9:[.?!…‽][]\"'”’)}]*\\(?8:%s\\)?\\(?2:$\\|[	  ]\\)\\|[。．？！]+\\)[
 ]*"
     org-bracket-link-regexp)))
 
 (add-hook 'org-mode-hook #'aj/set-org-sentence-end)
 
-(defun aj/one-sentence-per-line-region (from to) 
+(defun aj/one-sentence-per-line-region (from to)
   "Makes one sentence per line in region"
   (interactive "r")
   (let ((se (sentence-end)))
@@ -2548,31 +2886,97 @@ Disable for now. (I never use it).
   :commands wc-mode
   :config (setq wc-modeline-format "[W:%tw]"))
 #+end_src
+
 *** Abbrev-mode
+In the abbrev-file I have defined two tables to use as parents of ~text-mode-abbrev-table~, ~aj/swedish-abbrevs~ and ~aj/english-abbrevs~. They are activated when writing in English or Swedish as defined by the functions below (the ~:enable-function~ of the tables).
+
+I also define abbrevs for english which expand "dont" to "do not" etc. in the table ~aj/formal-english-abbrevs~. This is activated via the minor mode ~aj/formal-english-minor-mode~.
+
+Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t seem to preserve properties. Therefore properties are added below.
 #+BEGIN_SRC emacs-lisp
 (use-package abbrev
-  :init (add-hook 'text-mode-hook #'abbrev-mode)
+  :delight
+  :init
+  (add-hook 'text-mode-hook #'abbrev-mode)
   (setq abbrev-file-name "~/.emacs.d/config/abbrev_defs")
-  ;; Define an abbrev for i->I
-  (defun ajf/make-i-I ()
+  :config
+  ;; Define a special abbrev for i->I, use it only when writing non-Swedish
+  (defun aj/make-i-I ()
     (when (or (bound-and-true-p orgqda-transcript-mode)
               (and
-               (not (null ispell-local-dictionary))
+               ispell-local-dictionary
                (not (string-match-p "sv" ispell-local-dictionary))))
       (zap-to-char -1 ?i)
       (insert "I")))
-  :delight)
+
+  (defun aj/writing-english-p ()
+    (if ispell-local-dictionary
+        (string-match-p "en" ispell-local-dictionary)
+      (and flyspell-mode
+           (string-match-p "en" ispell-dictionary))))
+
+  (defun aj/writing-swedish-p ()
+    (if ispell-local-dictionary
+        (string-match-p "sv" ispell-local-dictionary)
+      (and flyspell-mode
+           (string-match-p "sv" ispell-dictionary))))
+
+  (with-eval-after-load abbrev-file-name
+    (abbrev-table-put aj/english-abbrevs :enable-function #'aj/writing-english-p)
+    (abbrev-table-put aj/swedish-abbrevs :enable-function #'aj/writing-swedish-p)
+    (abbrev-table-put text-mode-abbrev-table
+                      :parents (list aj/english-abbrevs aj/swedish-abbrevs))
+    ;; to add or replace it every time abbrev-file is loaded:
+    (setf (alist-get 'aj/formal-english-minor-mode abbrev-minor-mode-table-alist)
+          aj/formal-english-abbrevs)))
+
+(define-minor-mode aj/formal-english-minor-mode
+  "Minor mode for expanding abbrevs like \"dont\" to \"do not\"."
+  :lighter ""
+  (if aj/formal-english-minor-mode
+      (font-lock-add-keywords nil (aj/formal-english-fl-keywords))
+    (font-lock-remove-keywords nil (aj/formal-english-fl-keywords)))
+  (font-lock-flush))
+
+(defvar aj/formal-english-highlights
+  '("aren't" "aren’t" "can't" "can’t" "couldn't" "couldn’t" "could've" "could’ve" "didn't" "didn’t" "doesn't" "doesn’t" "don't" "don’t" "hadn't" "hadn’t" "hasn't" "hasn’t" "haven't" "haven’t" "i'll" "i’ll" "isn't" "isn’t" "mightn't" "mightn’t" "mustn't" "mustn’t" "shouldn't" "shouldn’t" "should've" "should’ve" "that's" "that’s" "there's" "there’s" "wasn't" "wasn’t" "we're" "we’re" "weren't" "weren’t" "we've" "we’ve" "what's" "what’s" "where's" "where’s" "won't" "won’t" "wouldn't" "wouldn’t" "would've" "would’ve"))
+
+;; could be precomputed but ...
+(defun aj/formal-english-fl-keywords ()
+  `((,(regexp-opt aj/formal-english-highlights) 0 'hi-pink prepend)))
 #+END_SRC
 
 *** Ispell + flyspell
-**** Languages and hydra
+**** Options, define languages, hunspell, etc.
 #+begin_src emacs-lisp
 (setq-default ispell-program-name "hunspell")
 
 (setq ispell-silently-savep t
       ispell-dictionary "sv_SE")
 
-;; (with-eval-after-load 'ispell 
+;; (setq ispell-local-dictionary-alist
+;;       '(("en_GB"
+;;          "[[:alpha:]]" "[^[:alpha:]]"
+;;          "[’'´.0-b:-]" t ("-d" "en_GBz-large")
+;;          nil utf-8)
+;;         ("en_US"
+;;          "[[:alpha:]]" "[^[:alpha:]]"
+;;          "[’'´.0-b:-]" t ("-d" "en_US")
+;;          nil utf-8)
+;;         ("en_GB,sv_SE"
+;;          "[[:alpha:]]" "[^[:alpha:]]"
+;;          "[’'´.0-b:-]" t ("-d" "en_GBz-large,sv_SE")
+;;          nil utf-8)
+;;         ("blandat"
+;;          "[[:alpha:]]" "[^[:alpha:]]"
+;;          "[ø’'´.0-b:-]" t ("-d" "en_GBz-large,sv_SE,da_DK")
+;;          nil utf-8)
+;;         ("en_US,sv_SE"
+;;          "[[:alpha:]]" "[^[:alpha:]]"
+;;          "[’'´.0-b:-]" t ("-d" "en_US,sv_SE")
+;;          nil utf-8)))
+
+;; (with-eval-after-load 'ispell
 
 ;; ispell-set-spellchecker-params has to be called
 ;; before ispell-hunspell-add-multi-dic will work
@@ -2582,26 +2986,6 @@ Disable for now. (I never use it).
 
 ;; but I want to have control over all parameters,
 ;; quoting characters and personal dictionaries.
-
-;; (dolist (l '(("en_GB"
-;;               "[[:alpha:]]" "[^[:alpha:]]"
-;;               "[’'´.0-b:-]" t ("-d" "en_GBz-large")
-;;               nil utf-8)
-;;              ("en_US"
-;;               "[[:alpha:]]" "[^[:alpha:]]"
-;;               "[’'´.0-b:-]" t ("-d" "en_US")
-;;               nil utf-8)
-;;              ("en_GB,sv_SE"
-;;               "[[:alpha:]]" "[^[:alpha:]]"
-;;               "[’'´.0-b:-]" t ("-d" "en_GBz-large,sv_SE")
-;;               nil utf-8)
-;;              ("en_US,sv_SE"
-;;               "[[:alpha:]]" "[^[:alpha:]]"
-;;               "[’'´.0-b:-]" t ("-d" "en_US,sv_SE")
-;;               nil utf-8)))
-;;   (add-to-list 'ispell-dictionary-alist l))
-
-;; )
 
 (add-hook 'ispell-initialize-spellchecker-hook #'aj/extra-dicts)
 (defun aj/extra-dicts ()
@@ -2618,18 +3002,25 @@ Disable for now. (I never use it).
            "[[:alpha:]]" "[^[:alpha:]]"
            "[’'´.0-b:-]" t ("-d" "en_GBz-large,sv_SE")
            nil utf-8)
+          ("blandat"
+           "[[:alpha:]]" "[^[:alpha:]]"
+           "[ø’'´.0-b:-]" t ("-d" "en_GBz-large,sv_SE,da_DK")
+           nil utf-8)
           ("en_US,sv_SE"
            "[[:alpha:]]" "[^[:alpha:]]"
            "[’'´.0-b:-]" t ("-d" "en_US,sv_SE")
            nil utf-8))))
 
+#+END_SRC
 
+**** flyspell-hydra and custom commands
+#+BEGIN_SRC emacs-lisp
 (bind-key "C-c l" 'hydra-flyspell/body)
 (defhydra hydra-flyspell (:color blue :hint nil)
   "
-^Correct:^    _,_: auto-correct   _c_orrect
+^Correct:^    _,_: auto-correct   _c_orrect Current: %(identity ispell-current-dictionary)
 ^Toggle:^     _l_: turn %(if flyspell-mode \"off\" \"on \") flyspell _L_ toggle+disable, turn: %(if flyspell-mode \"off\" \"on \")
-^Languages:^  _s_venska   _b_ritish  _d_: svenska-british _a_: svenska-american  _u_s english
+^Languages:^  _s_venska   _b_ritish  _d_: svenska-british _a_: blandat  _u_s english
 "
   ("l" flyspell-mode)
   ("L" aj/disable-enable-flyspell-permanently-in-file)
@@ -2637,16 +3028,19 @@ Disable for now. (I never use it).
   ("," flyspell-auto-correct-word :color red)
   ("s" (ispell-change-dictionary "sv_SE"))
   ("S" (aj/ispell-change-dictionary-store "sv_SE"))
-  ("b" (ispell-change-dictionary "en_GB"))
+  ("b" (aj/ispell-change-dictionary "en_GB"))
   ("B" (aj/ispell-change-dictionary-store "en_GB"))
-  ("d" (ispell-change-dictionary "en_GB,sv_SE"))
+  ("d" (aj/ispell-change-dictionary "en_GB,sv_SE"))
   ("D" (aj/ispell-change-dictionary-store "en_GB,sv_SE"))
-  ("a" (ispell-change-dictionary "en_US,sv_SE"))
-  ("A" (aj/ispell-change-dictionary-store "en_US,sv_SE"))
-  ("u" (ispell-change-dictionary "en_US"))
+  ("a" (aj/ispell-change-dictionary "blandat"))
+  ("A" (aj/ispell-change-dictionary-store "blandat"))
+  ("u" (aj/ispell-change-dictionary "en_US"))
   ("U" (aj/ispell-change-dictionary-store "en_US"))
   ("q" nil))
 
+(defun aj/ispell-change-dictionary (dict)
+  (ispell-change-dictionary dict)
+  (guess-language-mode -1))
 
 (defun aj/disable-enable-flyspell-permanently-in-file ()
   (interactive)
@@ -2656,6 +3050,7 @@ Disable for now. (I never use it).
       (if flyspell-mode
           (progn
             (flyspell-mode -1)
+            (guess-language-mode -1)
             (add-file-local-variable 'aj/inhibit-flyspell t))
         (flyspell-mode)
         (goto-char (point-min))
@@ -2668,7 +3063,8 @@ Disable for now. (I never use it).
                       (mapcar #'car ispell-dictionary-alist))))
   (save-excursion
     (ispell-change-dictionary dict)
-    (add-file-local-variable 'ispell-local-dictionary dict)))
+    (add-file-local-variable 'ispell-local-dictionary dict)
+    (guess-language-mode -1)))
 
 (advice-add 'ispell-change-dictionary :after #'aj/ispell-change-dictionary-merge-personal)
 
@@ -2692,7 +3088,7 @@ personal dictionaries into a combined personal dictionary."
       (setq-local ispell-local-pdict (car dictfiles)))))
 #+end_src
 
-**** Guess language and enabling of flyspell
+**** Guess language, conditional enabling of flyspell and setting of languages for flyspell, typo and langtool.
 #+BEGIN_SRC emacs-lisp
 (use-package guess-language
   :ensure t
@@ -2702,11 +3098,25 @@ personal dictionaries into a combined personal dictionary."
                                    (sv . ("sv_SE" "Swedish")))
         guess-language-languages '(en sv)
         guess-language-min-paragraph-length 45)
+  (add-to-list 'guess-language-after-detection-functions
+               #'aj/set-langtool-language)
+
+  (defun aj/set-langtool-language (lang _beg _end)
+    (cl-case lang
+      (sv (setq-local langtool-default-language "sv-SE"))
+      (en (setq-local langtool-default-language "en-GB"))))
+
   :delight guess-language-mode)
 
 (defvar aj/flyspell-modes '(org-mode mu4e-compose-mode))
 (defvar-local aj/inhibit-flyspell nil)
 (put 'aj/inhibit-flyspell 'safe-local-variable #'booleanp)
+
+
+;; Functions that maybe enables flyspell and guess-language, a second
+;; after local variables are read (to ensure ispell language and
+;; aj/inhabit-flyspell is set).
+(add-hook 'hack-local-variables-hook #'aj/maybe-enable-flyspell-and-guess-language)
 
 (defun aj/maybe-enable-flyspell-and-guess-language ()
   (run-with-idle-timer 1 nil #'aj/maybe-enable-flyspell-and-guess-language-fn (current-buffer)))
@@ -2716,14 +3126,20 @@ personal dictionaries into a combined personal dictionary."
     (with-current-buffer buf
       (when (and (not aj/inhibit-flyspell)
                  (member major-mode aj/flyspell-modes))
-        (flyspell-mode 1))
+        (flyspell-mode 1)
+        (aj/set-langtool-language-from-ispell-dict))
       (if (or (eq major-mode 'mu4e-compose-mode)
               (and flyspell-mode (not ispell-local-dictionary)))
           (guess-language-mode 1)
         (guess-language-mode -1)))))
 
-(add-hook 'hack-local-variables-hook #'aj/maybe-enable-flyspell-and-guess-language)
+(defun aj/set-langtool-language-from-ispell-dict ()
+  (when (and ispell-local-dictionary
+             (< (length ispell-local-dictionary) 7))
+    (setq-local langtool-default-language
+                (replace-regexp-in-string "\_" "-" ispell-local-dictionary))))
 #+END_SRC
+
 **** Extra flyspell bindings
 #+BEGIN_SRC emacs-lisp
 (with-eval-after-load 'flyspell
@@ -2793,7 +3209,7 @@ personal dictionaries into a combined personal dictionary."
 
 #+END_SRC
 
-**** Avoid unneccesary messages
+**** Avoid unneccesary messages :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (defun aj/message-off-advice (oldfun &rest args)
   "Quiet down messages in adviced OLDFUN."
@@ -2881,17 +3297,21 @@ For doing smart (curly) quotes, mainly in mails since org has it’s own mechani
          ("C-x 4 l" . langtool-switch-default-language)
          ("C-x 4 4" . langtool-show-message-at-point)
          ("C-x 4 c" . langtool-correct-buffer))
-  :config (progn
-            (setq langtool-language-tool-jar
-                  (expand-file-name "languagetool-commandline.jar" "~/lib")
-                  langtool-mother-tongue "sv"
-                  langtool-default-language "en-GB"
-                  langtool-disabled-rules '("WHITESPACE_RULE"
-                                            "EN_QUOTES"))))
+  :config
+  (setq langtool-language-tool-jar nil
+        langtool-java-classpath
+        "/usr/share/java/languagetool/*:/usr/share/languagetool"
+        langtool-mother-tongue "sv"
+        langtool-disabled-rules '("WHITESPACE_RULE"
+                                  "EN_QUOTES")))
 #+END_SRC
 
 *** Word lookups (definition, translation, synonyms). Use define-word for online word definitions and SDCV for Webster's dictionary installed locally
-My extra libraries can be found at:  https://gitlab.com/andersjohansson/define-word-thesaurus and  https://gitlab.com/andersjohansson/definew-word-tyda
+My extra libraries can be found at:  https://gitlab.com/andersjohansson/define-word-thesaurus (doesn’t work with updated thesaurus.com) and  https://gitlab.com/andersjohansson/definew-word-tyda.
+
+I like thesaurus.com because it separates different meanings of a word, and because it sorts the words into more and less common.
+Thesaurus.com has changed the frontend to random class names and ids however, and is much harder to parse now than when i wrote ~define-word-thesaurus~.
+https://github.com/Manwholikespie/thesaurus (python) seems to be doing a good job of it though. If it was easy and my system didn’t crash when attempting to call python from elisp (with https://github.com/jvkersch/emacs-python) it would be a very good alternative. Parsing the output from a python shell seems to be an alternative for using that.
 
 Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_now_using_the_right_dictionary
 
@@ -2904,18 +3324,35 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
          (if arg
              (define-word-at-point nil 'tyda)
            (define-word (read-from-minibuffer "Tyda: ") 'tyda)))
-  (defun aj/thesaurus-lookup (arg) (interactive "P")
-         (if arg
-             (define-word-at-point nil 'thesaurus)
-           (define-word (read-from-minibuffer "Thesaurus: ") 'thesaurus))))
-(use-package define-word-thesaurus
-  :load-path "~/kodat/elisp/define-word-thesaurus/"
-  :after define-word)
+  ;; (defun aj/thesaurus-lookup (arg) (interactive "P")
+  ;;        (if arg
+  ;;            (define-word-at-point nil 'thesaurus)
+  ;;          (define-word (read-from-minibuffer "Thesaurus: ") 'thesaurus)))
+  )
+;; (use-package define-word-thesaurus
+;;   :load-path "~/kodat/elisp/define-word-thesaurus/"
+;;   :after define-word)
 (use-package define-word-tyda
+  :load-path "~/kodat/elisp/define-word-tyda/"
+  :after define-word)
+(use-package define-word-synonymer
   :load-path "~/kodat/elisp/define-word-tyda/"
   :after define-word)
 (use-package sdcv-mode
   :commands 'sdcv-search)
+(use-package google-translate
+  :commands 'google-translate-smooth-translate
+  :init (setq google-translate-translation-directions-alist
+              '(("sv" . "en") ("en" . "sv") ("da" . "sv"))))
+
+;; needs wn, installed with aur package wordnet-cli
+(use-package synosaurus
+  :ensure t
+  :pin "melpa"
+  :commands (synosaurus-lookup synosaurus-choose-and-replace)
+  :init
+  ;; this means completing-read, which gives me helm completion
+  (setq synosaurus-choose-method 'default))
 
 (defhydra hydra-word-lookup
   (:color blue)
@@ -2924,8 +3361,13 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
   ("<RET>" define-word "define word")
   ("t" (define-word (read-from-minibuffer "Tyda: " ) 'tyda) "tyda")
   ("T" (define-word-at-point nil 'tyda) "Tyda at point")
-  ("s" (define-word (read-from-minibuffer "Thesaurus: " ) 'thesaurus) "Thesaurus")
-  ("S" (define-word-at-point nil 'thesaurus) "Thesaurus at point"))
+  ("c" (define-word (read-from-minibuffer "Synonymer: " ) 'synonymer) "synonymer")
+  ("C" (define-word-at-point nil 'synonymer) "Synonymer at point")
+  ;; ("s" (define-word (read-from-minibuffer "Thesaurus: " ) 'thesaurus) "Thesaurus")
+  ;; ("S" (define-word-at-point nil 'thesaurus) "Thesaurus at point")
+  ("s" synosaurus-lookup "synosaurus")
+  ("S" synosaurus-choose-and-replace "Synosaurus at point")
+  ("g" google-translate-smooth-translate "Google translate"))
 
 (bind-key "C-x l"  #'hydra-word-lookup/body)
 #+END_SRC
@@ -2956,7 +3398,7 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
             (nth (mod (1+ ind) (length aj/pdf-view-midnight-list))
                  aj/pdf-view-midnight-list))
       (pdf-view-midnight-minor-mode 1)))
-  
+
   (defvar aj/pdf-hl-color "#DED1EE")
   (defvar aj/pdf-ul-color "#633D91")
   (defvar aj/pdf-ol-color "#9C2F38")
@@ -3049,9 +3491,8 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
              ("M-p" . aj/other-window-pdf-previous-page))
 
   :functions (pdf-annot-add-markup-annotation pdf-annot-add-text-annotation))
-
-
 #+END_SRC
+
 **** pdf-zotxt-quote
 Copying from a pdf with correct org-zotxt references and page numbers
 https://gitlab.com/andersjohansson/pdf-zotxt-quote
@@ -3059,10 +3500,32 @@ https://gitlab.com/andersjohansson/pdf-zotxt-quote
 (use-package pdf-zotxt-quote
   :load-path "~/kodat/elisp/pdf-zotxt-quote/"
   :commands pdf-zotxt-quote-mode
-  :config (delight 'pdf-zotxt-quote-mode (all-the-icons-material "format_quote" :v-adjust 0) t))
+  :config
+  (setq pdf-zotxt-quote-fill-column 99999)
+  (delight 'pdf-zotxt-quote-mode (all-the-icons-material "format_quote" :v-adjust 0) t))
 #+END_SRC
 
 ** Various display customizations
+*** Variable pitch
+I want to use variable pitch for most things. But changing the default face to a variable pitch font is not a good idea, since so many tabular modes etc. depend on a monospace font. Setting it for ~prog-mode~, ~text-mode~ and in the modeline is good though.
+
+#+begin_src emacs-lisp
+(add-hook 'prog-mode-hook #'variable-pitch-mode)
+(add-hook 'text-mode-hook #'variable-pitch-mode)
+(set-face-attribute 'mode-line nil :family "Input Sans Condensed")
+#+end_src
+*** Document font
+When editing longer text documents in org mode (or perhaps LaTeX) it’s good to use a nice sans serif like ET Book (https://github.com/edwardtufte/et-book).
+This code defines a mode for doing a a local remapping to do that in a buffer.
+Heavily inspired by the package ~mixed-pitch~ (https://gitlab.com/jabranham/mixed-pitch).
+But also with some inspiration from here: https://lepisma.github.io/2017/10/28/ricing-org-mode/
+
+#+begin_src emacs-lisp
+(use-package doc-font
+  ;; in /lisp
+  :commands doc-font-mode)
+
+#+end_src
 *** Visual wrap column :ARCHIVE:
 Could be useful, but I don’t use it.
 #+begin_src emacs-lisp
@@ -3103,11 +3566,15 @@ Could be useful, but I don’t use it.
 *** Toggle font size
 Sometimes I feel the need for a generally bigger font.
 #+begin_src emacs-lisp
+(defvar aj/orig-font-size nil)
+
+(add-hook 'after-init-hook (lambda () (setq aj/orig-font-size (face-attribute 'default :height))))
+
 (defun aj/toggle-font-size ()
   (interactive)
-  (if (= 128 (face-attribute 'default :height))
+  (if (= aj/orig-font-size (face-attribute 'default :height))
       (set-face-attribute 'default nil :height 158)
-    (set-face-attribute 'default nil :height 128)))
+    (set-face-attribute 'default nil :height aj/orig-font-size)))
 #+end_src
 
 
@@ -3151,7 +3618,7 @@ A way of higlighting where you are, don’t use it now.
 #+END_SRC
 *** all the icons
 **** Base package
-Until this fix https://github.com/ubolonton/all-the-icons.el/tree/font-lock-fix is implemented I could use it from melpa.
+When this fix https://github.com/ubolonton/all-the-icons.el/tree/font-lock-fix is implemented I could use it from melpa.
 #+BEGIN_SRC emacs-lisp
 (use-package all-the-icons
   :load-path "~/kodat/elisp/all-the-icons.el")
@@ -3178,196 +3645,37 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
         (all-the-icons-dired--display)))))
 
 #+END_SRC
-*** Themes
-**** My own face definitions
-Load my own face customizations after enabling a theme (in general, these are modifications to solarized-light|dark).
-#+BEGIN_SRC emacs-lisp
-(defun aj/apply-face-definitions (&optional theme)
-  "Do face definition stuff after loading theme.
-Also runs hook aj/face-definitions-hook."
-  (unless (eq theme 'user) ;enable theme calls itself with user theme.
-    (with-eval-after-load 'org-faces
-      (set-face-attribute 'org-table nil :inherit 'fixed-pitch)
-      (set-face-attribute 'org-date nil :inherit 'fixed-pitch)
-      (set-face-attribute 'org-meta-line nil :inherit 'org-drawer)
-      (set-face-attribute 'org-block-begin-line nil :slant 'unspecified :foreground nil
-                          :inherit '(org-drawer) :overline t :height 0.9)
-      (set-face-attribute 'org-block-end-line nil :inherit '(org-drawer) :underline t :height 0.9)
-      (setq org-fontify-quote-and-verse-blocks t)
-      ;;(set-face-attribute 'org-block nil :inherit ??)
-      (set-face-attribute 'org-quote nil :weight 'normal :family "Cantarell" :inherit 'default)
-      (set-face-attribute 'org-date nil :inherit 'undefined)
-      (set-face-attribute 'org-verse nil :inherit 'org-table)
-      (set-face-attribute 'org-tag nil :weight 'normal :inherit 'show-paren-match)
-      (set-face-attribute 'org-special-keyword nil :weight 'normal :inherit 'shadow)
-      ;; (set-face-attribute 'org-link nil :underline nil)
-      ;; Special tag faces
-      (setq org-tag-faces
-            (append
-             '(("noexport" :inherit (widget-field org-tag))
-               ("ignoreheading" :inherit (widget-field org-tag))
-               ("read_only" :inherit (widget-field org-tag)))
-             org-tag-faces))
-      (org-set-tag-faces 'org-tag-faces org-tag-faces))
-
-    ;; level colors in solarized are bad
-    (when (member theme '(solarized-dark solarized-light))
-      (with-eval-after-load 'org-faces
-        (solarized-with-color-variables 'dark
-          (set-face-attribute 'org-level-1 nil :foreground violet)
-          (set-face-attribute 'org-level-2 nil :foreground blue)
-          (set-face-attribute 'org-level-3 nil :foreground cyan)
-          (set-face-attribute 'org-level-4 nil :foreground green)
-          (set-face-attribute 'org-level-5 nil :foreground yellow)
-          (set-face-attribute 'org-level-6 nil :foreground orange)
-          (set-face-attribute 'org-level-7 nil :foreground red)
-          (set-face-attribute 'org-level-8 nil :foreground magenta))))
-    (cond
-     ((eq theme 'solarized-light)
-      (setq org-n-level-faces 8))
-     ((eq theme 'solarized-dark)
-      ;; the yellow-red ones are garish contrast-colors to the background
-      (setq org-n-level-faces 4)))
-
-    ;; the thing solarized does with mode-line underline is bad.
-    (set-face-attribute 'mode-line nil :underline nil :overline nil)
-    (set-face-attribute 'mode-line-inactive nil :underline nil :overline nil)
-    (set-face-attribute 'header-line nil :underline nil :overline nil)
-
-    (with-eval-after-load 'idle-highlight-mode
-      (set-face-attribute 'idle-highlight nil :inherit nil :underline t))
-    
-    ;; Makes text indent kind of correct amount (I use a variable-pitch
-    ;; face as standard)
-    (with-eval-after-load 'org-indent
-      (set-face-attribute 'org-indent nil :family "Ubuntu Mono"))
-
-    (with-eval-after-load 'org-inlinetask
-      (set-face-attribute 'org-inlinetask nil :inherit 'org-level-5))
-
-    (with-eval-after-load 'volatile-highlights
-      (set-face-attribute 'vhl/default-face nil :background nil :foreground nil :inherit 'flycheck-info))
-
-    (run-hooks 'aj/face-definitions-hook)))
-
-(advice-add 'enable-theme :after #'aj/apply-face-definitions)
-#+END_SRC
-**** bbatsov’s solarized
-#+begin_src emacs-lisp
-(use-package solarized-theme
-  :ensure t
-  :init
-  (setq solarized-scale-org-headlines nil
-        solarized-distinct-fringe-background t
-        solarized-high-contrast-mode-line nil)
-  (load-theme 'solarized-light))
-
-(defun aj/toggle-light-dark ()
-  "Toggles light and dark solarized theme in Emacs and Arc theme in gtk."
-  (interactive)
-  (cond
-   ((custom-theme-enabled-p 'solarized-light)
-    (disable-theme 'solarized-light)
-    (unless (custom-theme-p 'solarized-dark)
-      ;; I seldom use the dark theme, so now is the time to load it
-      (load-theme 'solarized-dark t t))
-    (enable-theme 'solarized-dark)
-    (call-process-shell-command
-     "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc-Dark'\""))
-   ((custom-theme-enabled-p 'solarized-dark)
-    (disable-theme 'solarized-dark)
-    (enable-theme 'solarized-light)
-    (call-process-shell-command
-     "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc'\""))
-   (t
-    (enable-theme 'solarized-light))))
-
-(bind-key "S-<f11>" #'aj/toggle-light-dark)
-#+end_src
-**** sellout’s solarized :ARCHIVE:
-I actually liked this more, especially the unified-branch which I used here. But it has kind of stagnated, and has so few definitions.
-#+BEGIN_SRC emacs-lisp
-(use-package solarized-definitions
-  :if (display-graphic-p)
-  :load-path "~/kodat/elisp/emacs-color-theme-solarized/"
-  :demand t
-  :init (add-to-list 'custom-theme-load-path
-                     "~/kodat/elisp/emacs-color-theme-solarized/"))
-(when (display-graphic-p)
-  (setq frame-background-mode 'light)
-  (load-theme 'solarized t)
-  (mapc 'frame-set-background-mode (frame-list))
-
-  (defun toggle-night-color-theme ()
-    "Switch to/from night color scheme."
-    (interactive)
-    (if (eq frame-background-mode 'dark)
-        (progn
-          (setq frame-background-mode 'light)
-          (setq pdf-view-midnight-colors '("#657b83" . "#fdf6e3")))
-      (setq frame-background-mode  'dark)
-      (setq pdf-view-midnight-colors '("#839496" . "#002b36" )))
-
-    (load-theme 'solarized)
-    (mapc 'frame-set-background-mode (frame-list))
-    (powerline-reset)
-    (aj/apply-face-definitions))
-  (bind-key "<f9>" 'toggle-night-color-theme))
-#+END_SRC
-*** Hl-line
-#+begin_src emacs-lisp
-(add-hook 'prog-mode-hook 'hl-line-mode)
-;; (use-package hl-line+
-;;   :ensure t
-;;   :defer 5
-;;   :config
-;;   (hl-line-toggle-when-idle))
-#+end_src
-
-*** Cursor
-#+begin_src emacs-lisp
-(setq cursor-type 'bar)
-(setq cursor-in-non-selected-windows 'hbar)
-(use-package cursor-chg
-  :defer 5
-  :init (setq curchg-default-cursor-color (face-attribute 'font-lock-type-face :foreground))
-  :config
-  ;; (setq curchg-idle-cursor-type 'box)
-  ;; (toggle-cursor-type-when-idle -1)
-  (change-cursor-mode 1))
-#+end_src
-
-*** Fullscreen toggling
-#+begin_src emacs-lisp
-(defvar aj/last-fullscreen-param nil)
-
-(defun aj/toggle-fullscreen (&optional f)
-  (interactive)
-  (let ((current-value (frame-parameter nil 'fullscreen)))
-    (set-frame-parameter nil 'fullscreen
-                         (if (equal 'fullboth current-value)
-                             aj/last-fullscreen-param
-                           
-                           (setq aj/last-fullscreen-param current-value)
-                           (fancy-battery-mode +1)
-                           'fullboth))))
-
-(autoload 'fancy-battery-mode "fancy-battery")
-
-(bind-key "<f11>" #'aj/toggle-fullscreen)
-#+end_src
-
-*** Writeroom
-#+BEGIN_SRC emacs-lisp
-(use-package writeroom-mode
-  :commands writeroom-mode
-  :bind ("<f12>" . writeroom-mode)
-  :config (setq writeroom-width 80
-                writeroom-mode-line t
-                writeroom-extra-line-spacing 0.1
-                writeroom-global-effects '(writeroom-set-fullscreen)))
-#+END_SRC
 *** Modeline
+**** Doom-modeline
+#+BEGIN_SRC emacs-lisp
+(use-package eldoc-eval
+  :ensure t
+  :pin "melpa")
+(use-package doom-modeline
+  :ensure t
+  :pin "melpa"
+  :defer t
+  :hook (after-init . doom-modeline-init))
+#+END_SRC
+
+**** Moody :ARCHIVE:
+#+BEGIN_SRC emacs-lisp
+(use-package moody
+  :config
+  (setq x-underline-at-descent-line t)
+  (setq moody-mode-line-height 26)
+  ;; (moody-replace-mode-line-buffer-identification)
+  ;; (moody-replace-vc-mode)
+  :init
+  (add-hook 'aj/face-definitions-hook #'aj/modeline-fix)
+
+  (defun aj/modeline-fix (&optional theme)
+    (when (aj/solarized-theme-p theme)
+      (let ((line (face-attribute 'mode-line :underline)))
+        (set-face-attribute 'mode-line          nil :overline line :box nil)
+        (set-face-attribute 'mode-line-inactive nil :overline line :underline line :box nil)))))
+#+END_SRC
+
 **** [[https://github.com/TheBB/spaceline/][spaceline]] :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (use-package spaceline-config
@@ -3398,7 +3706,7 @@ I actually liked this more, especially the unified-branch which I used here. But
 
   (solarized-with-color-variables 'light
     (setq spaceline-all-the-icons-file-name-highlight base1))
-  
+
   ;; Better conditions
   (put 'spaceline-all-the-icons-time-p :when
        '(or spaceline-all-the-icons-clock-always-visible
@@ -3416,7 +3724,7 @@ I actually liked this more, especially the unified-branch which I used here. But
     (propertize (if (eq major-mode 'pdf-view-mode)
                     (spaceline--pdfview-page-number)
                   (format-mode-line "%l:%2c"))
-                
+
                 'face `(:height ,(spaceline-all-the-icons--height 0.9) :inherit)
                 'display '(raise 0.1))
     :tight t
@@ -3464,8 +3772,8 @@ I actually liked this more, especially the unified-branch which I used here. But
                   'mouse-face (spaceline-all-the-icons--highlight)
                   'local-map (make-mode-line-mouse-map 'mouse-1 mouse-f)))
     :tight t)
-  
-  
+
+
   ;; (spaceline-define-segment aj/all-the-icons-mode-icon
   ;;   "An `all-the-icons' segment indicating the current buffer's mode with an icon"
   ;;   (let ((icon (all-the-icons-icon-for-mode major-mode)))
@@ -3478,7 +3786,7 @@ I actually liked this more, especially the unified-branch which I used here. But
   ;;                                   ;; :inherit (powerline-active1)
   ;;                                   )))))
 
-  
+
   (defun aj/spaceline-all-the-icons-theme (&rest additional-segments)
     "Install the `spaceline-ml-all-the-icons'.
 Add ADDITIONAL-SEGMENTS to the end of the theme."
@@ -3503,24 +3811,12 @@ Add ADDITIONAL-SEGMENTS to the end of the theme."
            all-the-icons-buffer-id-aj) :separator ""))
 
         ;; all-the-icons-separator-left-extra-2
-        
-        (((all-the-icons-position-aj :priority -1)
-          ((all-the-icons-process
-            all-the-icons-region-info
-            all-the-icons-text-scale)
-           :priority 0.0)
-          (all-the-icons-narrowed :priority -1))
-         :separator (spaceline-all-the-icons--separator
-                     spaceline-all-the-icons-primary-separator " "))
 
         ;; all-the-icons-separator-left-extra-1
         ;; all-the-icons-separator-left-inactive
-        
+
         (all-the-icons-minor-modes :separator " " :priority -0.1)
-        
-        ;; all-the-icons-separator-left-extra-2
-        ;; all-the-icons-separator-left-inactive
-        
+
         ((all-the-icons-vc-icon
           all-the-icons-vc-status
           all-the-icons-git-ahead
@@ -3532,16 +3828,27 @@ Add ADDITIONAL-SEGMENTS to the end of the theme."
                      spaceline-all-the-icons-secondary-separator " ")
          :priority 0.5)
 
+        (((all-the-icons-position-aj :priority -1)
+          ((all-the-icons-process
+            all-the-icons-region-info
+            all-the-icons-text-scale)
+           :priority 0.0)
+          (all-the-icons-narrowed :priority -1))
+         :separator (spaceline-all-the-icons--separator
+                     spaceline-all-the-icons-primary-separator " "))
+
+        ;; all-the-icons-separator-left-extra-2
+        ;; all-the-icons-separator-left-inactive
         ;; all-the-icons-separator-right-active-1
-        
+
         ((all-the-icons-which-function)
          :separator ""))
 
       ;; right
       `((spaceline-mu4e-alert-segment :when active :priority 1)
         (global :when active :priority 1)
-        
-        
+
+
         ((((org-pomodoro
             (all-the-icons-org-clock-current-task
              :global-override 'org-mode-line-string))
@@ -3589,6 +3896,276 @@ Add ADDITIONAL-SEGMENTS to the end of the theme."
 
 (delight 'emacs-lisp-mode " Elisp" :major)
 #+end_src
+*** Themes
+**** My own face definitions
+Load my own face customizations after enabling a theme (in general, these are modifications to solarized-light|dark).
+#+BEGIN_SRC emacs-lisp
+
+;; Would it be possible to do it as a custom theme that is enabled
+;; after other themes? It would be cleaner (disableable).
+;; But it is tricky, to get the evaluation logic (is solarized
+;; loaded?) working as well as the hook. It could be modifications of
+;; the var aj/face-defs but we would still need to do dynamic checks
+;; of what theme is loaded for some of the faces before calling
+;; custom-theme-set-faces with this variable. Much hassle.
+
+;; (deftheme aj/face-definitions
+;;   "Extra face definitions to be loaded after other themes")
+
+;; (defvar aj/face-defs
+;;   (list
+;;    '(org-table ((t :inherit 'fixed-pitch)))
+;;    '(org-date ((t :inherit 'fixed-pitch)))))
+
+
+;; (defun aj/enable-face-definitions (en-theme theme)
+;;   (funcall en-theme theme)
+;;   (apply #'custom-theme-set-faces
+;;          'aj/face-definitions
+;;          aj/face-defs)
+
+;;   (funcall en-theme 'aj/face-definitions)
+
+;;   )
+
+
+(defun aj/apply-face-definitions (&optional theme)
+  "Do face definition stuff after loading theme.
+Also runs hook aj/face-definitions-hook."
+  (unless (eq theme 'user) ;enable theme calls itself with user theme.
+    (with-eval-after-load 'org-faces
+      (set-face-attribute 'org-table nil :inherit 'fixed-pitch)
+      (set-face-attribute 'org-meta-line nil :inherit 'org-drawer)
+
+      ;;(let ((shadow-color (face-attribute 'highlight :background)))
+      (set-face-attribute 'org-block-begin-line nil :inherit '(shadow) :height 0.9)
+      (set-face-attribute 'org-block-end-line nil :inherit '(shadow)  :height 0.9)
+      ;;)
+
+      ;;(set-face-attribute 'org-block nil :inherit ??)
+      (set-face-attribute 'org-quote nil :weight 'normal :height 0.95 :inherit 'default)
+      (set-face-attribute 'org-verse nil :inherit 'org-table)
+      ;; (set-face-attribute 'org-tag nil :weight 'normal :inherit
+      ;; 'show-paren-match)
+
+      (set-face-attribute 'org-special-keyword nil :weight 'normal :inherit 'shadow)
+
+      ;; Special tag faces
+      (dolist (f '(("noexport" :inherit (widget-field org-tag))
+                   ("ignoreheading" :inherit (widget-field org-tag))
+                   ("read_only" :inherit (widget-field org-tag))))
+        (add-to-list 'org-tag-faces f))
+      (org-set-tag-faces 'org-tag-faces org-tag-faces)
+
+      ;; specific for solarized
+      ;; level colors in solarized are bad
+      (when (aj/solarized-theme-p)
+        (solarized-with-color-variables 'dark
+                                        (set-face-attribute 'org-level-1 nil :foreground violet)
+                                        (set-face-attribute 'org-level-2 nil :foreground blue)
+                                        (set-face-attribute 'org-level-3 nil :foreground cyan)
+                                        (set-face-attribute 'org-level-4 nil :foreground green)
+                                        (set-face-attribute 'org-level-5 nil :foreground yellow)
+                                        (set-face-attribute 'org-level-6 nil :foreground orange)
+                                        (set-face-attribute 'org-level-7 nil :foreground red)
+                                        (set-face-attribute 'org-level-8 nil :foreground magenta))))
+
+    (cond
+     ((eq theme 'solarized-light)
+      (setq org-n-level-faces 8))
+     ((eq theme 'solarized-dark)
+      ;; the yellow-red ones are garish contrast-colors to the background
+      (setq org-n-level-faces 4)))
+
+    ;; the thing solarized does with mode-line underline is bad.
+    ;; (when (member theme '(solarized-dark solarized-light))
+    ;;   (set-face-attribute 'mode-line nil :underline nil :overline nil)
+    ;;   (set-face-attribute 'mode-line-inactive nil :underline nil :overline nil)
+    ;;   (set-face-attribute 'header-line nil :underline nil :overline nil))
+
+    (with-eval-after-load 'idle-highlight-mode
+      (set-face-attribute 'idle-highlight nil :inherit nil :underline t))
+
+    ;; Makes text indent kind of correct amount (I use a variable-pitch
+    ;; face as standard)
+    ;; (with-eval-after-load 'org-indent
+    ;;   (set-face-attribute 'org-indent nil :inherit 'org-hide))
+
+    (with-eval-after-load 'org-inlinetask
+      (set-face-attribute 'org-inlinetask nil :inherit 'org-level-5))
+
+    (run-hook-with-args 'aj/face-definitions-hook theme)))
+
+(advice-add 'enable-theme :after #'aj/apply-face-definitions)
+#+END_SRC
+**** Gruvbox
+#+BEGIN_SRC emacs-lisp
+(use-package gruvbox
+  :load-path "~/kodat/elisp/gruvbox-theme/"
+  :init
+  (add-to-list 'custom-theme-load-path "~/kodat/elisp/gruvbox-theme/"))
+#+END_SRC
+
+**** Define themes to use for dark and light and load light theme
+#+BEGIN_SRC emacs-lisp
+(defvar aj/light-theme 'gruvbox-light-hard)
+(defvar aj/dark-theme 'gruvbox-dark-medium)
+
+(load-theme aj/light-theme)
+#+END_SRC
+**** Dark-light-switching
+#+BEGIN_SRC emacs-lisp
+(defun aj/toggle-light-dark ()
+  "Toggles light and dark solarized theme in Emacs and Arc theme in gtk."
+  (interactive)
+  (cond
+   ((custom-theme-enabled-p aj/light-theme)
+    (disable-theme aj/light-theme)
+    (unless (custom-theme-p aj/dark-theme)
+      ;; I seldom use the dark theme, so now is the time to load it
+      (load-theme aj/dark-theme t t))
+    (enable-theme aj/dark-theme)
+    (call-process-shell-command
+     "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc-Dark'\""))
+   ((custom-theme-enabled-p aj/dark-theme)
+    (disable-theme aj/dark-theme)
+    (enable-theme aj/light-theme)
+    (call-process-shell-command
+     "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc'\""))
+   (t
+    (enable-theme 'aj/light-theme))))
+
+(bind-key "S-<f11>" #'aj/toggle-light-dark)
+#+END_SRC
+**** Base 16 :ARCHIVE:
+Works ok... But also here, too bright oranges
+Which are nice?
+- Dark
+  + base16-materia
+  + base16-material (similar)
+- light
+  + mexico-light
+  + tomorrow
+
+
+#+BEGIN_SRC emacs-lisp
+(use-package base16-theme
+  :ensure t
+  :config
+  (load-theme 'base16-mexico-light t))
+#+END_SRC
+**** Tomorrow :ARCHIVE:
+Is almost good, but it lacks some definitions, and the yellow and orange have bad contrast against white (too bright)
+#+BEGIN_SRC emacs-lisp
+(use-package color-theme-sanityinc-tomorrow
+:ensure t
+:init (load-theme 'sanityinc-tomorrow-day))
+
+#+END_SRC
+**** bbatsov’s solarized :ARCHIVE:
+#+begin_src emacs-lisp
+(use-package solarized-theme
+  :ensure t
+  :init
+  (setq solarized-scale-org-headlines nil
+        solarized-distinct-fringe-background t
+        solarized-high-contrast-mode-line nil)
+  (load-theme 'solarized-light))
+#+end_src
+**** sellout’s solarized :ARCHIVE:
+I actually liked this more, especially the unified-branch which I used here. But it has kind of stagnated, and has so few definitions.
+#+BEGIN_SRC emacs-lisp
+(use-package solarized-definitions
+  :if (display-graphic-p)
+  :load-path "~/kodat/elisp/emacs-color-theme-solarized/"
+  :demand t
+  :init (add-to-list 'custom-theme-load-path
+                     "~/kodat/elisp/emacs-color-theme-solarized/"))
+(when (display-graphic-p)
+  (setq frame-background-mode 'light)
+  (load-theme 'solarized t)
+  (mapc 'frame-set-background-mode (frame-list))
+
+  (defun toggle-night-color-theme ()
+    "Switch to/from night color scheme."
+    (interactive)
+    (if (eq frame-background-mode 'dark)
+        (progn
+          (setq frame-background-mode 'light)
+          (setq pdf-view-midnight-colors '("#657b83" . "#fdf6e3")))
+      (setq frame-background-mode  'dark)
+      (setq pdf-view-midnight-colors '("#839496" . "#002b36" )))
+
+    (load-theme 'solarized)
+    (mapc 'frame-set-background-mode (frame-list))
+    (powerline-reset)
+    (aj/apply-face-definitions))
+  (bind-key "<f9>" 'toggle-night-color-theme))
+#+END_SRC
+
+
+*** Hl-line
+#+begin_src emacs-lisp
+(add-hook 'prog-mode-hook 'hl-line-mode)
+;; (use-package hl-line+
+;;   :ensure t
+;;   :defer 5
+;;   :config
+;;   (hl-line-toggle-when-idle))
+#+end_src
+
+*** Cursor
+#+begin_src emacs-lisp
+(setq cursor-type 'bar)
+(setq cursor-in-non-selected-windows 'hbar)
+(use-package cursor-chg
+  :defer 5
+  :init (setq curchg-default-cursor-color (face-attribute 'font-lock-type-face :foreground))
+  :config
+  ;; (setq curchg-idle-cursor-type 'box)
+  ;; (toggle-cursor-type-when-idle -1)
+  (change-cursor-mode 1))
+#+end_src
+
+*** Fullscreen toggling
+#+begin_src emacs-lisp
+(defvar aj/last-fullscreen-param nil)
+
+(defun aj/toggle-fullscreen (&optional f)
+  (interactive)
+  (let ((current-value (frame-parameter nil 'fullscreen)))
+    (set-frame-parameter nil 'fullscreen
+                         (if (equal 'fullboth current-value)
+                             aj/last-fullscreen-param
+
+                           (setq aj/last-fullscreen-param current-value)
+                           (fancy-battery-mode +1)
+                           'fullboth))))
+
+(autoload 'fancy-battery-mode "fancy-battery")
+
+(bind-key "<f11>" #'aj/toggle-fullscreen)
+#+end_src
+
+*** Writeroom
+#+BEGIN_SRC emacs-lisp
+(use-package writeroom-mode
+  :commands writeroom-mode
+  :bind ("<f12>" . writeroom-mode)
+  :config (setq writeroom-width 80
+                writeroom-mode-line t
+                writeroom-extra-line-spacing 0.1
+                writeroom-global-effects '(writeroom-set-fullscreen)))
+#+END_SRC
+
+*** Readable-frame :ARCHIVE:
+With some inspiration from here: https://lepisma.github.io/2017/10/28/ricing-org-mode/
+Launches a frame with a serif font and writeroom, to read texts in org-mode.
+#+BEGIN_SRC emacs-lisp
+(use-package reading-frame
+  :load-path "~/kodat/elisp/reading-frame/"
+  :commands reading-frame-make-frame)
+#+END_SRC
 
 *** Colours in shell output
 From: http://stackoverflow.com/questions/4726220/how-to-have-colors-in-the-output-of-emacs-shell-command/4729543#4729543
@@ -3611,7 +4188,7 @@ From: http://stackoverflow.com/questions/4726220/how-to-have-colors-in-the-outpu
 Some special functions for managing my data files.
 #+begin_src emacs-lisp
   (use-package aj-forskning
-	:load-path "~/kodat/elisp/org-qda"
+	:load-path "~/kodat/elisp/orgqda"
 	:defer t)
 
   ;;; font-lock () och {}
@@ -3641,7 +4218,7 @@ I use my fork, available here: https://github.com/andersjohansson/mplayer-mode/t
 Available at: https://github.com/andersjohansson/orgqda
 #+BEGIN_SRC emacs-lisp
 (use-package orgqda
-  :load-path "~/kodat/elisp/org-qda"
+  :load-path "~/kodat/elisp/orgqda"
   :defer t
   :init (put 'orgqda-csv-dir 'safe-local-variable #'file-directory-p)
   :config (setq orgqda-exclude-tags
@@ -3657,7 +4234,7 @@ Available at: https://github.com/andersjohansson/orgqda
 	("v" #'orgqda-collect-tagged-csv "Collect csv")
 	("V" #'orgqda-collect-tagged-csv-save "Collect csv save")
 	("b" #'orgqda-collect-tagged-csv-save-all "Save all as csv"))
-  (bind-key "C-c C-ö" 'aj/orgqda-hydra/body orgqda-mode))
+  (bind-key "C-c C-ö" 'aj/orgqda-hydra/body orgqda-mode-map))
 
 (use-package orgqda-helm-tags
   :after 'orgqda)
@@ -3667,7 +4244,7 @@ Available at: https://github.com/andersjohansson/orgqda
 Also at: https://github.com/andersjohansson/orgqda
 #+BEGIN_SRC emacs-lisp
 (use-package orgqda-transcript
-  :load-path "~/kodat/elisp/org-qda"
+  :load-path "~/kodat/elisp/orgqda"
   :defer t
   :config (setq orgqda-transcript-bind-fn-keys t
                 orgqda-transcript-set-up-speaker-keys t
@@ -3803,6 +4380,6 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
 *  Local Variables :ARCHIVE:
 
 # Local Variables:
-# eval: (progn (require 'use-package) (variable-pitch-mode -1))
+# eval: (progn (require 'use-package))
 # aj/inhibit-flyspell: t
 # End:
