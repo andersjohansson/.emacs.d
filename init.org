@@ -2256,13 +2256,20 @@ I often have more use for killing emacs (including all GUI-windows).
       (goto-char mk))))
 #+END_SRC
 
-*** Reasonable binding for ~other-window~
+*** Reasonable binding (~C-'~) for ~other-window~, define backwards command as well.
 (But I never seem to remember this, my fingers are stuck with ~C-x o~)
 #+BEGIN_SRC emacs-lisp
 (bind-key "C-'" #'other-window)
 (with-eval-after-load 'org
   (unbind-key "C-'" org-mode-map))
+
+(defun aj/back-window ()
+  (interactive)
+  (other-window -1))
+(bind-key "C-x O" #'aj/back-window)
+(bind-key "C-*" #'aj/back-window)
 #+END_SRC
+
 *** Kill this buffer instead of kill-buffer
 #+BEGIN_SRC emacs-lisp
 (global-set-key (kbd "C-x k") #'aj/kill-this-buffer)
@@ -2341,14 +2348,6 @@ _v_ variable-pitch:
 ;;
 ;; This means that you actually see the state of the mode that you're changing.
 #+END_SRC
-*** Other-window backwards with ~C-x O~
-#+begin_src emacs-lisp
-(defun back-window ()
-  (interactive)
-  (other-window -1))
-(bind-key "C-x O" 'back-window)
-#+end_src
-
 *** Mark-paragraph, backward-kill-word
 #+begin_src emacs-lisp
 (global-set-key (kbd "M-?") 'mark-paragraph)
