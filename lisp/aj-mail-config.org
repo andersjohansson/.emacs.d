@@ -10,17 +10,32 @@
 
 * mail-config
 ** Basic settings for mailing and auth
-Passwords are stored with ~pass~
+I use ~msmtp~ together with the queueing script ~msmtpq~ (included with ~msmtp~).
 #+BEGIN_SRC emacs-lisp
-(setq message-send-mail-function 'message-smtpmail-send-it
+(setq message-send-mail-function #'message-send-mail-with-sendmail
+      sendmail-program "msmtpq"
+      message-sendmail-extra-arguments '("--read-recipients")
       mu4e-action-tags-header "Keywords")
-(require 'auth-source-pass)
-(auth-pass-enable)
+;; (require 'auth-source-pass)
+;; (auth-pass-enable)
 #+END_SRC
-*** TODO Use postfix?
-http://pragmaticemacs.com/emacs/using-postfix-instead-of-smtpmail-to-send-email-in-mu4e/
+** Display mail queue (from ~msmtpq~) in modeline
+#+begin_src emacs-lisp
+(defvar aj/mail-queue-modeline "")
+(add-to-list 'global-mode-string '(t aj/mail-queue-modeline))
 
+(defun aj/update-mail-queue-modeline (_event)
+  (setq aj/mail-queue-modeline
+        (format "%d%s"
+                (length (directory-files "~/.msmtp.queue" nil "\\.mail$"))
+                (all-the-icons-alltheicon "arrow-right" :v-adjust 0.02))))
 
+;; first run
+(aj/update-mail-queue-modeline t)
+;; update on file chanfges
+(defvar aj/mail-queue-watch
+  (file-notify-add-watch "~/.msmtp.queue" '(change) #'aj/update-mail-queue-modeline))
+#+end_src
 ** My custom tags
 #+BEGIN_SRC emacs-lisp
 (defvar aj/mail-tags
@@ -172,25 +187,18 @@ https://gitlab.com/andersjohansson/mu4e-helm-contact
   :after mu4e-compose)
 #+END_SRC
 
-*** mu4e-alert :ARCHIVE:
-Is it really neccesary to redefine the functions below?
+*** mu4e-alert
 #+BEGIN_SRC emacs-lisp
 (use-package mu4e-alert
   :ensure t
   :after mu4e
+  :defer t
   :init
-  (mu4e-alert-set-default-style 'notifications)
-  (mu4e-alert-enable-notifications)
-  (mu4e-alert-enable-mode-line-display)
-  ;; (add-hook 'after-init-hook #'mu4e-alert-enable-notifications)
-  ;; (add-hook 'after-init-hook #'mu4e-alert-enable-mode-line-display)
   (setq mu4e-alert-set-window-urgency nil
         mu4e-alert-email-notification-types '(subjects)
         mu4e-alert-group-by :maildir)
   :config
-  ;; (with-eval-after-load "spaceline-segments"
-  ;;   (spaceline-toggle-mu4e-alert-segment-on))
-
+  (mu4e-alert-set-default-style 'notifications)
   (defun aj/open-mu4e-unread (&rest _args)
     (if-let (window
              (cl-loop with res = nil
@@ -303,12 +311,13 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 #+END_SRC
 
 *** Allow and handle context change while composing
-I often open a compose buffer without checking the context. The functions below make sure that switching context in a compose buffer works as expected. A function to switch address and signature when switching context is defined. However, several compose buffers may be open at once, and this will only switch for the current buffer (which I believe is the most reasonable behaviour). To ensure that a we don’t attempt to send a message with the wrong context active, a function to check if the context matches with the from address is added to ~message-send-hook~.
+I often open a compose buffer without checking the context. The functions below make sure that switching context in a compose buffer works as expected. A function to switch address and signature when switching context is defined. However, several compose buffers may be open at once, and this will only switch for the current buffer (which I believe is the most reasonable behaviour). To ensure that we don’t attempt to send a message with the wrong context active, a function to check if the context matches with the from address is added to ~message-send-hook~.
 #+BEGIN_SRC emacs-lisp
 (defun aj/mu4e-compose-context-switch (&rest _ignore)
   "When switching context in a compose buffer, switch “from” and signature."
   (when (eq major-mode 'mu4e-compose-mode)
     (message-replace-header "From" (mu4e~draft-from-construct))
+    (message-replace-header "Reply-to" mu4e-compose-reply-to-address)
     (setq-local message-signature mu4e-compose-signature)
     (setq aj/message-sig-cycle 0)
     (aj/message-remove-signature)
@@ -594,13 +603,23 @@ From: http://mbork.pl/2015-11-28_Fixing_mml-attach-file_using_advice
   (save-excursion
     (save-restriction
       (widen)
-      ;; (goto-char (point-max))
-      (message-goto-signature)
-      (forward-line -1)
+      (goto-char (point-max))
+      ;; (message-goto-signature)
+      ;; (forward-line -1)
       (apply orig-fun args))))
 
 (advice-add 'mml-attach-file :around #'aj/mml-attach-file--go-to-eob)
 #+END_SRC
+
+**** Use custom command to invert prefix argument logic of ~mml-attach-file~
+#+begin_src emacs-lisp
+(defun aj/mml-attach-file (arg)
+  (interactive "P")
+  (let ((current-prefix-arg (not arg)))
+    (call-interactively #'mml-attach-file)))
+
+(bind-key "C-c C-a" 'aj/mml-attach-file mu4e-compose-mode-map)
+#+end_src
 
 **** Attach with dired
 #+BEGIN_SRC emacs-lisp
@@ -623,6 +642,50 @@ From: http://mbork.pl/2015-11-28_Fixing_mml-attach-file_using_advice
   (setq gnus-dired-mail-mode 'mu4e-user-agent)
   (add-hook 'dired-mode-hook 'turn-on-gnus-dired-mode))
 #+END_SRC
+
+**** Attach via dropbox-link
+#+BEGIN_SRC emacs-lisp
+(defun aj/copy-to-dropbox-return-link (file)
+  "Copies a file to public dropbox folder and returns public url"
+  (let ((newfile (expand-file-name (file-name-nondirectory file) "~/Dropbox/delning")))
+    (copy-file file newfile 1)
+    (aj/dropbox-get-link newfile)))
+
+(defun aj/dropbox-get-link (filename)
+  "Puts dropbox public link to FILENAME in kill ring.
+
+Non-interactive use returns link"
+  (interactive "f")
+  (let ((link (shell-command-to-string
+               (format "dropbox-cli sharelink %s" (shell-quote-argument filename)))))
+    (if (called-interactively-p)
+        (kill-new link)
+      link)))
+
+(defun aj/mml-attach-file-dropbox-link ()
+  "Attach file by inserting dropbox link."
+  (interactive)
+  (let ((file (mml-minibuffer-read-file "Dropbox link file: ")))
+    (insert (aj/copy-to-dropbox-return-link file))))
+#+END_SRC
+
+**** Add a recipient filename to attachment at point
+#+begin_src emacs-lisp
+(defun aj/mml-add-attachment-recipient-filename ()
+  "Add a recipient filename to attachment at point"
+  (interactive)
+  (save-excursion
+    (goto-char (point-at-bol))
+    (when (and (looking-at-p "<#part")
+               (search-forward-regexp "filename=\"\\([^\"]+\\)\"" (point-at-eol) t))
+      (goto-char (match-beginning 0))
+      (when-let ((filename (read-string
+                            "Recipient filename: "
+                            (file-name-nondirectory
+                             (substring-no-properties
+                              (match-string 1))))))
+        (insert (format "recipient-filename=\"%s\" " filename))))))
+#+end_src
 
 **** Detach attachments :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
@@ -680,26 +743,6 @@ From: http://mbork.pl/2015-11-28_Fixing_mml-attach-file_using_advice
 #+END_SRC
 
 
-**** Attach with dropbox
-#+BEGIN_SRC emacs-lisp
-(defun aj/copy-to-dropbox-return-link (file)
-  "Copies a file to public dropbox folder and returns public url"
-  (interactive "f")
-  (let ((newfile (expand-file-name (file-name-nondirectory file) "~/Dropbox/Public")))
-    (copy-file file newfile t)
-    (shell-command-to-string (format "dropbox puburl %s" (shell-quote-argument newfile)))))
-
-(defun aj/mml-attach-file-maybe-link (link?)
-  (interactive "P")
-  (if link?
-      (let ((file (mml-minibuffer-read-file "Dropbox link file: ")))
-        (insert (aj/copy-to-dropbox-return-link file)))
-    (call-interactively #'mml-attach-file)))
-
-(bind-key "C-c C-a" 'aj/mml-attach-file-maybe-link mu4e-compose-mode-map)
-
-#+END_SRC
-
 *** Mail templates :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (defcustom aj/mu4e-templates-dir "~/.emacs.d/mu4e-templates"
@@ -723,6 +766,15 @@ From: http://mbork.pl/2015-11-28_Fixing_mml-attach-file_using_advice
 #+END_SRC
 
 ** Headers settings
+
+*** Small stupid fix for first space in headers headline
+#+begin_src emacs-lisp
+(advice-add 'mu4e~header-line-format :around #'aj/mu4e-fix-header-space)
+
+(defun aj/mu4e-fix-header-space (fn &rest r)
+  (let ((mu4e~mark-fringe-len 3))
+    (apply fn r)))
+#+end_src
 *** Headers fields
 **** Set headers fields to view depending on what maildir is viewed
 #+BEGIN_SRC emacs-lisp
@@ -757,26 +809,29 @@ From: http://mbork.pl/2015-11-28_Fixing_mml-attach-file_using_advice
 (autoload '--all? "dash")
 (defun aj/mu4e-set-headers-fields (query)
   "Set ‘mu4e-headers-fields’ depending on which maildir is viewed."
-  (setq mu4e-headers-fields
-        (plist-get
-         aj/mu4e-headers-fields
-         (when-let* ((mdm
-                      (s-match-strings-all
-                       "maildir:\\(?2:\\\"\\(?1:[^\\\"]+\\)\\\"\\|\\(?1:[^[:space:]]+\\)\\)"
-                       query))
-                     (maildirs (mapcar #'cadr mdm)))
-           (cond
-            ((--all? (string-match-p "^/uu" it) maildirs)
-             :uu)
-            ((--all? (string-match-p "^/\\(mejla\\|ajf\\)" it) maildirs)
-             :gmail))))
-        header-line-format (mu4e~header-line-format)))
+  (when (buffer-live-p (mu4e-get-headers-buffer))
+    (with-current-buffer (mu4e-get-headers-buffer)
+      (setq mu4e-headers-fields
+            (plist-get
+             aj/mu4e-headers-fields
+             (when-let* ((mdm
+                          (s-match-strings-all
+                           "maildir:\\(?2:\\\"\\(?1:[^\\\"]+\\)\\\"\\|\\(?1:[^[:space:]]+\\)\\)"
+                           query))
+                         (maildirs (mapcar #'cadr mdm)))
+               (cond
+                ((--all? (string-match-p "^/uu" it) maildirs)
+                 :uu)
+                ((--all? (string-match-p "^/\\(mejla\\|ajf\\)" it) maildirs)
+                 :gmail))))
+            header-line-format (mu4e~header-line-format)))))
 
 
 (add-hook 'mu4e-headers-search-hook #'aj/mu4e-set-headers-fields)
+;;(remove-hook 'mu4e-headers-search-hook #'aj/mu4e-set-headers-fields)
 
 (setq mu4e-headers-fields (plist-get aj/mu4e-headers-fields nil)
-      mu4e-headers-from-or-to-prefix '("" . "⯈")
+      ;; mu4e-headers-from-or-to-prefix '("" . "⯈")
       mu4e-headers-include-related nil
       mu4e-headers-visible-columns nil)
 
@@ -924,43 +979,38 @@ date. The formats used for date and time are
             ))))))
 #+END_SRC
 
-** Dynamic folders for refile etc.
+** Dynamic folders for refile etc. + special functions for gmail-relabeling
 One could think that it would be reasonable to put this in the contexts, but no, these settings are mostly per message, and is therefore better dynamically matched on the current message.
 
 The most complex part is for choosing refile folders, depending on account and ~aj/mail-tags~ configuration.
 #+BEGIN_SRC emacs-lisp
+;; Utility function
+;; In its current form kind of repetitive. But I could want special
+;; conditions, so I will not abstract it more now.
+
+(cl-defmacro aj/mu4e-msg-account (msg &key uu mejla ajf default gmail)
+  (declare (indent 1))
+  `(cond
+    ((and ,msg (string-match-p "^/uu/" (mu4e-message-field ,msg :maildir)))
+     ,uu)
+    ((and ,msg ,mejla (string-match-p "^/mejla/" (mu4e-message-field ,msg :maildir)))
+     ,mejla)
+    ((and ,msg ,ajf (string-match-p "^/ajf/" (mu4e-message-field ,msg :maildir)))
+     ,ajf)
+    (t ,default)))
+
 (setq mu4e-sent-folder "/uu/Sent" ; gmail is set to delete sent mails
                                         ; (because it recreates them on the
                                         ; server from the mails sent via its
                                         ; smtp server.)
-      mu4e-drafts-folder "/UTKAST"
-      ;; (lambda (msg)
-      ;;   (aj/mu4e-msg-account
-      ;;    msg
-      ;;    :uu "/uu/Drafts"
-      ;;    :mejla "/mejla/Utkast"
-      ;;    :ajf "/ajf/Utkast"
-      ;;    :none "/mejla/Drafts"))
+      mu4e-drafts-folder "/UTKAST" ; Don’t care about syncing these
+                                        ; to the server
       mu4e-trash-folder (lambda (msg)
-                          (aj/mu4e-msg-account
-                           msg
-                           :uu "/uu/Trash"
-                           :mejla "/mejla/Papperskorgen"
-                           :ajf "/ajf/Papperskorgen"))
+                          (aj/mu4e-msg-account msg
+                            :uu "/uu/Trash"
+                            :mejla "/mejla/Papperskorgen"
+                            :ajf "/ajf/Papperskorgen"))
       mu4e-refile-folder #'aj/mu4e-refile-folder)
-
-;; Utility function
-;; In its current form kind of repetitive. But I could want special
-;; conditions, so I will not abstract it more now.
-(cl-defun aj/mu4e-msg-account (msg &key uu mejla ajf none)
-  (cond
-   ((and msg (string-match-p "^/uu/" (mu4e-message-field msg :maildir)))
-    (eval uu))
-   ((and msg (string-match-p "^/mejla/" (mu4e-message-field msg :maildir)))
-    (eval mejla))
-   ((and msg (string-match-p "^/ajf/" (mu4e-message-field msg :maildir)))
-    (eval ajf))
-   (t (when none (eval none)))))
 
 (defun aj/mu4e-refile-folder (msg &optional force-choice)
   "Guess or offer to select a refile folder for MSG.
@@ -968,23 +1018,22 @@ Chooses depending on account and tags (by configuration in `aj/mail-tags')
 No automatic guess if FORCE-CHOICE is non-nil."
   (let* ((user-has-chosen nil)
          (found
-          (aj/mu4e-msg-account
-           msg
-           :uu (if-let ((tags (mu4e-message-field msg :tags)))
-                   (catch 'found
-                     ;; default if no throw is /uu/Archive
-                     (dolist (tag tags "/uu/Archive")
-                       (when-let ((ajtag (assoc tag aj/mail-tags)))
-                         (when-let ((ajrf (nth 3 ajtag)))
-                           (cond
-                            ((stringp ajrf) (throw 'found ajrf))
-                            ((listp ajrf) (throw 'found (prog1 (aj/mu4e-choose-refile (car ajrf) msg)
-                                                          (setq user-has-chosen t))))
-                            (t (user-error "Bad config for tag %s in aj/mail-tags" tag)))))))
-                 "/uu/Archive")
-           ;; These should get changed labels via hook
-           :mejla "/mejla/Alla mail"
-           :ajf "/ajf/Alla mail")))
+          (aj/mu4e-msg-account msg
+            :uu (if-let ((tags (mu4e-message-field msg :tags)))
+                    (catch 'found
+                      ;; default if no throw is /uu/Archive
+                      (dolist (tag tags "/uu/Archive")
+                        (when-let ((ajtag (assoc tag aj/mail-tags)))
+                          (when-let ((ajrf (nth 3 ajtag)))
+                            (cond
+                             ((stringp ajrf) (throw 'found ajrf))
+                             ((listp ajrf) (throw 'found (prog1 (aj/mu4e-choose-refile (car ajrf) msg)
+                                                           (setq user-has-chosen t))))
+                             (t (user-error "Bad config for tag %s in aj/mail-tags" tag)))))))
+                  "/uu/Archive")
+            ;; Only for show, they get changed labels via custom action
+            :mejla "/mejla/Alla mail"
+            :ajf "/ajf/Alla mail")))
     (if (and found
              (or user-has-chosen (not force-choice)))
         found
@@ -1005,45 +1054,86 @@ No automatic guess if FORCE-CHOICE is non-nil."
 
 ;; gmail is treated with labels instead of folder moves
 
-(add-hook 'mu4e-mark-execute-pre-hook #'aj/mu4e-gmail-mark-pre-hook) 
+(add-hook 'mu4e-mark-execute-pre-hook #'aj/mu4e-gmail-mark-pre-hook)
+(remove-hook 'mu4e-mark-execute-pre-hook #'aj/mu4e-gmail-mark-pre-hook)
 
 
 ;; For forcing gmail-refiled messages to be removed from headers listing.
 (defvar aj/mu4e-treat-as-move nil)
 
-(defun aj/mu4e-gmail-mark-pre-hook (mark msg)
-  (aj/mu4e-msg-account msg
-                       :mejla (aj/mu4e-gmail-retag mark msg)
-                       :ajf (aj/mu4e-gmail-retag mark msg)))
+;; (defun aj/mu4e-gmail-mark-pre-hook (mark msg)
+;;   (aj/mu4e-msg-account msg
+;;     :mejla (aj/mu4e-gmail-retag mark msg)
+;;     :ajf (aj/mu4e-gmail-retag mark msg)))
 
-(defun aj/mu4e-gmail-retag (mark msg)
-  (cond ((equal mark 'refile)
-         (setq aj/mu4e-treat-as-move t)
-         (mu4e-action-retag-message msg "-\\Inbox"))
-        ;;this moves to trash directory as well:
-        ((equal mark 'trash) (mu4e-action-retag-message msg "-\\Inbox,-\\Starred"))
-        ((equal mark 'flag) (mu4e-action-retag-message msg "\\Starred"))
-        ((equal mark 'unflag) (mu4e-action-retag-message msg "-\\Starred"))))
+;; (defun aj/mu4e-gmail-retag (mark msg)
+;;   (cond ;; ((equal mark 'refile)
+;;    ;;  (setq aj/mu4e-treat-as-move t)
+;;    ;;  (mu4e-action-retag-message msg "-\\Inbox"))
+;;    ;; this moves to trash directory as well:
+;;    ((equal mark 'trash) (mu4e-action-retag-message msg "-\\Inbox,-\\Starred"))
+;;    ;; ((equal mark 'flag) (mu4e-action-retag-message msg "\\Starred"))
+;;    ;; ((equal mark 'unflag) (mu4e-action-retag-message msg "-\\Starred"))
+;;    ))
+
+
+(advice-add 'mu4e-mark-execute-all :before (lambda () (setq aj/mu4e-treat-as-move nil)))
 
 (setq mu4e-update-func #'aj/mu4e-headers-update-handler)
-
 (defun aj/mu4e-headers-update-handler (msg is-move maybe-view)
   "Wrapper around ‘mu4e~headers-update-handler’ to remove
 messages “refiled” in gmail accounts from the inbox listing."
-  (unwind-protect
-      (mu4e~headers-update-handler msg (or aj/mu4e-treat-as-move is-move) maybe-view)
-    (setq aj/mu4e-treat-as-move nil)))
+  (let ((docid (plist-get msg :docid)))
+    (mu4e~headers-update-handler
+     msg
+     (or
+      (memq docid aj/mu4e-treat-as-move)
+      is-move)
+     maybe-view)
+    (setq aj/mu4e-treat-as-move (delq docid aj/mu4e-treat-as-move))))
+
+(defun aj/mu4e-retag-as-move (msg tagchange)
+  (push (plist-get msg :docid) aj/mu4e-treat-as-move)
+  (mu4e-action-retag-message msg tagchange))
+
+
+;; Redefine refile to work with gmail
+(setf (cl-getf (alist-get 'refile mu4e-marks) :action)
+      #'aj/mu4e-refile-action)
+
+(defun aj/mu4e-refile-action (docid msg target)
+  (aj/mu4e-msg-account msg
+    :mejla (aj/mu4e-retag-as-move msg "-\\Inbox")
+    :ajf (aj/mu4e-retag-as-move msg "-\\Inbox")
+    :default (mu4e~proc-move docid
+                             (mu4e~mark-check-target target)
+                             "-N")))
+
+;; Redefine move to trash
+(setf (cl-getf (alist-get 'trash mu4e-marks) :action)
+      #'aj/mu4e-trash-action)
+
+(defun aj/mu4e-trash-action (docid msg target)
+  "Move to trash, mark as read, possibly change gmail labels"
+  (aj/mu4e-msg-account msg
+    :mejla (mu4e-action-retag-message msg "-\\Inbox,-\\Starred,-\\Important")
+    :ajf (mu4e-action-retag-message msg "-\\Inbox,-\\Starred,-\\Important"))
+  
+  (mu4e~proc-move docid (mu4e~mark-check-target target) "+T+S-N"))
 #+END_SRC
-
-
 
 ** Marks
 *** Custom marks
 **** Add tag
 #+BEGIN_SRC emacs-lisp
 (defun aj/mu4e-choose-tag ()
-  (let ((tags (mapcar #'car aj/mail-tags))
-        (case-fold-search t))
+  (let* ((face (lambda (tag)
+                 (cons (propertize (concat (nth 2 tag) " " (car tag)) 'face `(:foreground ,(cadr tag)))
+                       (car tag))))
+         (tags (append
+                (mapcar face aj/mail-tags)
+                (mapcar face aj/mu4e-gmail-labels)))
+         (case-fold-search t))
     (helm-comp-read "Add tag:" tags :fuzzy t :case-fold t)))
 (add-to-list 'mu4e-marks
              '(tag
@@ -1051,8 +1141,7 @@ messages “refiled” in gmail accounts from the inbox listing."
                :prompt     "tag"
                :ask-target aj/mu4e-choose-tag
                :action      (lambda (docid msg target)
-    
-                          (mu4e-action-retag-message msg (concat "+" target)))))
+                              (mu4e-action-retag-message msg (concat "+" target)))))
 
 (mu4e~headers-defun-mark-for tag)
 (define-key 'mu4e-headers-mode-map (kbd "ö") 'mu4e-headers-mark-for-tag)
@@ -1069,13 +1158,21 @@ At times, I can safely refile messages without reading them and at the same time
                :prompt "refile"
                :dyn-target (lambda (target msg)
                              (aj/mu4e-refile-folder msg))
-               :action (lambda (docid msg target)
-                         (mu4e~proc-move
-                          docid (mu4e~mark-check-target target) "-N+S"))))
+               :action aj/mu4e-refile-read-action))
+
+(defun aj/mu4e-refile-read-action (docid msg target)
+  (aj/mu4e-msg-account msg
+    :gmail '(progn
+              (mu4e-action-retag-message msg "-\\Inbox")
+              (mu4e~proc-move docid (mu4e~mark-check-target target) "-N+S"))
+    :default '(mu4e~proc-move
+               docid (mu4e~mark-check-target target) "-N+S")))
+
 
 (mu4e~headers-defun-mark-for refile-read)
 (define-key 'mu4e-headers-mode-map "ä" 'mu4e-headers-mark-for-refile-read)
 #+END_SRC
+
 
 *** Mark all duplicates in current view for deletion
 #+BEGIN_SRC emacs-lisp
@@ -1096,7 +1193,7 @@ At times, I can safely refile messages without reading them and at the same time
     (mu4e-headers-search "maildir:/uu/* date:20171001..now ")))
 #+END_SRC
 
-*** Directly applied marks
+*** COMMENT Directly applied marks :ARCHIVE:
 Here I define my own variant of ~mu4e~headers-defun-mark-for~ which defines functions taking a prefix argument to optionally execute the mark immediately.
 Some of the functions are redefined.
 #+BEGIN_SRC emacs-lisp
@@ -1171,6 +1268,19 @@ Some of the functions are redefined.
 (add-to-list 'mu4e-view-actions '("View in external browser" . mu4e-action-view-in-browser))
 #+END_SRC
 
+** Contacts
+#+begin_src emacs-lisp
+(defvar aj/mu4e-contacts-exclude-patterns
+  '("no-reply" "noreply" "github.com" " donotreply"))
+
+(setq mu4e-contact-process-function #'aj/mu4e-contact-process-function)
+
+(defun aj/mu4e-contact-process-function (c)
+  (unless (string-match-p (regexp-opt aj/mu4e-contacts-exclude-patterns) c)
+    c))
+
+
+#+end_src
 * Provide statement
 #+BEGIN_SRC emacs-lisp
 (provide 'aj-mail-config)
