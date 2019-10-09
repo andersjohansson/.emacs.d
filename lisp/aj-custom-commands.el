@@ -278,16 +278,15 @@ other parameters."
         (kill-buffer buf)))))
 
 ;;;###autoload
-(defun aj/clean-all-tex-dirs (root)
-  (interactive "D")
+(defun aj/clean-tex-dirs-recursive (root)
+  (interactive "DRoot directory: ")
   (let ((root (or root "~/")))
     (aj/clean-tex-dirs
      (cl-delete-duplicates
       (split-string
        (shell-command-to-string
-        (format "find %s -name '*.tex'-printf '%%h\n'" root))
+        (format "find %s -name '*.tex' -printf '%%h\n'" root))
        "\n") :test 'string=))))
-
 
 ;;;###autoload
 (defun aj/annotations-from-läsplattan ()
@@ -309,13 +308,11 @@ other parameters."
       (user-error "No books?"))
     (setq bookid
           (helm-comp-read "Choose book: "
-                          (cl-loop for b in books
+                          (cl-loop for (id name filename) in books
                                    collect
-                                   (cons (concat
-                                          (nth 1 b)
-                                          "	"
-                                          (propertize (nth 2 b) 'face 'shadow))
-                                         (car b)))
+                                   (cons (concat name "	"
+                                                 (propertize filename 'face 'shadow))
+                                         id))
                           :must-match t :fuzzy t))
     (with-temp-buffer
       (call-process-shell-command
@@ -327,14 +324,19 @@ other parameters."
       (setq annotations (pcsv-parse-buffer)))
     (if annotations
         (progn (switch-to-buffer (generate-new-buffer "*PRS annotations*"))
-               (dolist (a annotations)
-                 (when (equal "11" (nth 1 a))
-                   (insert (nth 2 a) ":\n"))
-                 (insert "#+BEGIN_QUOTE\n"
-                         (nth 3 a)
-                         "\n"
-                         "(p. " (car a) ")\n"
-                         "#+END_QUOTE\n\n"))
+               (cl-loop for (page type note marked) in annotations
+                        do
+                        (when (equal "11" type) ; if the note has text
+                          (insert note ":\n"))
+                        (insert "#+BEGIN_QUOTE\n"
+                                marked
+                                "\n"
+                                "(p. "
+                                (if (string-match "^\\([0-9]+\\)\\.0$" page)
+                                    (match-string 1 page)
+                                  page)
+                                ")\n"
+                                "#+END_QUOTE\n\n"))
                (goto-char (point-min))
                (org-mode))
       (message "No annotations found for that book"))))
@@ -403,8 +405,9 @@ other parameters."
      (format "http://texdoc.net/pkg/%s" doc)
      :timeout 5
      :parser 'buffer-string
-     :error (cl-function (lambda (&key _data &allow-other-keys)
-                           (message "Failed contacting texdoc.net")))
+     :error (cl-function (lambda (&key _data response &allow-other-keys)
+                           (message "Failed contacting texdoc.net, response status: %s"
+                                    (request-response-status-code response))))
      :success (cl-function
                (lambda (&key data response &allow-other-keys)
                  (if (string= "application/pdf"
@@ -517,32 +520,18 @@ other parameters."
                        t)))
     (org-id-locations-save)))
 
-;;; Center frame
-;; Code adapted from ime-frame
+;;; See recent messages
 ;;;###autoload
-(defun aj/center-frame (&optional frame)
-  "Center a frame on the screen."
+(defun aj/message-peek ()
   (interactive)
-  (apply 'set-frame-position
-         (let* ((frame (or (and (boundp 'frame) frame) (selected-frame)))
-                (center (aj/center-frame--get-center frame)))
-           `(,frame ,@center))))
+  (pop-to-buffer "*Messages*" 'display-buffer-pop-up-window)
+  (goto-char (point-max)))
 
-(defun aj/center-frame--get-center (frame)
-  "Return the center position of FRAME on it's display."
-  (let ((screengeometry (assq 'geometry (frame-monitor-attributes frame))))
-    (aj/center-frame--box-get-center
-     (frame-pixel-width frame)
-     (frame-pixel-height frame)
-     (nth 3 screengeometry)
-     (nth 4 screengeometry))))
-
-(defun aj/center-frame--box-get-center (w h cw ch)
-  "Center a box inside another box.
-
-Returns a list of `(TOP LEFT)' representing the centered position
-of the box `(w h)' inside the box `(cw ch)'."
-  (list (/ (- cw w) 2) (/ (- ch h) 2)))
+;;; Run meld on selected files
+;;;###autoload
+(defun aj/meld-compare (file1 file2)
+  (interactive "fFil 1: \nfFil 2: ")
+  (start-process "meld" "meld" "meld" file1 file2))
 
 
 (provide 'aj-custom-commands)

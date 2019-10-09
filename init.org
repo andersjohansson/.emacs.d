@@ -7,7 +7,7 @@ This is my init file. Kept as an org file which is tangled and compiled to ~init
 
 Additional configuration is in [[file:lisp/aj-org-config.org][aj-org-config.org]] and [[file:lisp/aj-mail-config.org][aj-mail-config.org]], and some of my configurations have been put in separate packages which are generally available in gitlab or github repositories.
 
-Hopefully some of this could be useful to others
+Hopefully some of this could be useful to others.
 
 * All configuration
 ** Meta
@@ -19,58 +19,92 @@ Emacs can only load =.el=-files. We can use =C-c C-v t= to run =org-babel-tangle
 To avoid doing this each time a change is made we can add a function to the =after-save-hook= ensuring to always tangle and byte-compile the =org=-document after changes. But this generally annoys me, it’s easier to just choose when it should be done.
 
 These functions possibly create two files from each org-file. When doing org-mode asynchronous exports, a small init file should be loaded, and this is automatically generated through tangling all trees tagged with "org_async". Even more specificity can be achieved with the tag "org_async_exclude" (which means a subtree of an "org_async"-tree can still be excluded). Additionally, "no_default_tangle" excludes trees from the standard init-files, and archived trees are always excluded (I use it for "commenting out" stuff). All to make as small and lean init files as possible.
+
 #+BEGIN_SRC emacs-lisp
 (defvar aj/org-init-files
   (list (expand-file-name "init.org" user-emacs-directory)
         (expand-file-name "aj-org-config.org" (concat user-emacs-directory "lisp"))
         (expand-file-name "aj-mail-config.org" (concat user-emacs-directory "lisp"))))
 
-(defun aj/tangle-init ()
+(defun aj/tangle-init (&optional file)
   (interactive)
   "If the current file is listed in aj/org-init-files the
 code-blocks are tangled, and the tangled file is compiled.
 
 Two files are possibly created, one with all trees, and one for
 org mode async exports, using only trees tagged with “org_async”."
-  (when (or (called-interactively-p 'interactive)
-            (and (member (buffer-file-name) aj/org-init-files)
-                 (y-or-n-p-with-timeout "Tangle+compile file?" 3 nil)))
+  (let* ((file (or file (buffer-file-name)))
+         (file-noext (file-name-sans-extension file)))
+    (when (or (called-interactively-p 'interactive)
+              (and (member file aj/org-init-files)
+                   ;; (y-or-n-p-with-timeout "Tangle+compile file?" 3 nil)
+                   ))
 
-	(let* ((file-el (concat (file-name-sans-extension (buffer-file-name)) ".el"))
-           (file-async (concat (file-name-sans-extension (buffer-file-name)) "-org-async.el"))
-           (prog-mode-hook nil)
-           ;; avoid garbage-collection for this
-           (gc-cons-threshold most-positive-fixnum))
-      (aj/org-tangle-matching "-no_default_tangle-ARCHIVE" file-el)
-      (aj/org-tangle-matching "org_async-org_async_exclude-ARCHIVE" file-async))))
+	  (let* ((file-el (concat file-noext ".el"))
+             (file-async (concat file-noext "-org-async.el"))
+             (prog-mode-hook nil)
+             ;; avoid garbage-collection for this
+             (gc-cons-threshold most-positive-fixnum))
+        (aj/org-tangle-matching "-no_default_tangle-ARCHIVE" file file-el)
+        (aj/org-tangle-matching "org_async-org_async_exclude-ARCHIVE" file file-async))
+      (load file-noext))))
 
-(defun aj/org-tangle-matching (match target-file)
-  (let* ((todo-only nil)
-         (trees (mapconcat #'identity
-                           (org-scan-tags #'aj/org-return-entry
-                                          (cdr (org-make-tags-matcher match))
-                                          todo-only) "\n\n"))
-         (ofile (make-temp-file "org-init-tangle" nil ".org"))
-         (ofb (find-file-noselect ofile t))
-         (byte-compile-warnings '(not free-vars)))
-	(with-current-buffer ofb
-      (insert trees)
-      (let ((text-mode-hook nil)
-            (outline-mode-hook nil)
-            (org-mode-hook nil)
-            (org-agenda-inhibit-startup t)
-            (org-inhibit-startup t))
-        (org-mode)
-        (org-babel-tangle nil target-file "emacs-lisp")))
-    (kill-buffer ofb)
-    (when (and (file-exists-p target-file) (file-writable-p target-file))
-      (chmod target-file 333)
-      (byte-compile-file target-file))))
+(defun aj/org-tangle-matching (match origin-file target-file)
+  (with-current-buffer
+      (find-file-noselect origin-file)
+    (let* ((todo-only nil)
+           (trees (mapconcat #'identity
+                             (org-scan-tags #'aj/org-return-entry
+                                            (cdr (org-make-tags-matcher match))
+                                            todo-only) "\n\n"))
+           (ofile (make-temp-file "org-init-tangle" nil ".org"))
+           (ofb (find-file-noselect ofile t))
+           (byte-compile-warnings '(not free-vars)))
+	  (with-current-buffer ofb
+        (insert trees)
+        (let ((text-mode-hook nil)
+              (outline-mode-hook nil)
+              (org-mode-hook nil)
+              (org-agenda-inhibit-startup t)
+              (org-inhibit-startup t))
+          (org-mode)
+          (org-babel-tangle nil target-file "emacs-lisp")))
+      (kill-buffer ofb)
+      (when (and (file-exists-p target-file) (file-writable-p target-file))
+        (chmod target-file 333)
+        (byte-compile-file target-file)))))
 
 (defun aj/org-return-entry ()
   (buffer-substring-no-properties
    (org-entry-beginning-position)
    (org-entry-end-position)))
+
+
+;; attempts at doing this async
+
+;; this is difficult, because it seems I need to have all my
+;; load-paths initiated. In particular it didn’t work with
+;; pdf-zotxt-quote which couldn’t find org-zotxt in the compilation.
+;; But why was this needed?
+
+;; tried to add only the neccesary stuff to init-async, but ...
+
+;; (async-start
+;;  ;; What to do in the child process
+;;  (lambda ()
+;;    (load-file "~/.emacs.d/init-async.elc")
+;;    (aj/tangle-init "~/.emacs.d/init.org")
+;;    (sleep-for 1)
+;;    (message "hej!")
+;;    (with-current-buffer "*Messages*"
+;;      (buffer-string)))
+
+;;  ;; What to do when it finishes
+;;  (lambda (result)
+;;    (message "Async process done, result should be 222: %s"
+;;             result)))
+
+
 
 ;; (let ((weal (aj/org-get-weal)))
 ;;   (concat
@@ -158,25 +192,35 @@ https://bling.github.io/blog/2016/01/18/why-are-you-changing-gc-cons-threshold/
 
 (when window-system
   (setq frame-title-format '(buffer-file-name "%f" ("%b")))
-
+  
   (defun aj/deactivate-gui (mode on)
     "Activate or deactivate MODE depending on ON, and defines a variable stating my choice."
     (when (fboundp mode)
       (funcall mode (or on -1))
       (eval `(defconst ,(intern (concat "aj/" (symbol-name mode) "-on")) ,on))))
 
-  (dolist (mm '((menu-bar-mode nil) (tool-bar-mode nil)
-                (scroll-bar-mode t) (mouse-wheel-mode t)
-                (tooltip-mode nil)))
+                                        ; I always want it to the right
+  (dolist (mm '((menu-bar-mode nil) (tool-bar-mode nil) (mouse-wheel-mode t)))
     (aj/deactivate-gui (car mm) (cadr mm))))
 #+END_SRC
 
+*** Enable scroll-bars
+#+begin_src emacs-lisp
+(when window-system
+  (scroll-bar-mode t)  
+  (set-scroll-bar-mode 'right)
+  (set-window-scroll-bars (minibuffer-window) nil nil)
+  (set-window-fringes (minibuffer-window) nil 0) ; no right fringe in minibuffer
+  )
+
+#+end_src
 *** Fontset stuff
 I never get this to work really well, the issue is with special (fancy) symbols in [[*Mail-config][mu4e]] that gets the columns misaligned when the characters are taken from another font than the default mono-space (I use Ubuntu mono, which lacks many symbols). The "monospacified" version of Symbola is supposed to solve this problem but seemingly doesn’t. For now, I have switched to symbols that are in Ubuntu mono ([[file:lisp/aj-mail-config.org::*Symbols][defined here]]).
 #+BEGIN_SRC emacs-lisp
 (dolist (ft (fontset-list))
   ;; (set-fontset-font ft 'unicode (font-spec :name "Ubuntu Mono"))
   (set-fontset-font ft nil (font-spec :name "Symbola") nil 'append)
+  (set-fontset-font ft 'cjk-misc (font-spec :name "Noto Sans CJK") nil)
   ;; (set-fontset-font ft 'unicode (font-spec :name "Symbola monospacified for Ubuntu Mono") nil 'append)
   ;; (set-fontset-font ft nil (font-spec :name "Symbola monospacified for Ubuntu Mono") nil 'append)
   )
@@ -217,8 +261,8 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 #+begin_src emacs-lisp
 (require 'package)
 (setq package-enable-at-startup nil)
-(add-to-list 'package-archives '("melpa-stable" . "https://stable.melpa.org/packages/") t)
-(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+(add-to-list 'package-archives '("melpa-stable" . "https://www.mirrorservice.org/sites/stable.melpa.org/packages/") t)
+(add-to-list 'package-archives '("melpa" . "https://www.mirrorservice.org/sites/melpa.org/packages/") t)
 (add-to-list 'package-archives '("org" . "https://orgmode.org/elpa/") t)
 (setq package-archive-priorities
       '(("gnu" . 10)
@@ -267,6 +311,11 @@ Some variables are not suitable to keep in the init-file, I add these via custom
         `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))))
 #+end_src
 
+*** Tooltip-mode
+#+begin_src emacs-lisp
+(tooltip-mode t)
+(setq x-gtk-use-system-tooltips t)
+#+end_src
 
 *** Hydra (used for definitions later on) :org_async:
 #+BEGIN_SRC emacs-lisp
@@ -274,16 +323,45 @@ Some variables are not suitable to keep in the init-file, I add these via custom
   :demand t
   :ensure t)
 #+END_SRC
+*** Center frame (used for helm)
+Code adapted from ime-frame
+#+begin_src emacs-lisp
+(defun aj/center-frame (&optional frame)
+  "Center a frame on the screen."
+  (interactive)
+  (apply 'set-frame-position
+         (let* ((frame (or (and (boundp 'frame) frame) (selected-frame)))
+                (center (aj/center-frame--get-center frame)))
+           `(,frame ,@center))))
+
+(defun aj/center-frame--get-center (frame)
+  "Return the center position of FRAME on it's display."
+  (let ((screengeometry (assq 'geometry (frame-monitor-attributes frame))))
+    (aj/center-frame--box-get-center
+     (frame-pixel-width frame)
+     (frame-pixel-height frame)
+     (nth 3 screengeometry)
+     (nth 4 screengeometry))))
+
+(defun aj/center-frame--box-get-center (w h cw ch)
+  "Center a box inside another box.
+
+Returns a list of `(TOP LEFT)' representing the centered position
+of the box `(w h)' inside the box `(cw ch)'."
+  (list (/ (- cw w) 2) (/ (- ch h) 2)))
+
+
+#+end_src
 *** org-mode
 **** org init
 #+begin_src emacs-lisp
 ;;load local org-reveal
-(use-package ox-reveal
+(use-package org-re-reveal
   :defer t
-  :load-path "~/kodat/elisp/org-reveal")
+  :load-path "~/kodat/elisp/org-re-reveal")
 
 (use-package org
-  :ensure org-plus-contrib
+  :ensure org
   :pin "org"
   :bind (("C-c a" . org-agenda) ("C-c c" . org-capture))
   :commands org-mode
@@ -292,8 +370,8 @@ Some variables are not suitable to keep in the init-file, I add these via custom
   ;; (require 'org-protocol) ;; move to modules? autoload the entry commands (don’t seem to be)
   (setq org-directory "~/org"
         org-ellipsis " ⤵"
-        org-export-backends '(reveal beamer odt ascii html icalendar latex)
-        org-modules '(org-habit org-inlinetask org-mu4e org-id org-bullets org-zotxt)
+        org-export-backends '(re-reveal beamer odt ascii html icalendar latex)
+        org-modules '(org-habit org-inlinetask org-mu4e org-id org-bullets org-zotxt org-pdfview)
         org-list-allow-alphabetical t
         org-id-link-to-org-use-id 'use-existing
         org-agenda-files (expand-file-name "agenda-files" org-directory))
@@ -302,8 +380,12 @@ Some variables are not suitable to keep in the init-file, I add these via custom
     :group 'aj
     :type '(repeat file))
   :config
-  (require 'helm-mode)
-  (require 'aj-org-config))
+  ;; (message "Laddade org")
+  (load-library "helm-mode")
+  (load-library "aj-org-config")
+  ;; (require 'helm-mode)
+  ;; (require 'aj-org-config)
+  )
 #+end_src
 **** org init async :org_async:no_default_tangle:
 #+begin_src emacs-lisp
@@ -312,8 +394,8 @@ Some variables are not suitable to keep in the init-file, I add these via custom
   :commands org-mode
   :init (progn
           (setq org-directory "~/org"
-                org-export-backends '(reveal beamer odt ascii html icalendar latex)
-                org-modules '(org-inlinetask org-zotxt)
+                org-export-backends '(beamer odt ascii html icalendar latex)
+                org-modules '(org-inlinetask org-zotxt org-id)
                 org-list-allow-alphabetical t))
   :config (require 'ox) (require 'aj-org-config-org-async))
 #+end_src
@@ -322,7 +404,7 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 #+BEGIN_SRC emacs-lisp
 (use-package org-pdfview
   :ensure t
-  :after 'org)
+  :after org)
 #+END_SRC
 **** org clock hydra
 #+BEGIN_SRC emacs-lisp
@@ -449,7 +531,7 @@ Use mu4e, the extensive config is in an [[file:lisp/aj-mail-config.org][external
 		   ("C-x m" . mu4e-compose-new)
 		   ("C-x i" . mu4e~headers-jump-to-maildir)
 		   ("C-x å" . mu4e-headers-search-bookmark))
-	:defer t
+	:defer 10
 	:init (setq mu4e-get-mail-command "mailsync" ; bash script running 3 offlineimap
 		        mu4e-update-interval 1800
 		        mu4e-view-show-images t
@@ -457,7 +539,9 @@ Use mu4e, the extensive config is in an [[file:lisp/aj-mail-config.org][external
 		        mu4e-attachment-dir "~/Hämtningar"
 		        ;; mu4e-change-filenames-when-moving t ;;for mbsync
 		        mu4e-completing-read-function #'completing-read) ; hands it to helm
-	:config (require 'aj-mail-config)))
+	:config (require 'aj-mail-config)
+    (mu4e t) ;; start delayed in background
+    ))
 #+END_SRC
 *** Fix parse-time-string :ARCHIVE:
 Why do I need this? For something with mu4e emailing? I don’t remember. It messes with ~org-read-date-analyze~, which is smarter anyway.
@@ -479,7 +563,8 @@ Disable it for now.
 ** Elfeed (feed-reader)
 #+BEGIN_SRC emacs-lisp
 (use-package elfeed
-  :bind ("C-x y" . elfeed))
+  :bind ("C-x y" . elfeed)
+  :config (add-hook 'elfeed-show-mode-hook #'visual-line-mode))
 
 ;; just the split-pane part extracted from the elfeed-goodies package
 (use-package elfeed-goodies-split-pane
@@ -535,6 +620,24 @@ But why do I need to compress pdf-files this way? Shouldn’t pdf-files have rea
       dired-recursive-copies 'always
       dired-dwim-target t)
 #+end_src
+**** dired: use ~hl-line-mode~ and hide cursor
+But show cursor in ~wdired-mode~
+#+begin_src emacs-lisp
+(add-hook 'dired-mode-hook #'hl-line-mode)
+
+(defun aj/dired-no-cursor ()
+  (setq cursor-type nil))
+
+(add-hook 'dired-mode-hook #'aj/dired-no-cursor)
+
+(defun aj/reset-cursor ()
+  (kill-local-variable 'cursor-type))
+
+(add-hook 'wdired-mode-hook #'aj/reset-cursor)
+
+(advice-add 'wdired-change-to-dired-mode :after #'aj/dired-no-cursor)
+#+end_src
+
 **** Dired collapse
 #+BEGIN_SRC emacs-lisp
 (use-package dired-collapse
@@ -586,16 +689,20 @@ But why do I need to compress pdf-files this way? Shouldn’t pdf-files have rea
 
 **** Sorting and listing-switches (dired-quick-sort)
 https://gitlab.com/xuhdev/dired-quick-sort/
-But also my yet ([2018-03-01]) unmerged fixes:
-https://gitlab.com/andersjohansson/dired-quick-sort/tree/ajfixes
+But also my branch for persistent per-directory options.
+https://gitlab.com/andersjohansson/dired-quick-sort/tree/dir-save
+(including some other unmerged fixes).
 #+begin_src emacs-lisp
+(setq dired-listing-switches "-lhA")
 (use-package dired-quick-sort
   :load-path "~/kodat/elisp/dired-quick-sort"
-  :commands hydra-dired-quick-sort dired-quick-sort-set-switches
-  :init
-  (setq dired-listing-switches "-lhA")
-  (add-hook 'dired-mode-hook 'dired-quick-sort-set-switches)
-  :config (define-key dired-mode-map "s" 'hydra-dired-quick-sort/body))
+  :after dired
+  :custom
+  (dired-quick-sort-use-per-directory-options t)
+  (dired-quick-sort-default-options '("version" ?n ?y "default"))
+  (dired-quick-sort-key "s")
+  :config
+  (dired-quick-sort-setup))
 #+end_src
 
 But some of the options for listing-switches doesn’t work with remote sessions in tramp. Avoid this!
@@ -643,6 +750,8 @@ Store visited directories in a list, make it accessible from helm
                                    (helm-basename candidate) candidate)))
        (fuzzy-match :initform t)))
 
+
+    ;; FIX: should be able to use helm-add-action-to-source
     (defmethod helm--setup-source :after ((source aj/helm-dired-recent-source))
       (setf (slot-value source 'action)
             (append (symbol-value (helm-actions-from-type-file))
@@ -665,6 +774,9 @@ Store visited directories in a list, make it accessible from helm
   :init (setq-default recentf-exclude '("xhtml-loader\\.rnc$" "\\.elc$"
                                         "elpa.*-autoloads.el"
                                         "/tmp/org-init-tangle"
+                                        "~/.emacs.d/init.el"
+                                        "~/.emacs.d/lisp/aj-org-config.el"
+                                        "~/.emacs.d/lisp/aj-mail-config.el"
                                         aj/recentf-exclude)
                       recentf-max-menu-items 500
                       recentf-max-saved-items 500)
@@ -759,6 +871,10 @@ I also want a function that places the newly generated password in the kill ring
 Last, a few functions to git push, pull and run ~magit~ on the password store.
 
 #+BEGIN_SRC emacs-lisp
+(use-package auth-source-pass
+  :after auth-source
+  :config (auth-source-pass-enable))
+
 (use-package password-store
   :defer t
   :config (setq password-store-password-length 47)
@@ -813,7 +929,6 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
                  (f-directories dir nil t))))))
   )
 
-
 (use-package pass
   :defer t
   :config
@@ -862,6 +977,7 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
         TeX-auto-save t ;parse on save
         TeX-auto-local ".auctex-auto" ; more sensible directory name
         TeX-style-local ".auctex-auto"
+        TeX-auto-private '("~/.emacs.d/auctex/.auctex-auto")
         LaTeX-babel-hyphen nil ; Disable language-specific hyphen insertion.
         LaTeX-clean-intermediate-suffixes
         '("\\.aux" "\\.bbl" "\\.blg" "\\.brf" "\\.fot" "\\.glo" "\\.gls" "\\.idx" "\\.ilg" "\\.ind" "\\.lof"  "\\.lot" "\\.nav" "\\.out" "\\.snm" "\\.toc" "\\.url" "\\.synctex\\.gz" "\\.run\\.xml" "\\.bcf" "\\.fdb_latexmk" "\\.upa" "\\.fls" "\\.lox" "\\.log")
@@ -1187,9 +1303,16 @@ https://github.com/andersjohansson/tex-fold-linebreaks
 #+BEGIN_SRC emacs-lisp
 (defun aj/switch-to-other-buffer ()
   (interactive)
-  (switch-to-buffer nil))
+  (switch-to-buffer nil)
+  (aj/cycle-buffers/body))
 
 (bind-key "C-x C-b" #'aj/switch-to-other-buffer)
+
+(defhydra aj/cycle-buffers (:color red)
+  "Cycle buffers"
+  ("n" #'next-buffer "Next buffer")
+  ("b" #'previous-buffer "Previous buffer")
+  ("q" nil "Quit"))
 #+END_SRC
 *** Eyebrowse
 #+BEGIN_SRC emacs-lisp
@@ -1364,7 +1487,6 @@ already narrowed."
                (t (org-narrow-to-subtree))))
         (t (narrow-to-defun))))
 
-;;(define-key endless/toggle-map "n" #'aj/narrow-or-widen-dwim)
 
 ;; This line actually replaces Emacs' entire narrowing keymap, that's
 ;; how much I like this command. Only copy it if that's what you want.
@@ -1436,61 +1558,63 @@ Example of alist entry:
   ;; display
   (setq helm-split-window-inside-p t)
   ;; from: https://www.reddit.com/r/emacs/comments/3asbyn/new_and_very_useful_helm_feature_enter_search/
-  ;; (defun helm-hide-minibuffer-maybe ()
-  ;;   (when (with-helm-buffer helm-echo-input-in-header-line)
-  ;;     (let ((ov (make-overlay (point-min) (point-max) nil nil t)))
-  ;;       (overlay-put ov 'window (selected-window))
-  ;;       (overlay-put ov 'face (let ((bg-color (face-background 'default nil)))
-  ;;                               `(:background ,bg-color :foreground ,bg-color)))
-  ;;       (setq-local cursor-type nil))))
+  (defun helm-hide-minibuffer-maybe ()
+    (when (with-helm-buffer helm-echo-input-in-header-line)
+      (let ((ov (make-overlay (point-min) (point-max) nil nil t)))
+        (overlay-put ov 'window (selected-window))
+        (overlay-put ov 'face (let ((bg-color (face-background 'default nil)))
+                                `(:background ,bg-color :foreground ,bg-color)))
+        (setq-local cursor-type nil))))
 
-  ;; (add-hook 'helm-minibuffer-set-up-hook
-  ;; 'helm-hide-minibuffer-maybe)
+  (add-hook 'helm-minibuffer-set-up-hook
+            'helm-hide-minibuffer-maybe)
 
-  (setq helm-display-function #'aj/helm-display-child-frame
+  (setq helm-display-function
+        ;;#'aj/helm-display-child-frame
+        #'helm-default-display-buffer 
         helm-display-buffer-reuse-frame t
-        helm-display-buffer-width 100
-        helm-display-buffer-height 30
+        helm-display-buffer-width 120
+        helm-display-buffer-height 35
         helm-echo-input-in-header-line t)
 
-  (defun aj/helm-display-child-frame (buffer &optional resume)
-    "Display `helm-buffer' in a separate frame.
-Function suitable for `helm-display-function',
-`helm-completion-in-region-display-function'
-and/or `helm-show-completion-default-display-function'.
-See `helm-display-buffer-height' and `helm-display-buffer-width' to
-configure frame size."
-    (if (not (display-graphic-p))
-        ;; Fallback to default when frames are not usable.
-        (helm-default-display-buffer buffer)
-      (setq helm--buffer-in-new-frame-p t)
-      (let ((default-frame-alist
-              `((parent . ,(selected-frame))
-                (width . ,helm-display-buffer-width)
-                (height . ,helm-display-buffer-height)
-                (undecorated . t)
-                (left-fringe . 2)
-                (right-fringe . 2)
-                (tool-bar-lines . 0)
-                (line-spacing . 0)
-                (desktop-dont-save . t)
-                (no-special-glyphs . t)
-                (tool-bar-lines . 0)
-                (left . 0)
-                (top . 0)
-                (title . "Helm")
-                (vertical-scroll-bars . nil)
-                (menu-bar-lines . 0)
-                (fullscreen . nil)
-                (visibility . ,(null helm-display-buffer-reuse-frame))
-                (minibuffer . nil)))
-            display-buffer-alist)
-        (helm-display-buffer-popup-frame buffer default-frame-alist)
-        (set-face-attribute 'header-line (selected-frame)
-                            :background nil :foreground 'unspecified :height 1.15
-                            :inherit 'default)
-        (aj/center-frame))
-      (helm-log-run-hook 'helm-window-configuration-hook)))
+  ;; (defun aj/helm-display-child-frame (buffer &optional resume)
+  ;;     "Display `helm-buffer' in a separate frame.
+  ;; Function suitable for `helm-display-function',
+  ;; `helm-completion-in-region-display-function'
+  ;; and/or `helm-show-completion-default-display-function'.
+  ;; See `helm-display-buffer-height' and `helm-display-buffer-width' to
+  ;; configure frame size."
+  ;;     (if (not (display-graphic-p))
+  ;;         ;; Fallback to default when frames are not usable.
+  ;;         (helm-default-display-buffer buffer)
+  ;;       (setq helm--buffer-in-new-frame-p t)
+  ;;       (let ((default-frame-alist
+  ;;               `((parent . ,(selected-frame))
+  ;;                 (width . ,helm-display-buffer-width)
+  ;;                 (height . ,helm-display-buffer-height)
+  ;;                 (undecorated . t)
+  ;;                 (left-fringe . 2)
+  ;;                 (right-fringe . 2)
+  ;;                 (tool-bar-lines . 0)
+  ;;                 (line-spacing . 0)
+  ;;                 (desktop-dont-save . t)
+  ;;                 (no-special-glyphs . t)
+  ;;                 (tool-bar-lines . 0)
+  ;;                 (left . 0)
+  ;;                 (top . 0)
+  ;;                 (title . "Helm")
+  ;;                 (vertical-scroll-bars . nil)
+  ;;                 (menu-bar-lines . 0)
+  ;;                 (fullscreen . nil)
+  ;;                 (visibility . ,(null helm-display-buffer-reuse-frame))
+  ;;                 (minibuffer . nil)))
+  ;;             display-buffer-alist)
+  ;;         (helm-display-buffer-popup-frame buffer default-frame-alist)
+  ;;         (set-face-attribute 'header-line (selected-frame)
+  ;;                             :background nil :foreground 'unspecified :height 1.15
+  ;;                             :inherit 'default)
+  ;;         (aj/center-frame))
+  ;;       (helm-log-run-hook 'helm-window-configuration-hook)))
 
   ;; Only show headers if several sources
   ;; https://www.reddit.com/r/emacs/comments/2z7nbv/lean_helm_window/
@@ -1515,7 +1639,7 @@ configure frame size."
   (global-set-key (kbd "C-c h g") 'helm-google-suggest)
 
 ;;; Helm mini:
-
+  
   (setq helm-mini-default-sources
         '(helm-source-buffers-list
           aj/helm-source-favourite-files
@@ -1706,12 +1830,12 @@ Differnt fuzzy search algorithm, is this needed?
   (defun aj/helm-zotero-recently-modified ()
     (when (file-accessible-directory-p aj/helm-zotero-library)
       (with-temp-buffer
-        (call-process "ls" nil t nil aj/helm-zotero-library "-t")
+        (call-process "ls" nil t nil "-t" "-1" aj/helm-zotero-library)
         (mapcar (lambda (x) (cons x (expand-file-name x aj/helm-zotero-library)))
                 (split-string
                  (buffer-substring (point-min)
                                    (progn (goto-char (point-min))
-                                          (forward-line 10) (point)))
+                                          (forward-line 20) (point)))
                  "\n"
                  t)))))
 
@@ -1721,7 +1845,7 @@ Differnt fuzzy search algorithm, is this needed?
 
   (defun aj/helm-zotero-files ()
     (when (file-accessible-directory-p aj/helm-zotero-library)
-      (directory-files aj/helm-zotero-library t)))
+      (directory-files aj/helm-zotero-library t "\\.\\(pdf\\|djvu\\|vue\\)$")))
 
   (defun aj/helm-zotero-match-part (candidate)
     (if (or helm-ff-transformer-show-only-basename
@@ -1801,8 +1925,11 @@ Differnt fuzzy search algorithm, is this needed?
 
 (defun aj/add-favourite-file ()
   (interactive)
-  (when (buffer-file-name)
-    (add-to-list 'aj/favourite-files (buffer-file-name) nil #'string=)))
+  (if-let ((name (or
+                  (buffer-file-name)
+                  (and (eq major-mode 'dired-mode) default-directory))))
+      (cl-pushnew name aj/favourite-files :test #'string=)
+    (user-error "Not in a file- or dired-buffer")))
 
 (with-eval-after-load "helm-for-files"
   (defun aj/remove-favourite-file (_candidate)
@@ -1831,7 +1958,6 @@ Differnt fuzzy search algorithm, is this needed?
 
   (defvar aj/helm-source-favourite-files
     (helm-make-source "Favourite files" 'aj/helm-favourite-files-source)))
-
 #+END_SRC
 
 **** Favorite directories
@@ -1935,24 +2061,28 @@ overriding it, but you should know before you do.
 (use-package company
   :defer 3
   :delight ""
+  :custom (company-idle-delay 1)
   :config (global-company-mode))
 
+(use-package company-emoji
+  :after company
+  :config (add-to-list 'company-backends 'company-emoji))
+
+;; see https://github.com/sebastiencs/company-box/pull/65
 (use-package company-box
-  :load-path "~/kodat/elisp/company-box" ;; fork from https://github.com/a13/company-box
-  :ensure t
+  :load-path "~/kodat/elisp/company-box"
   :delight ""
+  :after company
   :hook (company-mode . company-box-mode)
-  :config (setq company-box-icons-alist company-box-icons-all-the-icons))
+  :init (setq company-box-enable-icon nil
+              company-box-scrollbar 'default))
 #+END_SRC
-*** hippie-expand and yasnippet
+
+*** COMMENT yasnippet
 #+begin_src emacs-lisp
 (use-package yasnippet
   :defer 6
   :delight yas-minor-mode ""
-  :bind (("C-å" . hippie-expand))
-  :init
-  ;; (add-to-list 'hippie-expand-try-functions-list 'yas-hippie-try-expand)
-  ;; (add-to-list 'hippie-expand-try-functions-list 'ispell-complete-word t); append
   :config
   (yas-global-mode 1) ;välja specifika?
   (define-key yas-minor-mode-map (kbd "<tab>") nil)
@@ -1963,9 +2093,11 @@ overriding it, but you should know before you do.
 
 *** Hippie expand
 #+BEGIN_SRC emacs-lisp
+(bind-key "C-å" #'hippie-expand)
+
 ;;some kind of default
 (setq hippie-expand-try-functions-list
-      '(yas-hippie-try-expand
+      '(;; yas-hippie-try-expand
         try-complete-file-name
         try-expand-all-abbrevs
         try-expand-dabbrev
@@ -1978,10 +2110,11 @@ overriding it, but you should know before you do.
 
 (add-hook 'text-mode-hook #'aj/hippie-expand-for-text-mode)
 (add-hook 'prog-mode-hook #'aj/hippie-expand-for-prog-mode)
+(add-hook 'emacs-lisp-mode-hook #'aj/hippie-expand-for-elisp)
 
 (defun aj/hippie-expand-for-text-mode ()
   (setq-local hippie-expand-try-functions-list
-              '(yas-hippie-try-expand
+              '(;; yas-hippie-try-expand
                 try-expand-all-abbrevs
                 try-expand-dabbrev
                 try-expand-dabbrev-all-buffers
@@ -1989,15 +2122,16 @@ overriding it, but you should know before you do.
                 ;; ispell-complete-word
                 try-complete-file-name
                 try-complete-file-name-partially
-                try-complete-lisp-symbol-partially
-                try-complete-lisp-symbol)))
+                ;; try-complete-lisp-symbol-partially
+                ;; try-complete-lisp-symbol
+                )))
 
 (defun aj/hippie-expand-for-prog-mode ()
   (setq-local hippie-expand-try-functions-list
-              '(yas-hippie-try-expand
+              '(;; yas-hippie-try-expand
                 try-complete-file-name
                 try-expand-all-abbrevs
-                try-expand-list ;;what do they do?
+                try-expand-list
                 try-expand-line
                 try-complete-lisp-symbol-partially
                 try-complete-lisp-symbol
@@ -2005,6 +2139,20 @@ overriding it, but you should know before you do.
                 try-expand-dabbrev-all-buffers
                 try-expand-dabbrev-from-kill
                 try-complete-file-name-partially)))
+
+(defun aj/hippie-expand-for-elisp ()
+  (setq-local hippie-expand-try-functions-list
+              '(;; yas-hippie-try-expand
+                try-complete-lisp-symbol-partially
+                try-complete-lisp-symbol
+                try-complete-file-name
+                try-complete-file-name-partially
+                try-expand-all-abbrevs
+                try-expand-dabbrev
+                try-expand-dabbrev-all-buffers
+                try-expand-dabbrev-from-kill
+                try-expand-list
+                try-expand-line)))
 #+END_SRC
 
 ** info+
@@ -2033,6 +2181,7 @@ overriding it, but you should know before you do.
 #+end_src
 
 ** Magit
+*** Magit config
 #+begin_src emacs-lisp
 (use-package magit
   :ensure t
@@ -2048,6 +2197,13 @@ overriding it, but you should know before you do.
             (lambda () (setq fill-column 70)
               (ispell-change-dictionary "en_GB,sv_SE"))
             t))
+#+end_src
+*** magit-todos
+#+begin_src emacs-lisp
+(use-package magit-todos
+  :after magit
+  :commands magit-todos-mode
+  :config (magit-todos-mode t))
 #+end_src
 
 *** Use visual-line-mode in magit for repositories with mostly prose text
@@ -2125,7 +2281,8 @@ overriding it, but you should know before you do.
 (use-package aj-custom-commands
   :bind (("C-x C-k" . aj/delete-current-buffer-file)
          ("C-x C-r" . aj/rename-current-buffer-file)
-         ("C-S-<return>" . ergoemacs-open-in-external-app))
+         ("C-S-<return>" . ergoemacs-open-in-external-app)
+         ("C-c m" . aj/message-peek))
   :init (bind-key "C-a" 'aj/beginning-or-indentation prog-mode-map)
   (with-eval-after-load "dired"
     (bind-key "<s-return>" 'sudo-edit-current-file dired-mode-map)))
@@ -2497,12 +2654,15 @@ Needed when starting in a non-interactive shell.
 	  version-control t)
 #+end_src
 
-*** Tramp default method
-#+begin_src emacs-lisp
-(setq tramp-default-method "ssh")
-#+end_src
-
 ** prog-modes
+
+*** Highlight todos (hl-todo)
+#+begin_src emacs-lisp
+(use-package hl-todo
+  :commands global-hl-todo-mode
+  :defer 10
+  :config (global-hl-todo-mode t))
+#+end_src
 
 *** eldoc
 #+BEGIN_SRC emacs-lisp
@@ -2790,23 +2950,61 @@ cperl instead of perl-mode
   (setq-local comment-auto-fill-only-comments t)
   (auto-fill-mode t))
 
-(defun esk-add-watchwords ()
-  (font-lock-add-keywords
-   nil '(("\\<\\(FIX\\(ME\\)?\\|TODO\\|HACK\\|REFACTOR\\|NOCOMMIT\\)"
-          1 font-lock-warning-face t))))
+;; (defun esk-add-watchwords ()
+;;   (font-lock-add-keywords
+;;    nil '(("\\<\\(FIX\\(ME\\)?\\|TODO\\|HACK\\|REFACTOR\\|NOCOMMIT\\)"
+;;           1 font-lock-warning-face t))))
+;;(remove-hook 'prog-mode-hook 'esk-add-watchwords)
 
 (add-hook 'prog-mode-hook 'esk-local-comment-auto-fill)
-(add-hook 'prog-mode-hook 'esk-add-watchwords)
 (add-hook 'prog-mode-hook 'idle-highlight-mode)
 #+end_src
 
 ** Text-modes and spelling
-*** Text-mode uses visual-line-mode
+
+*** Visual-line-mode
+**** Text-mode uses visual-line-mode and visual-fill-column-mode
 #+begin_src emacs-lisp
 (add-hook 'text-mode-hook 'turn-on-visual-line-mode)
+
+(use-package visual-fill-column
+  :init (add-hook 'visual-line-mode-hook #'visual-fill-column-mode)
+  :config
+  (setq-default visual-fill-column-width 100)
+  (setq split-window-preferred-function #'visual-fill-column-split-window-sensibly)
+  (advice-add 'text-scale-increase :after #'visual-fill-column-adjust))
 #+end_src
+
+**** Define a binding for killing logical line in visual-line-mode, make sure this works also in org-mode, and that org-mode calls org-kill-line even if visual-line-mode is activated
+#+begin_src emacs-lisp
+;;(with-eval-after-load 'simple
+(define-key visual-line-mode-map [remap kill-line] nil)
+(bind-keys :map visual-line-mode-map
+           ("C-k" . kill-visual-line)
+           ("C-S-k" . kill-line))
+
+(with-eval-after-load 'org
+  (define-key org-mode-map [remap kill-line] nil)
+  (bind-keys :map org-mode-map
+             ("C-k" . org-kill-line)
+             ("C-S-k" . kill-line))
+
+  ;; Make org-kill-line take priority over kill-visual-line
+  (defvar aj/org-visual-line-mode-map (copy-keymap visual-line-mode-map))
+  (define-key aj/org-visual-line-mode-map (kbd "C-k") #'org-kill-line)
+  (define-key aj/org-visual-line-mode-map  [remap kill-line] nil)
+  (define-key aj/org-visual-line-mode-map  (kbd "C-S-k") #'kill-line)
+
+  (defun aj/org-override-visual-line-mode-map ()
+    (setq minor-mode-overriding-map-alist
+          (list (cons visual-line-mode aj/org-visual-line-mode-map))))
+
+  (add-hook 'org-mode-hook #'aj/org-override-visual-line-mode-map))
+
+#+end_src
+
 *** No, sentences don’t end with double space
-That’s a stupid convention from the days of the typewriter.
+That’s a stupid convention from the days of the typewriter (and in Swedish we don’t even use the longer (not double!) spaces after sentences that are good typographic practice in English).
 #+BEGIN_SRC emacs-lisp
 (setq sentence-end-double-space nil)
 #+END_SRC
@@ -2820,9 +3018,18 @@ The minor mode defined below takes care of this. I advice ~fill-region-as-paragr
 #+BEGIN_SRC emacs-lisp
 (add-hook 'text-mode-hook (lambda () (setq fill-column 99999)))
 
+
 (define-minor-mode aj/one-sentence-per-line-mode
   "Minor mode that overrides `fill-region-as-paragraph' to
-  arrange every sentence on its own line")
+  arrange every sentence on its own line"
+  ;; (message "hej")
+  ;; (if aj/one-sentence-per-line-mode
+  ;;     (font-lock-add-keywords nil aj/missing-eol-period-fl-keywords)
+  ;;   (font-lock-remove-keywords nil aj/missing-eol-period-fl-keywords))
+  )
+
+;; (defvar aj/missing-eol-period-fl-keywords
+;;   '(("^[^#:\\*].+\\(\\b[[:word:]]+[^].?:]\\)$" 1 'font-lock-warning-face prepend)))
 
 (defun aj/one-sentence-fill-override (fun from to &rest args)
   (if aj/one-sentence-per-line-mode
@@ -2830,20 +3037,6 @@ The minor mode defined below takes care of this. I advice ~fill-region-as-paragr
     (apply fun from to args)))
 
 (advice-add 'fill-region-as-paragraph :around #'aj/one-sentence-fill-override)
-
-(defun aj/set-org-sentence-end ()
-  "Allow sentences to end with an org-bracket-link
-
-I often put `org-annotate' comments after sentences, and these
-should be kept together."
-  (setq-local
-   sentence-end
-   (format
-    "\\(?9:[.?!…‽][]\"'”’)}]*\\(?8:%s\\)?\\(?2:$\\|[	  ]\\)\\|[。．？！]+\\)[
-]*"
-    org-bracket-link-regexp)))
-
-(add-hook 'org-mode-hook #'aj/set-org-sentence-end)
 
 (defun aj/one-sentence-per-line-region (from to)
   "Makes one sentence per line in region"
@@ -2859,7 +3052,22 @@ should be kept together."
       (while (search-forward-regexp se (- to 2) t)
         (replace-match "\n" t nil nil 2)))))
 
+
+(defun aj/set-org-sentence-end ()
+  "Allow sentences to end with an org-bracket-link
+
+I often put `org-annotate' comments after sentences, and these
+should be kept together."
+  (setq-local
+   sentence-end
+   (format
+    "\\(?9:[.?!…‽][]\"'”’)}]*\\(?8:%s\\)?\\(?2:$\\|[	  ]\\)\\|[。．？！]+\\)[
+]*"
+    org-bracket-link-regexp)))
+
+(add-hook 'org-mode-hook #'aj/set-org-sentence-end)
 #+END_SRC
+
 *** Fix text-mode syntax table and char table for quote symbols
 When writing english with contractions using "right single quotation mark", ~’~, it needs to be treated as a word character, similar to how ~'~ is treated in ~text-mode-syntax-table~.
 
@@ -2902,16 +3110,18 @@ Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t
       (zap-to-char -1 ?i)
       (insert "I")))
 
+
+  ;; TODO, check use of ispell-local-dictionary, ispell-dictionary, ispell-current-dictionary
   (defun aj/writing-english-p ()
     (if ispell-local-dictionary
         (string-match-p "en" ispell-local-dictionary)
-      (and flyspell-mode
+      (and flyspell-mode ispell-dictionary
            (string-match-p "en" ispell-dictionary))))
 
   (defun aj/writing-swedish-p ()
     (if ispell-local-dictionary
         (string-match-p "sv" ispell-local-dictionary)
-      (and flyspell-mode
+      (and flyspell-mode ispell-dictionary
            (string-match-p "sv" ispell-dictionary))))
 
   (with-eval-after-load abbrev-file-name
@@ -2945,7 +3155,8 @@ Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t
 (setq-default ispell-program-name "hunspell")
 
 (setq ispell-silently-savep t
-      ispell-dictionary "sv_SE")
+      ;; ispell-dictionary "sv_SE"
+      )
 
 ;; (setq ispell-local-dictionary-alist
 ;;       '(("en_GB"
@@ -3019,7 +3230,7 @@ Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t
   ("L" aj/disable-enable-flyspell-permanently-in-file)
   ("c" ispell-word)
   ("," flyspell-auto-correct-word :color red)
-  ("s" (ispell-change-dictionary "sv_SE"))
+  ("s" (aj/ispell-change-dictionary "sv_SE"))
   ("S" (aj/ispell-change-dictionary-store "sv_SE"))
   ("b" (aj/ispell-change-dictionary "en_GB"))
   ("B" (aj/ispell-change-dictionary-store "en_GB"))
@@ -3078,7 +3289,11 @@ personal dictionaries into a combined personal dictionary."
           (write-file (car dictfiles))))
       ;; should be overridden in `ispell-buffer-local-dict' if we have
       ;; a local variable definition in the buffer
-      (setq-local ispell-local-pdict (car dictfiles)))))
+      ;; tvivlar på att detta är rätt kanske:
+      ;; (setq-local ispell-local-pdict (car dictfiles))
+
+      ;; eller så borde den avsättas om vi växlat till en icke-mergad.
+      )))
 #+end_src
 
 **** Guess language, conditional enabling of flyspell and setting of languages for flyspell, typo and langtool.
@@ -3101,87 +3316,51 @@ personal dictionaries into a combined personal dictionary."
 
   :delight guess-language-mode)
 
+
+
 (defvar aj/flyspell-modes '(org-mode mu4e-compose-mode))
 (defvar-local aj/inhibit-flyspell nil)
 (put 'aj/inhibit-flyspell 'safe-local-variable #'booleanp)
 
+;; DISABLE AUTO-activation for a while. See if this leads to less
+;; multiple ispell-processes bugs.
 
-;; Functions that maybe enables flyspell and guess-language, a second
-;; after local variables are read (to ensure ispell language and
-;; aj/inhabit-flyspell is set).
-(add-hook 'hack-local-variables-hook #'aj/maybe-enable-flyspell-and-guess-language)
 
-(defun aj/maybe-enable-flyspell-and-guess-language ()
-  (run-with-idle-timer 1 nil #'aj/maybe-enable-flyspell-and-guess-language-fn (current-buffer)))
+;; ;; Functions that maybe enables flyspell and guess-language, a second
+;; ;; after local variables are read (to ensure ispell language and
+;; ;; aj/inhabit-flyspell is set).
 
-(defun aj/maybe-enable-flyspell-and-guess-language-fn (buf)
-  (when (buffer-live-p buf)
-    (with-current-buffer buf
-      (when (and (not aj/inhibit-flyspell)
-                 (member major-mode aj/flyspell-modes))
-        (flyspell-mode 1)
-        (aj/set-langtool-language-from-ispell-dict))
-      (if (or (eq major-mode 'mu4e-compose-mode)
-              (and flyspell-mode (not ispell-local-dictionary)))
-          (guess-language-mode 1)
-        (guess-language-mode -1)))))
+;; (add-hook 'hack-local-variables-hook #'aj/maybe-enable-flyspell-and-guess-language)
 
-(defun aj/set-langtool-language-from-ispell-dict ()
-  (when (and ispell-local-dictionary
-             (< (length ispell-local-dictionary) 7))
-    (setq-local langtool-default-language
-                (replace-regexp-in-string "\_" "-" ispell-local-dictionary))))
+;; (defun aj/maybe-enable-flyspell-and-guess-language ()
+;;   (run-with-idle-timer 1 nil #'aj/maybe-enable-flyspell-and-guess-language-fn (current-buffer)))
+
+;; (defun aj/maybe-enable-flyspell-and-guess-language-fn (buf)
+;;   (when (buffer-live-p buf)
+;;     (with-current-buffer buf
+;;       (when (and (not aj/inhibit-flyspell)
+;;                  (member major-mode aj/flyspell-modes))
+;;         (flyspell-mode 1)
+;;         (aj/set-langtool-language-from-ispell-dict))
+;;       (if (or (eq major-mode 'mu4e-compose-mode)
+;;               (and flyspell-mode (not ispell-local-dictionary)))
+;;           (guess-language-mode 1)
+;;         (guess-language-mode -1)))))
+
+;; (defun aj/set-langtool-language-from-ispell-dict ()
+;;   (when (and ispell-local-dictionary
+;;              (< (length ispell-local-dictionary) 7))
+;;     (setq-local langtool-default-language
+;;                 (replace-regexp-in-string "\_" "-" ispell-local-dictionary))))
 #+END_SRC
 
 **** Extra flyspell bindings
 #+BEGIN_SRC emacs-lisp
 (with-eval-after-load 'flyspell
-    (bind-keys :map flyspell-mode-map
-               ("C-,"   . flyspell-auto-correct-previous-word)
-               ("C-;"   . flyspell-goto-previous-error)
-               ("C-M-," . flyspell-goto-next-error))
-
-  ;; from: http://pragmaticemacs.com/emacs/jump-back-to-previous-typo/
-  ;; move point to previous error
-  ;; based on code by hatschipuh at
-  ;; http://emacs.stackexchange.com/a/14912/2017
-  (defun flyspell-goto-previous-error (arg)
-    "Go to arg previous spelling error."
-    (interactive "p")
-    (while (not (= 0 arg))
-      (let ((pos (point))
-            (min (point-min)))
-        (if (and (eq (current-buffer) flyspell-old-buffer-error)
-                 (eq pos flyspell-old-pos-error))
-            (progn
-              (if (= flyspell-old-pos-error min)
-                  ;; goto beginning of buffer
-                  (progn
-                    (message "Restarting from end of buffer")
-                    (goto-char (point-max)))
-                (backward-word 1))
-              (setq pos (point))))
-        ;; seek the next error
-        (while (and (> pos min)
-                    (let ((ovs (overlays-at pos))
-                          (r '()))
-                      (while (and (not r) (consp ovs))
-                        (if (flyspell-overlay-p (car ovs))
-                            (setq r t)
-                          (setq ovs (cdr ovs))))
-                      (not r)))
-          (backward-word 1)
-          (setq pos (point)))
-        ;; save the current location for next invocation
-        (setq arg (1- arg))
-        (setq flyspell-old-pos-error pos)
-        (setq flyspell-old-buffer-error (current-buffer))
-        (goto-char pos)
-        (if (= pos min)
-            (progn
-              (message "No more miss-spelled word!")
-              (setq arg 0))
-          (forward-word))))))
+  (bind-keys :map flyspell-mode-map
+             ("C-,"   . flyspell-auto-correct-previous-word)
+             ("C-;"   . flyspell-check-previous-highlighted-word)
+             ("C-M-," . flyspell-goto-next-error)))
 #+END_SRC
 **** Helm flyspell, on C-ö
 #+BEGIN_SRC emacs-lisp
@@ -3191,7 +3370,7 @@ personal dictionaries into a combined personal dictionary."
   :init (with-eval-after-load 'flyspell
           (bind-key "C-ö" 'helm-flyspell-correct flyspell-mode-map)))
 #+END_SRC
-**** Extra words to skip in org-mode
+**** Extra areas to skip in org-mode
 #+BEGIN_SRC emacs-lisp
 (defun aj/org-flyspell-skip-links (fun)
   (if (memq (face-at-point) '(org-link org-date org-scheduled))
@@ -3202,17 +3381,17 @@ personal dictionaries into a combined personal dictionary."
 
 #+END_SRC
 
-**** Avoid unneccesary messages :ARCHIVE:
-#+BEGIN_SRC emacs-lisp
-(defun aj/message-off-advice (oldfun &rest args)
-  "Quiet down messages in adviced OLDFUN."
-  (let ((inhibit-message t))
-    (apply oldfun args)))
+**** Ispell-multi, keep processes for multiple languages going. :ARCHIVE:
 
-(advice-add #'ispell-init-process :around #'aj/message-off-advice)
-#+END_SRC
+#+begin_src emacs-lisp
+(use-package ispell-multi
+  :load-path "~/kodat/elisp/ispell-multi"
+  :after ispell
+  :config (ispell-multi-activate))
 
-**** COMMENT Med wcheck :ARCHIVE:
+#+end_src
+
+**** COMMENT With wcheck :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (setq ispell-really-hunspell t)
 
@@ -3268,7 +3447,9 @@ For doing smart (curly) quotes, mainly in mails since org has it’s own mechani
   :ensure t
   :after mu4e
   :config
-  (add-to-list 'typo-quotation-marks '("Swedish" "»" "«" "›" "‹"))
+  (add-to-list 'typo-quotation-marks  '("Swedish" "»" "«" "›" "‹")
+               ;; '("Swedish" "”" "”" "’" "’")
+               )
   (setq-default typo-language "Swedish")
   (typo-global-mode 1)
   (add-hook 'mu4e-compose-mode-hook #'typo-mode)
@@ -3300,31 +3481,19 @@ For doing smart (curly) quotes, mainly in mails since org has it’s own mechani
 #+END_SRC
 
 *** Word lookups (definition, translation, synonyms). Use define-word for online word definitions and SDCV for Webster's dictionary installed locally
-My extra libraries can be found at:  https://gitlab.com/andersjohansson/define-word-thesaurus (doesn’t work with updated thesaurus.com) and  https://gitlab.com/andersjohansson/definew-word-tyda.
-
-I like thesaurus.com because it separates different meanings of a word, and because it sorts the words into more and less common.
-Thesaurus.com has changed the frontend to random class names and ids however, and is much harder to parse now than when i wrote ~define-word-thesaurus~.
-https://github.com/Manwholikespie/thesaurus (python) seems to be doing a good job of it though. If it was easy and my system didn’t crash when attempting to call python from elisp (with https://github.com/jvkersch/emacs-python) it would be a very good alternative. Parsing the output from a python shell seems to be an alternative for using that.
+My extra libraries can be found at:  https://gitlab.com/andersjohansson/define-word-thesaurus and  https://gitlab.com/andersjohansson/definew-word-tyda.
 
 Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_now_using_the_right_dictionary
 
 #+BEGIN_SRC emacs-lisp
 (use-package define-word
-  :ensure t
-  :commands (define-word define-word-at-point)
-  :init
-  (defun aj/tyda-lookup (arg) (interactive "P")
-         (if arg
-             (define-word-at-point nil 'tyda)
-           (define-word (read-from-minibuffer "Tyda: ") 'tyda)))
-  ;; (defun aj/thesaurus-lookup (arg) (interactive "P")
-  ;;        (if arg
-  ;;            (define-word-at-point nil 'thesaurus)
-  ;;          (define-word (read-from-minibuffer "Thesaurus: ") 'thesaurus)))
-  )
-;; (use-package define-word-thesaurus
-;;   :load-path "~/kodat/elisp/define-word-thesaurus/"
-;;   :after define-word)
+  ;; :ensure t
+  :load-path "~/kodat/elisp/define-word/"
+  :commands (define-word define-word-at-point))
+
+(use-package define-word-thesaurus
+  :load-path "~/kodat/elisp/define-word-thesaurus/"
+  :after define-word)
 (use-package define-word-tyda
   :load-path "~/kodat/elisp/define-word-tyda/"
   :after define-word)
@@ -3356,24 +3525,48 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
   ("T" (define-word-at-point nil 'tyda) "Tyda at point")
   ("c" (define-word (read-from-minibuffer "Synonymer: " ) 'synonymer) "synonymer")
   ("C" (define-word-at-point nil 'synonymer) "Synonymer at point")
-  ;; ("s" (define-word (read-from-minibuffer "Thesaurus: " ) 'thesaurus) "Thesaurus")
-  ;; ("S" (define-word-at-point nil 'thesaurus) "Thesaurus at point")
-  ("s" synosaurus-lookup "synosaurus")
-  ("S" synosaurus-choose-and-replace "Synosaurus at point")
+  ("s" (define-word (read-from-minibuffer "Thesaurus: " ) 'thesaurus) "Thesaurus")
+  ("S" (define-word-at-point nil 'thesaurus) "Thesaurus at point")
+  ("a" synosaurus-lookup "synosaurus")
+  ("A" synosaurus-choose-and-replace "Synosaurus at point")
   ("g" google-translate-smooth-translate "Google translate"))
 
 (bind-key "C-x l"  #'hydra-word-lookup/body)
 #+END_SRC
 ** Special modes
+*** Spotify
+#+begin_src emacs-lisp
+(use-package spotify
+  :load-path "~/kodat/elisp/spotify.el/"
+  :defer t
+  :custom
+  (spotify-transport 'connect)
+  (spotify-api-locale "sv_SE")
+  (spotify-api-country "SE")
+  (spotify-mode-line-playing-text (all-the-icons-faicon "play-circle" :v-adjust 0.01))
+  (spotify-mode-line-paused-text (all-the-icons-faicon "pause-circle" :v-adjust 0.01))
+  (spotify-mode-line-stopped-text (all-the-icons-faicon "stop-circle" :v-adjust 0.01))
+  (spotify-mode-line-format  " %p %a: %t "))
+#+end_src
+*** Extra definitions for ~auto-mode-alist~
+#+begin_src emacs-lisp
+(add-to-list 'auto-mode-alist
+             '("\\.\\(timer\\|service\\)\\'" . conf-mode))
+#+end_src
 *** Pdf-view (pdf-tools)
 **** Main settings
+pdf-loader handles deferred loading. Then settings are applied after loading pdf-view
 #+BEGIN_SRC emacs-lisp
-(use-package pdf-tools
-  :commands pdf-tools-install
-  :init (pdf-tools-install)
-  :config
-  (with-eval-after-load 'pdf-view
-    (setq-default pdf-view-display-size 'fit-page))
+(use-package pdf-loader
+  ;; :load-path "~/kodat/elisp/pdf-tools/"
+  :commands pdf-loader-install
+  :init (pdf-loader-install))
+
+(with-eval-after-load 'pdf-view
+  (defun pdf-view-current-pagelabel (&optional window)
+    (nth (1- (pdf-view-current-page window)) (pdf-info-pagelabels)))
+  
+  (setq-default pdf-view-display-size 'fit-page)
   (add-hook 'pdf-view-mode-hook (lambda () (auto-revert-mode -1) (whole-line-or-region-local-mode -1)))
 
   (delight 'pdf-view-midnight-minor-mode " ☾" "pdf-misc")
@@ -3481,9 +3674,7 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
     (interactive "p")
     (aj/other-window-pdf-next-page (- (or n 1))))
   (bind-keys ("M-n" . aj/other-window-pdf-next-page)
-             ("M-p" . aj/other-window-pdf-previous-page))
-
-  :functions (pdf-annot-add-markup-annotation pdf-annot-add-text-annotation))
+             ("M-p" . aj/other-window-pdf-previous-page)))
 #+END_SRC
 
 **** pdf-zotxt-quote
@@ -3491,7 +3682,7 @@ Copying from a pdf with correct org-zotxt references and page numbers
 https://gitlab.com/andersjohansson/pdf-zotxt-quote
 #+BEGIN_SRC emacs-lisp
 (use-package pdf-zotxt-quote
-  :load-path "~/kodat/elisp/pdf-zotxt-quote/"
+  :load-path ("~/kodat/elisp/pdf-zotxt-quote/" "~/kodat/elisp/zotxt-emacs/")
   :commands pdf-zotxt-quote-mode
   :config
   (setq pdf-zotxt-quote-fill-column 99999)
@@ -3519,43 +3710,6 @@ But also with some inspiration from here: https://lepisma.github.io/2017/10/28/r
   :commands doc-font-mode)
 
 #+end_src
-*** Visual wrap column :ARCHIVE:
-Could be useful, but I don’t use it.
-#+begin_src emacs-lisp
-(defvar aj/visual-wrap-column 90)
-
-(defun aj/set-visual-wrap-column (new-wrap-column &optional buffer)
-  "Force visual line wrap at NEW-WRAP-COLUMN in BUFFER (defaults
-    to current buffer) by setting the right-hand margin on every
-    window that displays BUFFER.  A value of NIL or 0 for
-    NEW-WRAP-COLUMN disables this behavior."
-  (interactive (list (read-number "New visual wrap column, 0 to disable: " (or aj/visual-wrap-column fill-column 0))))
-  (if (and (numberp new-wrap-column)
-           (zerop new-wrap-column))
-      (setq new-wrap-column nil))
-  (with-current-buffer (or buffer (current-buffer))
-    (visual-line-mode t)
-    (set (make-local-variable 'aj/visual-wrap-column) new-wrap-column)
-    (add-hook 'window-configuration-change-hook 'update-visual-wrap-column nil t)
-    (let ((windows (get-buffer-window-list)))
-      (while windows
-        (when (window-live-p (car windows))
-          (with-selected-window (car windows)
-            (aj/update-visual-wrap-column)))
-        (setq windows (cdr windows))))))
-
-(defun aj/update-visual-wrap-column ()
-  (if (not aj/visual-wrap-column)
-      (set-window-margins nil nil)
-    (let* ((current-margins (window-margins))
-		   (right-margin (or (cdr current-margins) 0))
-		   (current-width (window-width))
-		   (current-available (+ current-width right-margin)))
-      (if (<= current-available aj/visual-wrap-column)
-		  (set-window-margins nil (car current-margins))
-		(set-window-margins nil (car current-margins)
-							(- current-available aj/visual-wrap-column))))))
-#+end_src
 *** Toggle font size
 Sometimes I feel the need for a generally bigger font.
 #+begin_src emacs-lisp
@@ -3566,7 +3720,7 @@ Sometimes I feel the need for a generally bigger font.
 (defun aj/toggle-font-size ()
   (interactive)
   (if (= aj/orig-font-size (face-attribute 'default :height))
-      (set-face-attribute 'default nil :height 158)
+      (set-face-attribute 'default nil :height 135)
     (set-face-attribute 'default nil :height aj/orig-font-size)))
 #+end_src
 
@@ -3611,10 +3765,9 @@ A way of higlighting where you are, don’t use it now.
 #+END_SRC
 *** all the icons
 **** Base package
-When this fix https://github.com/ubolonton/all-the-icons.el/tree/font-lock-fix is implemented I could use it from melpa.
 #+BEGIN_SRC emacs-lisp
 (use-package all-the-icons
-  :load-path "~/kodat/elisp/all-the-icons.el")
+  :ensure t)
 #+END_SRC
 
 **** All the icons dired
@@ -3648,7 +3801,55 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   :ensure t
   :pin "melpa"
   :defer t
-  :hook (after-init . doom-modeline-init))
+  :hook (after-init . doom-modeline-mode)
+  :custom
+  (doom-modeline-buffer-file-name-style 'truncate-all)
+  (doom-modeline-bar-width (frame-parameter nil 'left-fringe))
+  :config
+  ;; shorten filenames when the window is narrow
+  (defun aj/doom-modeline-shorten-file-name (name)
+    (let ((limit (/ (window-text-width) 3)))
+      (if (< limit (length name))
+          (concat (substring name 0 (1- limit)) " ⋯")
+        name)))
+
+  (advice-add 'doom-modeline-update-buffer-file-name :override #'aj/doom-modeline-update-buffer-file-name)
+  (add-hook 'window-configuration-change-hook #'doom-modeline-update-buffer-file-name)
+
+  (defun aj/doom-modeline-update-buffer-file-name (&rest _)
+    "Update buffer file name in mode-line."
+    (setq doom-modeline--buffer-file-name
+          (ignore-errors
+            (save-match-data
+              (if buffer-file-name
+                  (aj/doom-modeline-shorten-file-name (doom-modeline-buffer-file-name))
+                (propertize (aj/doom-modeline-shorten-file-name (buffer-name))
+                            'face (if (doom-modeline--active)
+                                      'doom-modeline-buffer-file
+                                    'mode-line-inactive)
+                            'help-echo "Buffer name
+mouse-1: Previous buffer\nmouse-3: Next buffer"
+                            'local-map mode-line-buffer-identification-keymap))))))
+  ;; pdf pages with pagelabels
+  (advice-add 'doom-modeline-update-pdf-pages :override #'aj/doom-modeline-update-pdf-pages)
+
+  (defun aj/doom-modeline-update-pdf-pages ()
+    "Update PDF pages. Use pagelabels if available."
+    (setq doom-modeline--pdf-pages
+          (let* ((cp (eval `(pdf-view-current-page)))
+                 (physical (format "%d/%d"
+                                   cp
+                                   (pdf-cache-number-of-pages)))
+                 (currlabel (pdf-view-current-pagelabel)))
+            
+            (propertize
+             (if (equal currlabel (number-to-string cp))
+                 (concat " P: " physical " ")
+               (concat " P:" currlabel " (" physical ") "))
+             'face (if (doom-modeline--active)
+                       'mode-line
+                     'mode-line-inactive)))))
+  )
 #+END_SRC
 
 **** Moody :ARCHIVE:
@@ -3887,11 +4088,11 @@ Add ADDITIONAL-SEGMENTS to the end of the theme."
            (magit-auto-revert-mode "" magit)
            (outline-minor-mode ,(all-the-icons-octicon "list-unordered" :v-adjust 0.1) outline)))
 
-(delight 'emacs-lisp-mode " Elisp" :major)
+;; (delight 'emacs-lisp-mode " Elisp" :major)
 #+end_src
 *** Themes
 **** My own face definitions
-Load my own face customizations after enabling a theme (in general, these are modifications to solarized-light|dark).
+Load my own face customizations after enabling a theme.
 #+BEGIN_SRC emacs-lisp
 
 ;; Would it be possible to do it as a custom theme that is enabled
@@ -3926,16 +4127,16 @@ Load my own face customizations after enabling a theme (in general, these are mo
   "Do face definition stuff after loading theme.
 Also runs hook aj/face-definitions-hook."
   (unless (eq theme 'user) ;enable theme calls itself with user theme.
+    (set-face-attribute 'scroll-bar nil :foreground (face-attribute 'widget-field :background))
+
     (with-eval-after-load 'org-faces
-      (set-face-attribute 'org-table nil :inherit 'fixed-pitch)
+
       (set-face-attribute 'org-meta-line nil :inherit 'org-drawer)
 
-      ;;(let ((shadow-color (face-attribute 'highlight :background)))
-      (set-face-attribute 'org-block-begin-line nil :inherit '(shadow) :height 0.9)
-      (set-face-attribute 'org-block-end-line nil :inherit '(shadow)  :height 0.9)
-      ;;)
+      (set-face-attribute 'org-block-begin-line nil :height 0.9)
+      (set-face-attribute 'org-block-end-line nil :height 0.9)
+      (set-face-attribute 'org-block nil :height 0.95)
 
-      ;;(set-face-attribute 'org-block nil :inherit ??)
       (set-face-attribute 'org-quote nil :weight 'normal :height 0.95 :inherit 'default)
       (set-face-attribute 'org-verse nil :inherit 'org-table)
       ;; (set-face-attribute 'org-tag nil :weight 'normal :inherit
@@ -3943,12 +4144,9 @@ Also runs hook aj/face-definitions-hook."
 
       (set-face-attribute 'org-special-keyword nil :weight 'normal :inherit 'shadow)
 
-      ;; Special tag faces
-      (dolist (f '(("noexport" :inherit (widget-field org-tag))
-                   ("ignoreheading" :inherit (widget-field org-tag))
-                   ("read_only" :inherit (widget-field org-tag))))
-        (add-to-list 'org-tag-faces f))
-      (org-set-tag-faces 'org-tag-faces org-tag-faces)
+      ;; Use fixed-pitch for checkbox, compressed font for table
+      (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
+      (set-face-attribute 'org-table nil :family "Input Mono Compressed")
 
       ;; specific for solarized
       ;; level colors in solarized are bad
@@ -4109,15 +4307,19 @@ I actually liked this more, especially the unified-branch which I used here. But
 
 *** Cursor
 #+begin_src emacs-lisp
-(setq cursor-type 'bar)
-(setq cursor-in-non-selected-windows 'hbar)
-(use-package cursor-chg
-  :defer 5
-  :init (setq curchg-default-cursor-color (face-attribute 'font-lock-type-face :foreground))
-  :config
-  ;; (setq curchg-idle-cursor-type 'box)
-  ;; (toggle-cursor-type-when-idle -1)
-  (change-cursor-mode 1))
+(setq-default cursor-type 'bar)
+(setq-default cursor-in-non-selected-windows 'hollow)
+(blink-cursor-mode -1)
+(setq blink-cursor-alist '((bar . (bar . 1))))
+
+;; (use-package cursor-chg
+;;   :defer 5
+;;   :init (setq curchg-default-cursor-color (face-attribute 'font-lock-type-face :foreground))
+;;   :config
+;;   ;; (setq curchg-idle-cursor-type 'box)
+;;   ;; (toggle-cursor-type-when-idle -1)
+;;   (setq curchg-overwrite/read-only-cursor-type 'box)
+;;   (change-cursor-mode 1))
 #+end_src
 
 *** Fullscreen toggling
@@ -4132,10 +4334,10 @@ I actually liked this more, especially the unified-branch which I used here. But
                              aj/last-fullscreen-param
 
                            (setq aj/last-fullscreen-param current-value)
-                           (fancy-battery-mode +1)
+                           ;; (fancy-battery-mode +1)
                            'fullboth))))
 
-(autoload 'fancy-battery-mode "fancy-battery")
+;; (autoload 'fancy-battery-mode "fancy-battery")
 
 (bind-key "<f11>" #'aj/toggle-fullscreen)
 #+end_src
@@ -4180,21 +4382,21 @@ From: http://stackoverflow.com/questions/4726220/how-to-have-colors-in-the-outpu
 *** ajf
 Some special functions for managing my data files.
 #+begin_src emacs-lisp
-  (use-package aj-forskning
-	:load-path "~/kodat/elisp/orgqda"
-	:defer t)
+(use-package aj-forskning
+  :load-path "~/kodat/elisp/orgqda"
+  :defer t)
 
-  ;;; font-lock () och {}
-  (with-eval-after-load 'org
-	(defvar ajf/font-lock-brackets-keywords
-	  '(("{[^}]+}" (0 '(face font-lock-type-face) prepend))
-		("([^)]+)" (0 '(face font-lock-variable-name-face) prepend))))
+;;; font-lock () och {}
+(with-eval-after-load 'org
+  (defvar ajf/font-lock-brackets-keywords
+	'(("{[^}]+}" (0 '(face font-lock-type-face) append))
+	  ("([^)]+)" (0 '(face font-lock-variable-name-face) append))))
 
-	(defun ajf/font-lock-brackets ()
-	  (dolist (el ajf/font-lock-brackets-keywords)
-		(add-to-list 'org-font-lock-extra-keywords el t)))
+  (defun ajf/font-lock-brackets ()
+	(dolist (el ajf/font-lock-brackets-keywords)
+	  (add-to-list 'org-font-lock-extra-keywords el t)))
 
-	(add-hook 'org-font-lock-set-keywords-hook #'ajf/font-lock-brackets))
+  (add-hook 'org-font-lock-set-keywords-hook #'ajf/font-lock-brackets))
 #+end_src
 
 *** mplayer-mode
@@ -4215,7 +4417,8 @@ Available at: https://github.com/andersjohansson/orgqda
   :defer t
   :init (put 'orgqda-csv-dir 'safe-local-variable #'file-directory-p)
   :config (setq orgqda-exclude-tags
-				'("ARCHIVE" "noexport" "Reflektion" "Observation" "Forskningsdagbok"))
+                (append (mapcar #'car org-tag-persistent-alist)
+                        '("ARCHIVE" "Reflektion" "Observation" "Forskningsdagbok")))
   (defhydra aj/orgqda-hydra (:color blue :hint t)
 	("m" #'orgqda-mode "Toggle mode")
 	("ö" #'orgqda-list-tags "List tags")
@@ -4230,7 +4433,8 @@ Available at: https://github.com/andersjohansson/orgqda
   (bind-key "C-c C-ö" 'aj/orgqda-hydra/body orgqda-mode-map))
 
 (use-package orgqda-helm-tags
-  :after 'orgqda)
+  :after orgqda
+  :config (setq orgqda-helm-tags-include-excluded t))
 #+END_SRC
 
 *** orgqda-transcript
@@ -4342,6 +4546,8 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
   (add-to-list 'default-frame-alist '(top . 0))
   (add-to-list 'default-frame-alist '(left . (+ -9)))
   (add-to-list 'default-frame-alist '(fullscreen . fullheight))
+  (add-to-list 'default-frame-alist '(scroll-bar-width . 7))
+  
   (defun aj/frame-to-left ()
     (interactive)
     (if (> (x-display-pixel-width) aj/large-screen-min-width)
@@ -4352,10 +4558,10 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
       (add-to-list 'default-frame-alist (cons 'width 90)) ;small
       )
     (set-frame-parameter nil 'fullscreen 'fullheight)
-    (set-frame-parameter nil 'left '(+ -9)) ;tweaked for gnome-shell on wayland
+    (set-frame-parameter nil 'left 0)
     (set-frame-parameter nil 'top 0))
 
-  (run-with-idle-timer 0.2 nil #'aj/frame-to-left))
+  (add-hook 'after-init-hook #'aj/frame-to-left))
 #+end_src
 
 * Final
