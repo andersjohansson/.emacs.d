@@ -1132,7 +1132,6 @@ This works better for my purposes.
 Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entries.
 #+BEGIN_SRC emacs-lisp
 (use-package helm-org-rifle
-  :ensure t
   :commands helm-org-rifle helm-org-rifle-current-buffer
   :init (bind-keys :map org-mode-map
                    ("C-<f2>" . helm-org-rifle-current-buffer)
@@ -1295,10 +1294,11 @@ I want my archive files to retain some structure, placing archived entries in a 
 Adapted from code by Florian Adamsky, now here:
 https://gitlab.com/andersjohansson/org-archive-hierarchically
 #+BEGIN_SRC emacs-lisp
-(use-package org-archive-hierarchically
-  :load-path "~/kodat/elisp/org-archive-hierarchically"
-  :commands org-archive-hierarchically
-  :init (setq org-archive-default-command #'org-archive-hierarchically))
+  (use-package org-archive-hierarchically
+	:straight nil ; TODO fix
+	:load-path "~/kodat/elisp/org-archive-hierarchically"
+	:commands org-archive-hierarchically
+	:init (setq org-archive-default-command #'org-archive-hierarchically))
 #+END_SRC
 
 ** Org capture
@@ -1479,6 +1479,7 @@ Useful for launching a small capture frame from window manager with a call like:
 I keep some notes for papers in org-mode, but sort my papers in Zotero. With this I can easily add a link to the specific note from Zotero, which is launched and resolved through org-protocol.
 #+BEGIN_SRC emacs-lisp
 (use-package org-protocol
+  :straight nil ;; included with org
   :config
   (add-to-list 'org-protocol-protocol-alist
                '(link
@@ -1544,14 +1545,13 @@ Can be passed any ox BACKEND in a non-interactive call"
                    (:ascii-text-width nil nil 3000)))
 #+end_src
 ** Org-annotate :org_async:
-From https://github.com/girzel/org-annotate
 #+BEGIN_SRC emacs-lisp
 (use-package org-annotate
-  :load-path "~/kodat/elisp/org-annotate"
-  :bind ( :map org-mode-map
-               ("C-c C-ä" . org-annotate-add-note)
-               ("C-c C-Ä" . org-annotate-delete-note)
-               ("C-c C-x C-ä" . org-annotate-display-notes))
+  :straight (:host github :repo "girzel/org-annotate")
+  :bind (:map org-mode-map
+              ("C-c C-ä" . org-annotate-add-note)
+              ("C-c C-Ä" . org-annotate-delete-note)
+              ("C-c C-x C-ä" . org-annotate-display-notes))
   :custom
   (org-annotate-special-brackets '("╣" "║" "╠"))
   ;; functions defined below
@@ -1664,7 +1664,7 @@ List of prefix strings or regex."
 
   ;; add name
   (defvar aj/org-annotate-name-history nil)
-  (add-to-list 'savehist-additional-variables 'aj/org-annotate-name-history)
+  (with-eval-after-load "savehist" (add-to-list 'savehist-additional-variables 'aj/org-annotate-name-history))
 
   (defun aj/org-annotate-name (&optional name)
     (interactive
@@ -1719,96 +1719,102 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 
 *** Zotxt configuration :org_async:
 #+begin_src emacs-lisp
-(use-package zotxt
-  :load-path "~/kodat/elisp/zotxt-emacs/"
-  :custom (zotxt-default-bibliography-style "apa")
-  :config
-  (defconst zotxt-url-base
-    "http://127.0.0.1:23200/zotxt"
-    "Base URL to contact.")
-  :commands zotxt--json-read)
+  (use-package zotxt
+  	:straight (zotxt-emacs :host gitlab :repo "egh/zotxt-emacs"
+						   :fork (:host gitlab :repo "andersjohansson/zotxt-emacs"))
+	;; :load-path "~/kodat/elisp/zotxt-emacs/"
+	:custom (zotxt-default-bibliography-style "apa")
+	:config
+	(defconst zotxt-url-base
+	  "http://127.0.0.1:23200/zotxt"
+	  "Base URL to contact.")
+	:commands zotxt--json-read)
 
-(use-package org-pdcite
-  :load-path "~/kodat/elisp/org-pdcite"
-  :commands 'org-pdcite-full-cite-parser)
+  (use-package org-pdcite
+	:straight nil
+	:load-path "~/kodat/elisp/org-pdcite"
+	:commands 'org-pdcite-full-cite-parser)
 
-(use-package zotxt-extra
-  :load-path "~/kodat/elisp/zotxt-extra"
-  :after zotxt
-  :demand t
-  :commands zotxt-extra-maybe-edit-description
-  zotxt-extra-link-parse-desc zotxt-extra--replace-consecutive
-  :config (zotxt-extra-complete-citation-help-echo-activate))
+  (use-package zotxt-extra
+	:straight nil
+	:load-path "~/kodat/elisp/zotxt-extra"
+	:after zotxt
+	:demand t
+	:commands zotxt-extra-maybe-edit-description
+	zotxt-extra-link-parse-desc zotxt-extra--replace-consecutive
+	:config (zotxt-extra-complete-citation-help-echo-activate))
 
-(defvar-local zotxt-helm-citation-files nil)
-(put 'zotxt-helm-citation-files 'safe-local-variable
-     #'orgqda--string-or-list-of-strings-p)
-(use-package zotxt-helm
-  :after zotxt
-  :demand t
-  :init (setq zotxt-helm-method 'async)
-  :commands zotxt-helm-link-to-disp-real
-  :config
-  ;; this could be added to zotxt-helm, but it’s depending so much on
-  ;; orgqda and I don’t want to require or copy that to zotxt-helm
-  (require 'orgqda)
+  (defvar-local zotxt-helm-citation-files nil)
+  (put 'zotxt-helm-citation-files 'safe-local-variable
+	   #'orgqda--string-or-list-of-strings-p)
+  (use-package zotxt-helm
+	:straight nil
+	:after zotxt
+	:demand t
+	:init (setq zotxt-helm-method 'async)
+	:commands zotxt-helm-link-to-disp-real
+	:config
+	;; this could be added to zotxt-helm, but it’s depending so much on
+	;; orgqda and I don’t want to require or copy that to zotxt-helm
+	(require 'orgqda)
 
-  (defun zotxt-helm-get-current-refs ()
-    (let* ((orgqda-tag-files zotxt-helm-citation-files)
-           (manyfiles (and zotxt-helm-citation-files
-                           (orgqda-tag-files))))
-      (cl-remove-duplicates
-       (if manyfiles
-           (cl-loop for file in manyfiles
-                    append
-                    (orgqda--inhibit-org-startups
-                     (with-current-buffer (find-file-noselect file)
-                       (zotxt-helm-get-current-refs-in-buffer))))
-         (zotxt-helm-get-current-refs-in-buffer))
-       :test 'equal)))
+	(defun zotxt-helm-get-current-refs ()
+	  (let* ((orgqda-tag-files zotxt-helm-citation-files)
+			 (manyfiles (and zotxt-helm-citation-files
+							 (orgqda-tag-files))))
+		(cl-remove-duplicates
+		 (if manyfiles
+			 (cl-loop for file in manyfiles
+					  append
+					  (orgqda--inhibit-org-startups
+					   (with-current-buffer (find-file-noselect file)
+						 (zotxt-helm-get-current-refs-in-buffer))))
+		   (zotxt-helm-get-current-refs-in-buffer))
+		 :test 'equal)))
 
-  (defun zotxt-helm-get-current-refs-in-buffer ()
-    (org-element-map
-        (if zotxt-helm-current-refs-in-widened-buffer
-            (save-restriction
-              (widen)
-              (org-element-parse-buffer))
-          (org-element-parse-buffer))
-        'link #'zotxt-helm-link-to-disp-real)))
+	(defun zotxt-helm-get-current-refs-in-buffer ()
+	  (org-element-map
+		  (if zotxt-helm-current-refs-in-widened-buffer
+			  (save-restriction
+				(widen)
+				(org-element-parse-buffer))
+			(org-element-parse-buffer))
+		  'link #'zotxt-helm-link-to-disp-real)))
 
-(use-package org-zotxt
-  :commands org-zotxt-mode
-  :demand t
-  :delight "𝐙 "
-  :init (setq org-zotxt-link-description-style :betterbibtexkey)
-  :commands org-zotxt-extract-link-id-at-point org-zotxt-choose-path
-  :custom (org-zotxt-default-search-method :title-creator-year)
-  :config
-  ;;prompt to add page references in quotes
-  (advice-add 'org-zotxt-insert-reference-link-to-item
-              :after #'zotxt-extra-maybe-edit-description)
+  (use-package org-zotxt
+	:straight nil
+	:commands org-zotxt-mode
+	:demand t
+	:delight "𝐙 "
+	:init (setq org-zotxt-link-description-style :betterbibtexkey)
+	:commands org-zotxt-extract-link-id-at-point org-zotxt-choose-path
+	:custom (org-zotxt-default-search-method :title-creator-year)
+	:config
+	;;prompt to add page references in quotes
+	(advice-add 'org-zotxt-insert-reference-link-to-item
+				:after #'zotxt-extra-maybe-edit-description)
 
-  ;; Special fontification, I often manipulate rows of references,
-  ;; and then it’s useful to display the outer brackets, for easy
-  ;; killing and yanking.
-  (org-link-set-parameters "zotero"
-                           :face 'org-scheduled
-                           :activate-func #'aj/org-zotxt-activate)
+	;; Special fontification, I often manipulate rows of references,
+	;; and then it’s useful to display the outer brackets, for easy
+	;; killing and yanking.
+	(org-link-set-parameters "zotero"
+							 :face 'org-scheduled
+							 :activate-func #'aj/org-zotxt-activate)
 
-  (defun aj/org-zotxt-activate (start end _path bracketp)
-    "Add text properties to display annotation links in a special way"
-    (when bracketp
-      (save-match-data
-        (save-excursion
-          (goto-char start)
-          (when (and (re-search-forward org-bracket-link-analytic-regexp end t)
-                     (match-end 4))
-            (let ((bracket '(invisible nil))
-                  (inv '(invisible t)))
-              (add-text-properties start (1+ start) bracket)
-              (add-text-properties end (1- end) bracket)
-              (add-text-properties (1+ start) (match-beginning 5) inv)
-              (add-text-properties (1- end) (- end 2) inv))))))))
+	(defun aj/org-zotxt-activate (start end _path bracketp)
+	  "Add text properties to display annotation links in a special way"
+	  (when bracketp
+		(save-match-data
+		  (save-excursion
+			(goto-char start)
+			(when (and (re-search-forward org-bracket-link-analytic-regexp end t)
+					   (match-end 4))
+			  (let ((bracket '(invisible nil))
+					(inv '(invisible t)))
+				(add-text-properties start (1+ start) bracket)
+				(add-text-properties end (1- end) bracket)
+				(add-text-properties (1+ start) (match-beginning 5) inv)
+				(add-text-properties (1- end) (- end 2) inv))))))))
 #+end_src
 
 *** My own view attachment which parses page numbers and jumps to page
@@ -1878,6 +1884,7 @@ Also a function to get all annotations in a pdf file
 Some hackish functions
 #+BEGIN_SRC emacs-lisp
 (use-package biblatex-to-zotxt
+  :straight nil
   :load-path "~/kodat/elisp/biblatex-to-zotxt/"
   :commands biblatex-to-zotxt)
 #+END_SRC
@@ -2017,7 +2024,7 @@ Mostly for html and reveal
 
 (defvar aj/org-reveal-current-url nil)
 (defvar aj/org-reveal-last-url nil)
-(add-to-list 'savehist-additional-variables 'aj/org-reveal-last-url)
+(with-eval-after-load "savehist" (add-to-list 'savehist-additional-variables 'aj/org-reveal-last-url))
 (defvar aj/org-reveal-current-file nil)
 (defvar aj/org-reveal-current-slide-id nil)
 
@@ -3799,6 +3806,7 @@ An ideally flexible org word count would be based on the parser in org-element, 
 This one is based on regex walking and skipping though. And that is quite fast.
 #+BEGIN_SRC emacs-lisp
 (use-package org-wc
+  :straight nil ;; TODO fix
   :load-path "~/kodat/elisp/org-wc"
   :commands (org-word-count org-wc-count-subtrees org-wc-display org-wc-remove-overlays)
   :bind (:map org-mode-map
@@ -3815,7 +3823,8 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2018-11/msg00015.html
 
 #+BEGIN_SRC emacs-lisp
 (use-package org-outline-numbering
-  :load-path "~/kodat/elisp/org-outline-numbering"
+  :straight (:host gitlab :repo "andersjohansson/org-outline-numbering")
+  ;; :load-path "~/kodat/elisp/org-outline-numbering"
   :init (setq org-outline-numbering-ignored-tags
               '("ignoreheading" "ignoreheadinglocal")))
 #+END_SRC

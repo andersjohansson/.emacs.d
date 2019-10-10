@@ -1,3 +1,4 @@
+# -*-coding: utf-8; -*-
 #+TITLE: Emacs init file
 #+AUTHOR: Anders Johansson
 #+PROPERTY: header-args :tangle yes :comments no :no-expand t
@@ -47,7 +48,8 @@ org mode async exports, using only trees tagged with “org_async”."
              (gc-cons-threshold most-positive-fixnum))
         (aj/org-tangle-matching "-no_default_tangle-ARCHIVE" file file-el)
         (aj/org-tangle-matching "org_async-org_async_exclude-ARCHIVE" file file-async))
-      (load file-noext))))
+      ;; (load file-noext)
+      )))
 
 (defun aj/org-tangle-matching (match origin-file target-file)
   (with-current-buffer
@@ -123,7 +125,7 @@ org mode async exports, using only trees tagged with “org_async”."
 ;;         (replace-regexp-in-string "_" "-" (match-string 1))))))
 #+END_SRC
 
-*** Autoloading in all custom load-paths
+*** Autoloading in all custom load-paths :ARCHIVE:
 Some of my own packages or libraries added in /lisp don’t normally get their autoloads parsed (like happens for libraries included in emacs or those handled via ~package.el~). This is my solution for that problem.
 **** Loaddefs file :org_async:
 To be loaded [[*Load custom loaddefs][at the end of init]].
@@ -257,47 +259,55 @@ Some variables are not suitable to keep in the init-file, I add these via custom
   (add-to-list 'load-path  "~/.emacs.d/lisp"))
 #+end_src
 
-*** Package-manager setup :org_async:
+*** Package-manager setup (use straight.el):org_async:
 #+begin_src emacs-lisp
-(require 'package)
-(setq package-enable-at-startup nil)
-(add-to-list 'package-archives '("melpa-stable" . "https://www.mirrorservice.org/sites/stable.melpa.org/packages/") t)
-(add-to-list 'package-archives '("melpa" . "https://www.mirrorservice.org/sites/melpa.org/packages/") t)
-(add-to-list 'package-archives '("org" . "https://orgmode.org/elpa/") t)
-(setq package-archive-priorities
-      '(("gnu" . 10)
-        ("org" . 8)
-        ("melpa-stable" . 6)
-        ("melpa" . 4)))
+(setq straight-use-package-by-default t
+      straight-vc-git-default-clone-depth 1
+      straight-cache-autoloads t)
 
-(package-initialize) ;; early, so the right org gets loaded
-
+(defvar bootstrap-version)
+(let ((bootstrap-file
+       (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
+      (bootstrap-version 5))
+  (unless (file-exists-p bootstrap-file)
+    (with-current-buffer
+        (url-retrieve-synchronously
+         "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+         'silent 'inhibit-cookies)
+      (goto-char (point-max))
+      (eval-print-last-sexp)))
+  (load bootstrap-file nil 'nomessage))
 #+end_src
 
 *** Bootstrap ~use-package~ :org_async:
 #+begin_src emacs-lisp
-(unless (package-installed-p 'use-package)
-  (package-refresh-contents)
-  (package-install 'use-package))
-(unless (package-installed-p 'validate)
-  (package-refresh-contents)
-  (package-install 'validate))
-(eval-when-compile
-  (require 'validate)
-  (require 'use-package))
+  ;; (unless (package-installed-p 'use-package)
+  ;;   (package-refresh-contents)
+  ;;   (package-install 'use-package))
+  ;; (unless (package-installed-p 'validate)
+  ;;   (package-refresh-contents)
+  ;;   (package-install 'validate))
+  ;; (eval-when-compile
+  ;;   (require 'validate)
+  ;;   (require 'use-package))
 
-;; (setq use-package-compute-statistics t)
+  ;; (setq use-package-compute-statistics t)
 
-(require 'bind-key)
-(use-package delight
-  :demand t
-  :ensure t)
+  (straight-use-package 'use-package)
+
+  (use-package validate
+	:demand t)
+  (use-package bind-key
+	:demand t)
+  ;;(require 'bind-key)
+
+  (use-package delight
+	:demand t)
 #+end_src
 
 *** No littering! :org_async:
 #+begin_src emacs-lisp
 (use-package no-littering
-  :ensure t
   :demand t
   :init
   (setq no-littering-etc-directory
@@ -311,6 +321,28 @@ Some variables are not suitable to keep in the init-file, I add these via custom
         `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))))
 #+end_src
 
+*** Save-hist (don't use session, but save many useful history variables)
+#+BEGIN_SRC emacs-lisp
+(setq savehist-additional-variables
+      '(kill-ring search-ring regexp-search-ring extended-command-history
+                 helm-M-x-input-history
+                  ;; mindre viktiga kanske
+                  helm-adaptive-history helm-build-regexp-history
+                  helm-eshell-command-on-file-input-history
+                  helm-external-command-history helm-ff-history
+                  helm-file-name-history helm-grep-history
+                  helm-surfraw-engines-history
+                  helm-surfraw-input-history Info-history
+                  Info-search-history compile-history
+                  dired-regexp-history dired-shell-command-history
+                  face-name-history grep-files-history
+                  grep-find-history grep-history grep-regexp-history
+                  org-agenda-search-history org-insert-link-history
+                  org-refile-history org-tags-history
+                  pdf-occur-history query-replace-history
+                  shell-command-history))
+(savehist-mode)
+#+END_SRC
 *** Tooltip-mode
 #+begin_src emacs-lisp
 (tooltip-mode t)
@@ -320,8 +352,7 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 *** Hydra (used for definitions later on) :org_async:
 #+BEGIN_SRC emacs-lisp
 (use-package hydra
-  :demand t
-  :ensure t)
+  :demand t)
 #+END_SRC
 *** Center frame (used for helm)
 Code adapted from ime-frame
@@ -352,17 +383,566 @@ of the box `(w h)' inside the box `(cw ch)'."
 
 
 #+end_src
+*** Helm
+(Really too much in config section here. Should probably move it to another file)
+#+begin_src emacs-lisp
+(defcustom aj/shortened-helm-paths nil
+  "List of replacements to do in `helm-recentf-source' and
+`helm-source-files-in-current-dir' lists of files
+Order is important! Only the first matching entry will be replaced.
+
+Example of alist entry:
+\(\"^~/my/favorite/path\" . \"MFP\"\)"
+  :group 'aj
+  :type '(alist :key-type regexp :value-type string))
+
+(use-package helm
+  :bind (("<f2>" . helm-imenu))
+  :delight helm-mode
+  :config
+  (setq-default helm-command-prefix-key "C-c h")
+  (require 'helm-config)
+  (helm-mode)
+  (define-key helm-map (kbd "<tab>") 'helm-execute-persistent-action) ; rebind tab to run persistent action
+  (define-key helm-map (kbd "C-i") 'helm-execute-persistent-action) ; make TAB works in terminal
+  (define-key helm-map (kbd "C-z")  'helm-select-action) ; list actions using C-z
+
+  (when (executable-find "curl")
+    (setq helm-net-prefer-curl-p t))
+  (setq
+   helm-M-x-always-save-history t ; ska spara även kraschade kommandon
+   helm-ff-search-library-in-sexp t ; search for library in `require' and `declare-function' sexp.
+   helm-scroll-amount 8 ; scroll 8 lines other window using M-<next>/M-<prior>
+   helm-ff-file-name-history-use-recentf t)
+  ;;fuzzy matching
+  (setq helm-buffers-fuzzy-matching t
+        helm-recentf-fuzzy-match t
+        helm-locate-fuzzy-match t
+        helm-file-cache-fuzzy-match t
+        helm-mode-fuzzy-match t
+        helm-M-x-fuzzy-match t
+        helm-semantic-fuzzy-match t
+        helm-imenu-fuzzy-match t
+        helm-apropos-fuzzy-match t
+        helm-lisp-fuzzy-completion t)
+  (helm-adaptive-mode 1)
+
+  ;; display
+  (setq helm-split-window-inside-p t)
+  ;; from: https://www.reddit.com/r/emacs/comments/3asbyn/new_and_very_useful_helm_feature_enter_search/
+  (defun helm-hide-minibuffer-maybe ()
+    (when (with-helm-buffer helm-echo-input-in-header-line)
+      (let ((ov (make-overlay (point-min) (point-max) nil nil t)))
+        (overlay-put ov 'window (selected-window))
+        (overlay-put ov 'face (let ((bg-color (face-background 'default nil)))
+                                `(:background ,bg-color :foreground ,bg-color)))
+        (setq-local cursor-type nil))))
+
+  (add-hook 'helm-minibuffer-set-up-hook
+            'helm-hide-minibuffer-maybe)
+
+  (setq helm-display-function
+        ;;#'aj/helm-display-child-frame
+        #'helm-default-display-buffer 
+        helm-display-buffer-reuse-frame t
+        helm-display-buffer-width 120
+        helm-display-buffer-height 35
+        helm-echo-input-in-header-line t)
+
+  ;; (defun aj/helm-display-child-frame (buffer &optional resume)
+  ;;     "Display `helm-buffer' in a separate frame.
+  ;; Function suitable for `helm-display-function',
+  ;; `helm-completion-in-region-display-function'
+  ;; and/or `helm-show-completion-default-display-function'.
+  ;; See `helm-display-buffer-height' and `helm-display-buffer-width' to
+  ;; configure frame size."
+  ;;     (if (not (display-graphic-p))
+  ;;         ;; Fallback to default when frames are not usable.
+  ;;         (helm-default-display-buffer buffer)
+  ;;       (setq helm--buffer-in-new-frame-p t)
+  ;;       (let ((default-frame-alist
+  ;;               `((parent . ,(selected-frame))
+  ;;                 (width . ,helm-display-buffer-width)
+  ;;                 (height . ,helm-display-buffer-height)
+  ;;                 (undecorated . t)
+  ;;                 (left-fringe . 2)
+  ;;                 (right-fringe . 2)
+  ;;                 (tool-bar-lines . 0)
+  ;;                 (line-spacing . 0)
+  ;;                 (desktop-dont-save . t)
+  ;;                 (no-special-glyphs . t)
+  ;;                 (tool-bar-lines . 0)
+  ;;                 (left . 0)
+  ;;                 (top . 0)
+  ;;                 (title . "Helm")
+  ;;                 (vertical-scroll-bars . nil)
+  ;;                 (menu-bar-lines . 0)
+  ;;                 (fullscreen . nil)
+  ;;                 (visibility . ,(null helm-display-buffer-reuse-frame))
+  ;;                 (minibuffer . nil)))
+  ;;             display-buffer-alist)
+  ;;         (helm-display-buffer-popup-frame buffer default-frame-alist)
+  ;;         (set-face-attribute 'header-line (selected-frame)
+  ;;                             :background nil :foreground 'unspecified :height 1.15
+  ;;                             :inherit 'default)
+  ;;         (aj/center-frame))
+  ;;       (helm-log-run-hook 'helm-window-configuration-hook)))
+
+  ;; Only show headers if several sources
+  ;; https://www.reddit.com/r/emacs/comments/2z7nbv/lean_helm_window/
+  (defun helm-toggle-header-line ()
+    (if (eq 1 (length (ignore-errors (with-helm-buffer helm-sources))))
+        (set-face-attribute 'helm-source-header nil :height 1)
+      (set-face-attribute 'helm-source-header nil :height 1.0)))
+
+  (add-hook 'helm-before-initialize-hook #'helm-toggle-header-line)
+
+
+  ;;; bindings
+  (define-key global-map [remap execute-extended-command] #'helm-M-x)
+  (global-set-key (kbd "M-y") 'helm-show-kill-ring)
+
+  (bind-key "<f1> a" #'helm-apropos)
+
+  (global-set-key (kbd "C-x b") 'helm-mini)
+  (global-set-key (kbd "C-x B") 'helm-mini)
+
+  (global-set-key (kbd "C-x C-f") 'helm-find-files)
+  (global-set-key (kbd "C-c h g") 'helm-google-suggest)
+
+;;; Helm mini:
+  
+  (setq helm-mini-default-sources
+        '(helm-source-buffers-list
+          aj/helm-source-favourite-files
+          helm-source-recentf
+          helm-source-files-in-current-dir
+          aj/helm-source-dired-recent
+          helm-source-buffer-not-found))
+  (defvar aj/helm-source-dired-recent
+    (helm-build-sync-source "Recent directories"
+      :candidates 'dired-recent-directories
+      :action '(("Open directory" . dired)
+                ("Delete from dired-recent list" . aj/helm-action-dired-recent-delete))))
+
+  (defun aj/shorten-helm-path (path)
+    (cl-loop
+     with disp = (or (car-safe path) path) with real = (or (cdr-safe path) path)
+     for s in aj/shortened-helm-paths
+     when (string-match (car s) disp)
+     return (cons
+             (concat (substring disp 0 (match-beginning 0))
+                     (propertize (cdr s) 'face '(bold helm-ff-symlink))
+                     (substring disp (match-end 0)))
+             real)
+     finally return path))
+
+  (defun aj/helm-recentf-filtered-candidates-shorten (candidates source)
+    (mapcar #'aj/shorten-helm-path candidates))
+
+  (with-eval-after-load "helm-for-files"
+    (dolist (source '(helm-source-recentf helm-source-files-in-current-dir))
+      (cl-callf append
+          (alist-get 'filtered-candidate-transformer (symbol-value source))
+        '(aj/helm-recentf-filtered-candidates-shorten))))
+
+  ;;; grep --> ripgrep
+
+  (setq helm-grep-ag-command "rg -u --color=never --smart-case --no-heading --line-number %s %s %s"
+        helm-grep-file-path-style 'relative)
+  (bind-key "C-s" #'helm-ff-run-grep-ag helm-find-files-map)
+
+  (defun aj/helm-rg-org-files ()
+    "Function for searching through all org files in home directory."
+    (interactive)
+    (advice-add 'helm-grep--filter-candidate-1 :filter-return
+                #'aj/shorten-helm-path)
+    (unwind-protect
+        (let ((helm-grep-file-path-style 'absolute))
+          (helm-grep-ag-1 (expand-file-name "~") '("-torg")))
+      (advice-remove 'helm-grep--filter-candidate-1
+                     #'aj/shorten-helm-path)))
+
+  ;;; google-suggest
+  (with-eval-after-load 'helm-net
+    (add-to-list 'helm-google-suggest-actions
+                 '("Thesaurus" . (lambda (candidate)
+                                   (helm-search-suggest-perform-additional-action
+                                    "http://www.thesaurus.com/browse/%s" candidate))) t)
+    (add-to-list 'helm-google-suggest-actions
+                 '("Tyda" . (lambda (candidate)
+                              (helm-search-suggest-perform-additional-action
+                               "http://tyda.se/search/%s" candidate))) t))
+
+  ;;; more candidates for helm-ucs
+  (defun aj/helm-500-candidates (fn &rest args)
+    (let ((helm-candidate-number-limit 500))
+      (apply fn args)))
+
+  (advice-add 'helm-ucs :around #'aj/helm-500-candidates)
+
+  ;;; mark-ring extra
+  (defun aj/pop-to-mark-invoke-helm (fun)
+    (interactive)
+    (if (eq last-command 'pop-to-mark-command)
+        (helm-all-mark-rings)
+      (funcall fun)))
+
+  (defvar helm-mark-ring-map
+    (let ((map (make-sparse-keymap)))
+      (set-keymap-parent map helm-map)
+      (define-key map (kbd "C-<SPC>") 'helm-next-line) map)
+    "Keymap for `helm-all-mark-rings'.")
+
+  (setq set-mark-command-repeat-pop t)
+  (with-eval-after-load 'helm-ring
+    (add-to-list 'helm-source-mark-ring `(keymap . ,helm-mark-ring-map)))
+  (advice-add 'pop-to-mark-command :around #'aj/pop-to-mark-invoke-helm)
+
+
+  ;; Don’t want launched processes lying around being children to
+  ;; emacs (and being killed when I have to kill emacs). Therefore I
+  ;; use ‘call-process-shell-command’ instead of
+  ;; ‘start-process-shell-command’.
+
+  (defun aj/helm-run-or-raise (exe &optional file)
+    (let ((real-com (car (split-string exe))))
+      (when (member real-com helm-external-commands-list)
+        (message "Starting %s..." real-com)
+        (if file
+            (call-process-shell-command
+             (format "%s %s"
+                     real-com
+                     (shell-quote-argument
+                      (if (eq system-type 'windows-nt)
+                          (helm-w32-prepare-filename file)
+                        (expand-file-name file))))
+             nil 0)
+          (call-process-shell-command real-com nil 0)))))
+
+  (advice-add 'helm-run-or-raise :override #'aj/helm-run-or-raise)
+
+  )
+
+
+#+end_src
+**** helm-flx
+Different fuzzy search algorithm, is this needed?
+#+BEGIN_SRC emacs-lisp
+(use-package helm-flx
+  :after helm
+  :init (helm-flx-mode t))
+
+#+END_SRC
+**** Open zotero library files
+#+BEGIN_SRC emacs-lisp
+(use-package dash)
+(eval-when-compile (require 'dash))
+
+(with-eval-after-load 'helm-files
+  (defcustom aj/helm-zotero-library nil
+    "Directory of Zotero library files"
+    :group 'aj
+    :type 'directory)
+
+  (defvar aj/helm-zoterofile-history)
+  (defvar aj/zoterofiles-frame-manage nil)
+
+  (defun aj/open-zoterofile-new-frame ()
+    (interactive)
+    (let ((ocframe
+           (make-frame '((width . 100) (height . 20) (name . "helm-zotero")
+                         (window-system . x) (fullscreen . nil))))
+          (helm-full-frame t)
+          (aj/zoterofiles-frame-manage t))
+      (select-frame-set-input-focus ocframe)
+      (aj/center-frame)
+      (aj/helm-open-zoterofile)))
+
+  (defun aj/helm-open-zoterofile ()
+    (interactive)
+    (let* ((oe '("Open externally" . aj/helm-open-file-externally-delete-frame))
+           (ff '("Find file" . aj/helm-find-many-files-widen-frame))
+           (active-actions (if aj/zoterofiles-frame-manage
+                               (list oe ff)
+                             (list ff oe))))
+      (helm :sources
+            (list
+             (helm-build-sync-source "Zotero recently modified"
+               :action active-actions
+               :pattern-transformer 'helm-recentf-pattern-transformer
+               :keymap helm-generic-files-map
+               :candidates #'aj/helm-zotero-recently-modified)
+             (helm-build-sync-source "Zotero recentf"
+               :candidates #'aj/recentf-list-zotero
+               :action active-actions
+               :fuzzy-match t
+               :filtered-candidate-transformer #'helm-highlight-files
+               :pattern-transformer #'helm-recentf-pattern-transformer
+               :match-part #'aj/helm-zotero-match-part
+               :keymap helm-generic-files-map)
+             (helm-build-sync-source "Zotero files"
+               :candidates #'aj/helm-zotero-files
+               :action active-actions
+               :fuzzy-match t
+               :candidate-transformer #'helm-skip-boring-files
+               :filtered-candidate-transformer #'helm-highlight-files
+               :pattern-transformer #'helm-recentf-pattern-transformer
+               :match-part #'aj/helm-zotero-match-part
+               :keymap helm-generic-files-map
+               ))
+
+
+            :buffer "*helm-zoterofile*"
+            :history 'aj/helm-zoterofile-history
+            :ff-transformer-show-only-basename t)))
+
+
+  (defun aj/helm-zotero-recently-modified ()
+    (when (file-accessible-directory-p aj/helm-zotero-library)
+      (with-temp-buffer
+        (call-process "ls" nil t nil "-t" "-1" aj/helm-zotero-library)
+        (mapcar (lambda (x) (cons x (expand-file-name x aj/helm-zotero-library)))
+                (split-string
+                 (buffer-substring (point-min)
+                                   (progn (goto-char (point-min))
+                                          (forward-line 20) (point)))
+                 "\n"
+                 t)))))
+
+  (defun aj/recentf-list-zotero ()
+    (--filter (string-match-p aj/helm-zotero-library it)
+              recentf-list))
+
+  (defun aj/helm-zotero-files ()
+    (when (file-accessible-directory-p aj/helm-zotero-library)
+      (directory-files aj/helm-zotero-library t "\\.\\(pdf\\|djvu\\|vue\\)$")))
+
+  (defun aj/helm-zotero-match-part (candidate)
+    (if (or helm-ff-transformer-show-only-basename
+            helm-recentf--basename-flag)
+        (helm-basename candidate) candidate))
+
+  (defun aj/helm-find-many-files-widen-frame (_ignore)
+    (helm-find-many-files t)
+    (when aj/zoterofiles-frame-manage
+      (aj/frame-to-left)
+      (set-frame-name (buffer-file-name))))
+  (defun aj/helm-open-file-externally-delete-frame (file)
+    (helm-open-file-externally file)
+    (when aj/zoterofiles-frame-manage
+      (delete-frame))))
+#+END_SRC
+**** TODO Utvärdera om vi borde använda helm-multi-files istället för att lägga allt i helm-mini
+**** COMMENT Helm omni-files, buffers, recentf :ARCHIVE:
+
+#+BEGIN_SRC emacs-lisp
+  (global-set-key (kbd "C-x C-b") 'aj/helm-omni-buffers)
+  (global-set-key (kbd "C-x b") 'aj/helm-omni-buffers)
+  (global-set-key (kbd "C-x C-r") 'aj/helm-omni-recent)
+
+  (defvar aj/helm-omni-history nil)
+
+  (defun aj/helm-omni-buffers (&rest arg)
+    (interactive)
+    (require 'helm-files)
+    (unless helm-source-buffers-list
+      (setq helm-source-buffers-list
+            (helm-make-source "Buffers" 'helm-source-buffers)))
+    (helm :sources
+          '(helm-source-buffers-list
+            helm-source-recentf
+            helm-source-files-in-current-dir
+            helm-source-locate
+            helm-source-bookmarks
+            helm-source-buffer-not-found)
+          :buffer "*helm omni recentf*"
+          :truncate-lines t
+          :history 'aj/helm-omni-history
+          :ff-transformer-show-only-basename nil))
+
+  (defun aj/helm-omni-recent (&rest arg)
+    (interactive)
+    (require 'helm-files)
+    (unless helm-source-buffers-list
+      (setq helm-source-buffers-list
+            (helm-make-source "Buffers" 'helm-source-buffers)))
+    (helm :sources
+          '(helm-source-recentf
+            helm-source-buffers-list
+            helm-source-locate
+            helm-source-files-in-current-dir
+            helm-source-bookmarks
+            helm-source-buffer-not-found)
+          :buffer "*helm omni recent*"
+          :truncate-lines t
+          :history 'aj/helm-omni-history
+          :ff-transformer-show-only-basename nil))
+
+#+END_SRC
+
+
+**** Helm-recoll :ARCHIVE:
+#+begin_src emacs-lisp
+(use-package helm-recoll
+  :commands helm-recoll
+  :config (helm-recoll-create-source "default" "~/.recoll/"))
+#+end_src
+
+**** Favourite files (to mark files which should be prioritized in helm matches)
+#+BEGIN_SRC emacs-lisp
+(defvar aj/favourite-files nil)
+(with-eval-after-load "savehist-mode"
+  (add-to-list 'savehist-additional-variables 'aj/favourite-files))
+
+(defun aj/add-favourite-file ()
+  (interactive)
+  (if-let ((name (or
+                  (buffer-file-name)
+                  (and (eq major-mode 'dired-mode) default-directory))))
+      (cl-pushnew name aj/favourite-files :test #'string=)
+    (user-error "Not in a file- or dired-buffer")))
+
+(with-eval-after-load "helm-for-files"
+  (defun aj/remove-favourite-file (_candidate)
+    ;; to be run from helm
+    (cl-loop for file in (helm-marked-candidates)
+             do (setq aj/favourite-files (delete file aj/favourite-files))))
+
+  (defclass aj/helm-favourite-files-source (helm-source-sync helm-type-file)
+    ((candidates :initform (lambda () aj/favourite-files))
+     (pattern-transformer :initform 'helm-recentf-pattern-transformer)
+     (match-part :initform (lambda (candidate)
+                             (if (or helm-ff-transformer-show-only-basename
+                                     helm-recentf--basename-flag)
+                                 (helm-basename candidate) candidate)))
+     (persistent-action :initform 'helm-ff-kill-or-find-buffer-fname)
+     (fuzzy-match :initform t)))
+
+  (defmethod helm--setup-source :after ((source aj/helm-favourite-files-source))
+    (setf (slot-value source 'action)
+          (append (symbol-value (helm-actions-from-type-file))
+                  '(("Delete file(s) from aj/favourite-files" .
+                     aj/remove-favourite-file))))
+    (setf (slot-value source 'filtered-candidate-transformer)
+          (append (slot-value source 'filtered-candidate-transformer)
+                  '(aj/helm-recentf-filtered-candidates-shorten))))
+
+  (defvar aj/helm-source-favourite-files
+    (helm-make-source "Favourite files" 'aj/helm-favourite-files-source)))
+#+END_SRC
+
+**** Favorite directories
+http://endlessparentheses.com/visit-directory-inside-a-set-of-directories.html
+#+begin_src emacs-lisp
+(defcustom aj/favorite-directories nil
+  "List of favorite directories.
+Used in `aj/visit-favorite-dir'. The order here affects the order
+that completions will be offered. Each element is a list of
+directory, search depth, and whether to include files."
+  :type '(repeat (list (directory :tag "Directory")
+                       (integer :tag "Search depth")
+                       (boolean :tag "Include files")))
+  :group 'aj)
+
+(defvar aj/fav-dir-history nil)
+
+(defun aj/visit-favorite-dir (files-too)
+  "Offer all directories inside a set of directories.
+Compile a list of all directories inside each element of
+`aj/favorite-directories', and visit one of them with
+`ido-completing-read'.
+With prefix argument FILES-TOO also offer to find files."
+  (interactive "P")
+  (let ((completions
+         (apply #'append
+                (mapcar (lambda (x)
+                          (aj/get-dir-list (car x) (cadr x) (or files-too (nth 2 x))))
+                        aj/favorite-directories)))
+        (helm-candidate-number-limit nil))
+    (dired
+     (helm-comp-read "Open directory: " completions
+                     :input-history aj/fav-dir-history))))
+
+
+(defun aj/get-dir-list (dir level &optional files-too)
+  "Get list of directories (or files with FILES-TOO) to a certain level"
+  (if (and (file-directory-p dir) (> level 0))
+      ;; recurse into directories if we have levels left
+      (apply #'append
+             (list dir)
+             (mapcar
+              (lambda (sdir) (aj/get-dir-list sdir (1- level) files-too))
+              (mapcar
+               #'abbreviate-file-name
+               (cl-remove-if-not
+                (if files-too #'file-readable-p
+                  #'file-directory-p)
+                (directory-files
+                 (expand-file-name dir)
+                 t "^[^\.].*" t)))))
+    ;; just return dir or file
+    (list dir)))
+
+;;TODO, define as helm-source
+;; (defclass aj/helm-favorit-dir-class (helm-source-sync helm-type-timers)
+;;   ((candidates :initform timer-idle-list)
+;;    (allow-dups :initform t)
+;;    (volatile :initform t)
+;;    (filtered-candidate-transformer
+;;     :initform
+;;     (lambda (candidates _source)
+;;       (cl-loop for timer in candidates
+;;                collect (cons (helm-elisp--format-timer timer) timer))))))
+
+;; (defvar helm-source-idle-time-timers
+;;   (helm-make-source "Idle Time Timers" 'helm-idle-time-timers-class))
+#+end_src
+
+Note that C-x d is usually bound to dired. I find
+this redundant with C-x C-f, so I don't mind
+overriding it, but you should know before you do.
+#+begin_src emacs-lisp
+(define-key ctl-x-map "d" #'aj/visit-favorite-dir)
+
+#+end_src
+
+
 *** org-mode
 **** org init
 #+begin_src emacs-lisp
 ;;load local org-reveal
 (use-package org-re-reveal
+  :straight nil
   :defer t
   :load-path "~/kodat/elisp/org-re-reveal")
 
+;; TODO, why here?
+(use-package orgqda
+  :straight (:host gitlab :repo "andersjohansson/orgqda")
+  :defer t
+  :init (put 'orgqda-csv-dir 'safe-local-variable #'file-directory-p)
+  :config (setq orgqda-exclude-tags
+                (append (mapcar #'car org-tag-persistent-alist)
+                        '("ARCHIVE" "Reflektion" "Observation" "Forskningsdagbok")))
+  (defhydra aj/orgqda-hydra (:color blue :hint t)
+	("m" #'orgqda-mode "Toggle mode")
+	("ö" #'orgqda-list-tags "List tags")
+	("C-ö" #'orgqda-list-tags nil)
+	("ä" #'normal-mode "Normal mode")
+	("Ö" #'orgqda-list-tags-full "List and extract")
+	("c" #'orgqda-collect-tagged "Collect tagged")
+	("C-c" #'orgqda-collect-tagged "Collect tagged")
+	("v" #'orgqda-collect-tagged-csv "Collect csv")
+	("V" #'orgqda-collect-tagged-csv-save "Collect csv save")
+	("b" #'orgqda-collect-tagged-csv-save-all "Save all as csv"))
+  (bind-key "C-c C-ö" 'aj/orgqda-hydra/body orgqda-mode-map))
+
+(use-package org-pomodoro)
+(use-package org-download)
+(use-package request-deferred)
+
 (use-package org
-  :ensure org
-  :pin "org"
   :bind (("C-c a" . org-agenda) ("C-c c" . org-capture))
   :commands org-mode
   :defer t
@@ -371,7 +951,7 @@ of the box `(w h)' inside the box `(cw ch)'."
   (setq org-directory "~/org"
         org-ellipsis " ⤵"
         org-export-backends '(re-reveal beamer odt ascii html icalendar latex)
-        org-modules '(org-habit org-inlinetask org-mu4e org-id org-bullets org-zotxt org-pdfview)
+        org-modules '(org-habit org-inlinetask org-mu4e org-id org-bullets org-pdfview)
         org-list-allow-alphabetical t
         org-id-link-to-org-use-id 'use-existing
         org-agenda-files (expand-file-name "agenda-files" org-directory))
@@ -403,7 +983,6 @@ of the box `(w h)' inside the box `(cw ch)'."
 ***** org-pdfview
 #+BEGIN_SRC emacs-lisp
 (use-package org-pdfview
-  :ensure t
   :after org)
 #+END_SRC
 **** org clock hydra
@@ -480,28 +1059,6 @@ of the box `(w h)' inside the box `(cw ch)'."
             (add-hook 'text-mode-hook (lambda ()(flycheck-mode -1)))))
 #+end_src
 
-*** Save-hist (don't use session, but save many useful history variables)
-#+BEGIN_SRC emacs-lisp
-(setq savehist-additional-variables
-      '(kill-ring search-ring regexp-search-ring extended-command-history
-                  helm-M-x-input-history
-                  ;; mindre viktiga kanske
-                  helm-adaptive-history helm-build-regexp-history
-                  helm-eshell-command-on-file-input-history
-                  helm-external-command-history helm-ff-history
-                  helm-file-name-history helm-grep-history
-                  helm-surfraw-engines-history
-                  helm-surfraw-input-history Info-history
-                  Info-search-history compile-history
-                  dired-regexp-history dired-shell-command-history
-                  face-name-history grep-files-history
-                  grep-find-history grep-history grep-regexp-history
-                  org-agenda-search-history org-insert-link-history
-                  org-refile-history org-tags-history
-                  pdf-occur-history query-replace-history
-                  shell-command-history))
-(savehist-mode)
-#+END_SRC
 *** Saveplace is neccessary
 #+BEGIN_SRC emacs-lisp
 (require 'saveplace)
@@ -522,6 +1079,7 @@ of the box `(w h)' inside the box `(cw ch)'."
   (defun aj/start-profiler () (interactive)
          (profiler-start 'cpu)))
 #+END_SRC
+
 ** Mail-config (mu4e)
 Use mu4e, the extensive config is in an [[file:lisp/aj-mail-config.org][external file]].
 #+BEGIN_SRC emacs-lisp
@@ -533,16 +1091,17 @@ Use mu4e, the extensive config is in an [[file:lisp/aj-mail-config.org][external
 		   ("C-x å" . mu4e-headers-search-bookmark))
 	:defer 10
 	:init (setq mu4e-get-mail-command "mailsync" ; bash script running 3 offlineimap
-		        mu4e-update-interval 1800
-		        mu4e-view-show-images t
-		        mu4e-use-fancy-chars t
-		        mu4e-attachment-dir "~/Hämtningar"
-		        ;; mu4e-change-filenames-when-moving t ;;for mbsync
-		        mu4e-completing-read-function #'completing-read) ; hands it to helm
+				mu4e-update-interval 1800
+				mu4e-view-show-images t
+				mu4e-use-fancy-chars t
+				mu4e-attachment-dir "~/Hämtningar"
+				;; mu4e-change-filenames-when-moving t ;;for mbsync
+				mu4e-completing-read-function #'completing-read) ; hands it to helm
 	:config (require 'aj-mail-config)
-    (mu4e t) ;; start delayed in background
-    ))
+	(mu4e t) ;; start delayed in background
+	))
 #+END_SRC
+
 *** Fix parse-time-string :ARCHIVE:
 Why do I need this? For something with mu4e emailing? I don’t remember. It messes with ~org-read-date-analyze~, which is smarter anyway.
 
@@ -567,17 +1126,23 @@ Disable it for now.
   :config (add-hook 'elfeed-show-mode-hook #'visual-line-mode))
 
 ;; just the split-pane part extracted from the elfeed-goodies package
-(use-package elfeed-goodies-split-pane
-  :after elfeed
-  :demand t
-  :bind (:map elfeed-show-mode-map
-              ("n" . elfeed-goodies/split-show-next)
-              ("p" . elfeed-goodies/split-show-prev))
-  :config
-  (setq elfeed-goodies/entry-pane-size 0.5
-        elfeed-show-entry-switch #'elfeed-goodies/switch-pane
-        elfeed-show-entry-delete #'elfeed-goodies/delete-pane))
+;; (use-package elfeed-goodies-split-pane
+;;   :after elfeed
+;;   :demand t
+;;   :bind (:map elfeed-show-mode-map
+;;               ("n" . elfeed-goodies/split-show-next)
+;;               ("p" . elfeed-goodies/split-show-prev))
+;;   :config
+;;   (setq elfeed-goodies/entry-pane-size 0.5
+;;         elfeed-show-entry-switch #'elfeed-goodies/switch-pane
+;;         elfeed-show-entry-delete #'elfeed-goodies/delete-pane))
+
 #+END_SRC
+** Unfixed dependencies
+#+BEGIN_SRC emacs-lisp
+(use-package dash-functional)
+#+END_SRC
+
 ** News :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (setq gnus-select-method '(nntp "news.gmane.org"))
@@ -637,11 +1202,15 @@ But show cursor in ~wdired-mode~
 
 (advice-add 'wdired-change-to-dired-mode :after #'aj/dired-no-cursor)
 #+end_src
-
+**** dired-git-info
+#+begin_src emacs-lisp
+(use-package dired-git-info
+    :bind (:map dired-mode-map
+                (")" . dired-git-info-mode)))
+#+end_src
 **** Dired collapse
 #+BEGIN_SRC emacs-lisp
 (use-package dired-collapse
-  :ensure t
   ;; :after dired
   :defer t
   :init (add-hook 'dired-mode-hook #'dired-collapse-mode))
@@ -649,15 +1218,12 @@ But show cursor in ~wdired-mode~
 **** dired-hide-dotfiles
 #+BEGIN_SRC emacs-lisp
 (use-package dired-hide-dotfiles
-  :ensure t
-  :init
-  (with-eval-after-load 'dired
-    (bind-key "å" #'dired-hide-dotfiles-mode dired-mode-map)))
+  :bind (:map dired-mode-map
+              ("å" . dired-hide-dotfiles)))
 #+END_SRC
 **** Dired subtree
 #+BEGIN_SRC emacs-lisp
 (use-package dired-subtree
-  :ensure t
   :defer t
   :after dired
   :config (setq dired-subtree-use-backgrounds nil)
@@ -667,14 +1233,12 @@ But show cursor in ~wdired-mode~
 **** Dired-narrow
 #+BEGIN_SRC emacs-lisp
 (use-package dired-narrow
-  :ensure t
   :commands dired-narrow)
 #+END_SRC
 
 **** Dired-du
 #+BEGIN_SRC emacs-lisp
 (use-package dired-du
-  :ensure t
   :defer t
   :config (validate-setq dired-du-size-format t
                          dired-du-update-headers t))
@@ -683,7 +1247,6 @@ But show cursor in ~wdired-mode~
 **** Dired-ranger :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (use-package dired-ranger
-  :ensure t
   :commands dired-ranger)
 #+END_SRC
 
@@ -695,6 +1258,7 @@ https://gitlab.com/andersjohansson/dired-quick-sort/tree/dir-save
 #+begin_src emacs-lisp
 (setq dired-listing-switches "-lhA")
 (use-package dired-quick-sort
+  :straight nil ; TODO fork
   :load-path "~/kodat/elisp/dired-quick-sort"
   :after dired
   :custom
@@ -720,7 +1284,6 @@ But some of the options for listing-switches doesn’t work with remote sessions
 **** dired-toggle-sudo
 #+begin_src emacs-lisp
 (use-package dired-toggle-sudo
-  :ensure t
   :commands dired-toggle-sudo
   :init
   (with-eval-after-load 'dired
@@ -797,6 +1360,7 @@ Store visited directories in a list, make it accessible from helm
 *** Zeitgeist
 #+BEGIN_SRC emacs-lisp
 (use-package zeitgeist
+  :straight nil
   :load-path "~/kodat/elisp/zeitgeist/"
   :demand t)
 #+END_SRC
@@ -1104,7 +1668,8 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
 
 ;; replacing \\par with a non-displaying character is just stupid
 (with-eval-after-load "tex-mode"
-  (setq tex--prettify-symbols-alist (delete '("\\par" . ? ) tex--prettify-symbols-alist)))
+  (setq tex--prettify-symbols-alist (delete '("\\par" . ?  
+) tex--prettify-symbols-alist)))
 #+END_SRC
 
 *** Use pdf-tools
@@ -1283,7 +1848,7 @@ Add biblatex formats
 https://github.com/andersjohansson/tex-fold-linebreaks
 #+BEGIN_SRC emacs-lisp
 (use-package tex-fold-linebreaks
-  :load-path "~/kodat/elisp/tex-fold-linebreaks"
+  :straight (:host gitlab :repo "andersjohansson/tex-fold-linebreaks")
   :commands tex-fold-linebreaks-mode
   :config (setq tex-fold-linebreaks-non-sentence-punctuation-regexp
                 "\\([0-9]\\|[[:space:]]\\([[:alpha:]]\\|t\\.ex\\|m\\.fl\\|bl\\|bl\\.a\\|e\\.g\\|i\\.e\\)?\\)$"))
@@ -1292,7 +1857,6 @@ https://github.com/andersjohansson/tex-fold-linebreaks
 *** beginend (redefine beginning and end of buffer in a smart way for special buffers)
 #+BEGIN_SRC emacs-lisp
 (use-package beginend
-  :ensure t
   :init (beginend-setup-all)
   :delight beginend-global-mode
   :config (cl-loop for x in beginend-modes do
@@ -1510,535 +2074,9 @@ already narrowed."
 #+END_SRC
 
 ** Searching, file-management, completion (helm and others)
-*** Helm
-(Really too much in config section here. Should probably move it to another file)
-#+begin_src emacs-lisp
-(defcustom aj/shortened-helm-paths nil
-  "List of replacements to do in `helm-recentf-source' and
-`helm-source-files-in-current-dir' lists of files
-Order is important! Only the first matching entry will be replaced.
-
-Example of alist entry:
-\(\"^~/my/favorite/path\" . \"MFP\"\)"
-  :group 'aj
-  :type '(alist :key-type regexp :value-type string))
-
-(use-package helm
-  :defer 0.5
-  :bind (("<f2>" . helm-imenu))
-  :delight helm-mode
-  :config
-  (setq-default helm-command-prefix-key "C-c h")
-  (require 'helm-config)
-  (helm-mode)
-  (define-key helm-map (kbd "<tab>") 'helm-execute-persistent-action) ; rebind tab to run persistent action
-  (define-key helm-map (kbd "C-i") 'helm-execute-persistent-action) ; make TAB works in terminal
-  (define-key helm-map (kbd "C-z")  'helm-select-action) ; list actions using C-z
-
-  (when (executable-find "curl")
-    (setq helm-net-prefer-curl-p t))
-  (setq
-   helm-M-x-always-save-history t ; ska spara även kraschade kommandon
-   helm-ff-search-library-in-sexp t ; search for library in `require' and `declare-function' sexp.
-   helm-scroll-amount 8 ; scroll 8 lines other window using M-<next>/M-<prior>
-   helm-ff-file-name-history-use-recentf t)
-  ;;fuzzy matching
-  (setq helm-buffers-fuzzy-matching t
-        helm-recentf-fuzzy-match t
-        helm-locate-fuzzy-match t
-        helm-file-cache-fuzzy-match t
-        helm-mode-fuzzy-match t
-        helm-M-x-fuzzy-match t
-        helm-semantic-fuzzy-match t
-        helm-imenu-fuzzy-match t
-        helm-apropos-fuzzy-match t
-        helm-lisp-fuzzy-completion t)
-  (helm-adaptive-mode 1)
-
-  ;; display
-  (setq helm-split-window-inside-p t)
-  ;; from: https://www.reddit.com/r/emacs/comments/3asbyn/new_and_very_useful_helm_feature_enter_search/
-  (defun helm-hide-minibuffer-maybe ()
-    (when (with-helm-buffer helm-echo-input-in-header-line)
-      (let ((ov (make-overlay (point-min) (point-max) nil nil t)))
-        (overlay-put ov 'window (selected-window))
-        (overlay-put ov 'face (let ((bg-color (face-background 'default nil)))
-                                `(:background ,bg-color :foreground ,bg-color)))
-        (setq-local cursor-type nil))))
-
-  (add-hook 'helm-minibuffer-set-up-hook
-            'helm-hide-minibuffer-maybe)
-
-  (setq helm-display-function
-        ;;#'aj/helm-display-child-frame
-        #'helm-default-display-buffer 
-        helm-display-buffer-reuse-frame t
-        helm-display-buffer-width 120
-        helm-display-buffer-height 35
-        helm-echo-input-in-header-line t)
-
-  ;; (defun aj/helm-display-child-frame (buffer &optional resume)
-  ;;     "Display `helm-buffer' in a separate frame.
-  ;; Function suitable for `helm-display-function',
-  ;; `helm-completion-in-region-display-function'
-  ;; and/or `helm-show-completion-default-display-function'.
-  ;; See `helm-display-buffer-height' and `helm-display-buffer-width' to
-  ;; configure frame size."
-  ;;     (if (not (display-graphic-p))
-  ;;         ;; Fallback to default when frames are not usable.
-  ;;         (helm-default-display-buffer buffer)
-  ;;       (setq helm--buffer-in-new-frame-p t)
-  ;;       (let ((default-frame-alist
-  ;;               `((parent . ,(selected-frame))
-  ;;                 (width . ,helm-display-buffer-width)
-  ;;                 (height . ,helm-display-buffer-height)
-  ;;                 (undecorated . t)
-  ;;                 (left-fringe . 2)
-  ;;                 (right-fringe . 2)
-  ;;                 (tool-bar-lines . 0)
-  ;;                 (line-spacing . 0)
-  ;;                 (desktop-dont-save . t)
-  ;;                 (no-special-glyphs . t)
-  ;;                 (tool-bar-lines . 0)
-  ;;                 (left . 0)
-  ;;                 (top . 0)
-  ;;                 (title . "Helm")
-  ;;                 (vertical-scroll-bars . nil)
-  ;;                 (menu-bar-lines . 0)
-  ;;                 (fullscreen . nil)
-  ;;                 (visibility . ,(null helm-display-buffer-reuse-frame))
-  ;;                 (minibuffer . nil)))
-  ;;             display-buffer-alist)
-  ;;         (helm-display-buffer-popup-frame buffer default-frame-alist)
-  ;;         (set-face-attribute 'header-line (selected-frame)
-  ;;                             :background nil :foreground 'unspecified :height 1.15
-  ;;                             :inherit 'default)
-  ;;         (aj/center-frame))
-  ;;       (helm-log-run-hook 'helm-window-configuration-hook)))
-
-  ;; Only show headers if several sources
-  ;; https://www.reddit.com/r/emacs/comments/2z7nbv/lean_helm_window/
-  (defun helm-toggle-header-line ()
-    (if (eq 1 (length (ignore-errors (with-helm-buffer helm-sources))))
-        (set-face-attribute 'helm-source-header nil :height 1)
-      (set-face-attribute 'helm-source-header nil :height 1.0)))
-
-  (add-hook 'helm-before-initialize-hook #'helm-toggle-header-line)
-
-
-  ;;; bindings
-  (define-key global-map [remap execute-extended-command] #'helm-M-x)
-  (global-set-key (kbd "M-y") 'helm-show-kill-ring)
-
-  (bind-key "<f1> a" #'helm-apropos)
-
-  (global-set-key (kbd "C-x b") 'helm-mini)
-  (global-set-key (kbd "C-x B") 'helm-mini)
-
-  (global-set-key (kbd "C-x C-f") 'helm-find-files)
-  (global-set-key (kbd "C-c h g") 'helm-google-suggest)
-
-;;; Helm mini:
-  
-  (setq helm-mini-default-sources
-        '(helm-source-buffers-list
-          aj/helm-source-favourite-files
-          helm-source-recentf
-          helm-source-files-in-current-dir
-          aj/helm-source-dired-recent
-          helm-source-buffer-not-found))
-  (defvar aj/helm-source-dired-recent
-    (helm-build-sync-source "Recent directories"
-      :candidates 'dired-recent-directories
-      :action '(("Open directory" . dired)
-                ("Delete from dired-recent list" . aj/helm-action-dired-recent-delete))))
-
-  (defun aj/shorten-helm-path (path)
-    (cl-loop
-     with disp = (or (car-safe path) path) with real = (or (cdr-safe path) path)
-     for s in aj/shortened-helm-paths
-     when (string-match (car s) disp)
-     return (cons
-             (concat (substring disp 0 (match-beginning 0))
-                     (propertize (cdr s) 'face '(bold helm-ff-symlink))
-                     (substring disp (match-end 0)))
-             real)
-     finally return path))
-
-  (defun aj/helm-recentf-filtered-candidates-shorten (candidates source)
-    (mapcar #'aj/shorten-helm-path candidates))
-
-  (with-eval-after-load "helm-for-files"
-    (dolist (source '(helm-source-recentf helm-source-files-in-current-dir))
-      (cl-callf append
-          (alist-get 'filtered-candidate-transformer (symbol-value source))
-        '(aj/helm-recentf-filtered-candidates-shorten))))
-
-  ;;; grep --> ripgrep
-
-  (setq helm-grep-ag-command "rg -u --color=never --smart-case --no-heading --line-number %s %s %s"
-        helm-grep-file-path-style 'relative)
-  (bind-key "C-s" #'helm-ff-run-grep-ag helm-find-files-map)
-
-  (defun aj/helm-rg-org-files ()
-    "Function for searching through all org files in home directory."
-    (interactive)
-    (advice-add 'helm-grep--filter-candidate-1 :filter-return
-                #'aj/shorten-helm-path)
-    (unwind-protect
-        (let ((helm-grep-file-path-style 'absolute))
-          (helm-grep-ag-1 (expand-file-name "~") '("-torg")))
-      (advice-remove 'helm-grep--filter-candidate-1
-                     #'aj/shorten-helm-path)))
-
-  ;;; google-suggest
-  (with-eval-after-load 'helm-net
-    (add-to-list 'helm-google-suggest-actions
-                 '("Thesaurus" . (lambda (candidate)
-                                   (helm-search-suggest-perform-additional-action
-                                    "http://www.thesaurus.com/browse/%s" candidate))) t)
-    (add-to-list 'helm-google-suggest-actions
-                 '("Tyda" . (lambda (candidate)
-                              (helm-search-suggest-perform-additional-action
-                               "http://tyda.se/search/%s" candidate))) t))
-
-  ;;; more candidates for helm-ucs
-  (defun aj/helm-500-candidates (fn &rest args)
-    (let ((helm-candidate-number-limit 500))
-      (apply fn args)))
-
-  (advice-add 'helm-ucs :around #'aj/helm-500-candidates)
-
-  ;;; mark-ring extra
-  (defun aj/pop-to-mark-invoke-helm (fun)
-    (interactive)
-    (if (eq last-command 'pop-to-mark-command)
-        (helm-all-mark-rings)
-      (funcall fun)))
-
-  (defvar helm-mark-ring-map
-    (let ((map (make-sparse-keymap)))
-      (set-keymap-parent map helm-map)
-      (define-key map (kbd "C-<SPC>") 'helm-next-line) map)
-    "Keymap for `helm-all-mark-rings'.")
-
-  (setq set-mark-command-repeat-pop t)
-  (with-eval-after-load 'helm-ring
-    (add-to-list 'helm-source-mark-ring `(keymap . ,helm-mark-ring-map)))
-  (advice-add 'pop-to-mark-command :around #'aj/pop-to-mark-invoke-helm)
-
-
-  ;; Don’t want launched processes lying around being children to
-  ;; emacs (and being killed when I have to kill emacs). Therefore I
-  ;; use ‘call-process-shell-command’ instead of
-  ;; ‘start-process-shell-command’.
-
-  (defun aj/helm-run-or-raise (exe &optional file)
-    (let ((real-com (car (split-string exe))))
-      (when (member real-com helm-external-commands-list)
-        (message "Starting %s..." real-com)
-        (if file
-            (call-process-shell-command
-             (format "%s %s"
-                     real-com
-                     (shell-quote-argument
-                      (if (eq system-type 'windows-nt)
-                          (helm-w32-prepare-filename file)
-                        (expand-file-name file))))
-             nil 0)
-          (call-process-shell-command real-com nil 0)))))
-
-  (advice-add 'helm-run-or-raise :override #'aj/helm-run-or-raise)
-
-
-  )
-
-
-#+end_src
-**** helm-flx
-Differnt fuzzy search algorithm, is this needed?
-#+BEGIN_SRC emacs-lisp
-(use-package helm-flx
-  :ensure t
-  :after helm
-  :init (helm-flx-mode t))
-
-#+END_SRC
-**** Open zotero library files
-#+BEGIN_SRC emacs-lisp
-(eval-when-compile (require 'dash))
-
-(with-eval-after-load 'helm-files
-  (defcustom aj/helm-zotero-library nil
-    "Directory of Zotero library files"
-    :group 'aj
-    :type 'directory)
-
-  (defvar aj/helm-zoterofile-history)
-  (defvar aj/zoterofiles-frame-manage nil)
-
-  (defun aj/open-zoterofile-new-frame ()
-    (interactive)
-    (let ((ocframe
-           (make-frame '((width . 100) (height . 20) (name . "helm-zotero")
-                         (window-system . x) (fullscreen . nil))))
-          (helm-full-frame t)
-          (aj/zoterofiles-frame-manage t))
-      (select-frame-set-input-focus ocframe)
-      (aj/center-frame)
-      (aj/helm-open-zoterofile)))
-
-  (defun aj/helm-open-zoterofile ()
-    (interactive)
-    (let* ((oe '("Open externally" . aj/helm-open-file-externally-delete-frame))
-           (ff '("Find file" . aj/helm-find-many-files-widen-frame))
-           (active-actions (if aj/zoterofiles-frame-manage
-                               (list oe ff)
-                             (list ff oe))))
-      (helm :sources
-            (list
-             (helm-build-sync-source "Zotero recently modified"
-               :action active-actions
-               :pattern-transformer 'helm-recentf-pattern-transformer
-               :keymap helm-generic-files-map
-               :candidates #'aj/helm-zotero-recently-modified)
-             (helm-build-sync-source "Zotero recentf"
-               :candidates #'aj/recentf-list-zotero
-               :action active-actions
-               :fuzzy-match t
-               :filtered-candidate-transformer #'helm-highlight-files
-               :pattern-transformer #'helm-recentf-pattern-transformer
-               :match-part #'aj/helm-zotero-match-part
-               :keymap helm-generic-files-map)
-             (helm-build-sync-source "Zotero files"
-               :candidates #'aj/helm-zotero-files
-               :action active-actions
-               :fuzzy-match t
-               :candidate-transformer #'helm-skip-boring-files
-               :filtered-candidate-transformer #'helm-highlight-files
-               :pattern-transformer #'helm-recentf-pattern-transformer
-               :match-part #'aj/helm-zotero-match-part
-               :keymap helm-generic-files-map
-               ))
-
-
-            :buffer "*helm-zoterofile*"
-            :history 'aj/helm-zoterofile-history
-            :ff-transformer-show-only-basename t)))
-
-
-  (defun aj/helm-zotero-recently-modified ()
-    (when (file-accessible-directory-p aj/helm-zotero-library)
-      (with-temp-buffer
-        (call-process "ls" nil t nil "-t" "-1" aj/helm-zotero-library)
-        (mapcar (lambda (x) (cons x (expand-file-name x aj/helm-zotero-library)))
-                (split-string
-                 (buffer-substring (point-min)
-                                   (progn (goto-char (point-min))
-                                          (forward-line 20) (point)))
-                 "\n"
-                 t)))))
-
-  (defun aj/recentf-list-zotero ()
-    (--filter (string-match-p aj/helm-zotero-library it)
-              recentf-list))
-
-  (defun aj/helm-zotero-files ()
-    (when (file-accessible-directory-p aj/helm-zotero-library)
-      (directory-files aj/helm-zotero-library t "\\.\\(pdf\\|djvu\\|vue\\)$")))
-
-  (defun aj/helm-zotero-match-part (candidate)
-    (if (or helm-ff-transformer-show-only-basename
-            helm-recentf--basename-flag)
-        (helm-basename candidate) candidate))
-
-  (defun aj/helm-find-many-files-widen-frame (_ignore)
-    (helm-find-many-files t)
-    (when aj/zoterofiles-frame-manage
-      (aj/frame-to-left)
-      (set-frame-name (buffer-file-name))))
-  (defun aj/helm-open-file-externally-delete-frame (file)
-    (helm-open-file-externally file)
-    (when aj/zoterofiles-frame-manage
-      (delete-frame))))
-#+END_SRC
-**** TODO Utvärdera om vi borde använda helm-multi-files istället för att lägga allt i helm-mini
-**** COMMENT Helm omni-files, buffers, recentf :ARCHIVE:
-
-#+BEGIN_SRC emacs-lisp
-  (global-set-key (kbd "C-x C-b") 'aj/helm-omni-buffers)
-  (global-set-key (kbd "C-x b") 'aj/helm-omni-buffers)
-  (global-set-key (kbd "C-x C-r") 'aj/helm-omni-recent)
-
-  (defvar aj/helm-omni-history nil)
-
-  (defun aj/helm-omni-buffers (&rest arg)
-    (interactive)
-    (require 'helm-files)
-    (unless helm-source-buffers-list
-      (setq helm-source-buffers-list
-            (helm-make-source "Buffers" 'helm-source-buffers)))
-    (helm :sources
-          '(helm-source-buffers-list
-            helm-source-recentf
-            helm-source-files-in-current-dir
-            helm-source-locate
-            helm-source-bookmarks
-            helm-source-buffer-not-found)
-          :buffer "*helm omni recentf*"
-          :truncate-lines t
-          :history 'aj/helm-omni-history
-          :ff-transformer-show-only-basename nil))
-
-  (defun aj/helm-omni-recent (&rest arg)
-    (interactive)
-    (require 'helm-files)
-    (unless helm-source-buffers-list
-      (setq helm-source-buffers-list
-            (helm-make-source "Buffers" 'helm-source-buffers)))
-    (helm :sources
-          '(helm-source-recentf
-            helm-source-buffers-list
-            helm-source-locate
-            helm-source-files-in-current-dir
-            helm-source-bookmarks
-            helm-source-buffer-not-found)
-          :buffer "*helm omni recent*"
-          :truncate-lines t
-          :history 'aj/helm-omni-history
-          :ff-transformer-show-only-basename nil))
-
-#+END_SRC
-
-
-**** Helm-recoll :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package helm-recoll
-  :commands helm-recoll
-  :config (helm-recoll-create-source "default" "~/.recoll/"))
-#+end_src
-
-**** Favourite files (to mark files which should be prioritized in helm matches)
-#+BEGIN_SRC emacs-lisp
-(defvar aj/favourite-files nil)
-(add-to-list 'savehist-additional-variables 'aj/favourite-files)
-
-(defun aj/add-favourite-file ()
-  (interactive)
-  (if-let ((name (or
-                  (buffer-file-name)
-                  (and (eq major-mode 'dired-mode) default-directory))))
-      (cl-pushnew name aj/favourite-files :test #'string=)
-    (user-error "Not in a file- or dired-buffer")))
-
-(with-eval-after-load "helm-for-files"
-  (defun aj/remove-favourite-file (_candidate)
-    ;; to be run from helm
-    (cl-loop for file in (helm-marked-candidates)
-             do (setq aj/favourite-files (delete file aj/favourite-files))))
-
-  (defclass aj/helm-favourite-files-source (helm-source-sync helm-type-file)
-    ((candidates :initform (lambda () aj/favourite-files))
-     (pattern-transformer :initform 'helm-recentf-pattern-transformer)
-     (match-part :initform (lambda (candidate)
-                             (if (or helm-ff-transformer-show-only-basename
-                                     helm-recentf--basename-flag)
-                                 (helm-basename candidate) candidate)))
-     (persistent-action :initform 'helm-ff-kill-or-find-buffer-fname)
-     (fuzzy-match :initform t)))
-
-  (defmethod helm--setup-source :after ((source aj/helm-favourite-files-source))
-    (setf (slot-value source 'action)
-          (append (symbol-value (helm-actions-from-type-file))
-                  '(("Delete file(s) from aj/favourite-files" .
-                     aj/remove-favourite-file))))
-    (setf (slot-value source 'filtered-candidate-transformer)
-          (append (slot-value source 'filtered-candidate-transformer)
-                  '(aj/helm-recentf-filtered-candidates-shorten))))
-
-  (defvar aj/helm-source-favourite-files
-    (helm-make-source "Favourite files" 'aj/helm-favourite-files-source)))
-#+END_SRC
-
-**** Favorite directories
-http://endlessparentheses.com/visit-directory-inside-a-set-of-directories.html
-#+begin_src emacs-lisp
-(defcustom aj/favorite-directories nil
-  "List of favorite directories.
-Used in `aj/visit-favorite-dir'. The order here affects the order
-that completions will be offered. Each element is a list of
-directory, search depth, and whether to include files."
-  :type '(repeat (list (directory :tag "Directory")
-                       (integer :tag "Search depth")
-                       (boolean :tag "Include files")))
-  :group 'aj)
-
-(defvar aj/fav-dir-history nil)
-
-(defun aj/visit-favorite-dir (files-too)
-  "Offer all directories inside a set of directories.
-Compile a list of all directories inside each element of
-`aj/favorite-directories', and visit one of them with
-`ido-completing-read'.
-With prefix argument FILES-TOO also offer to find files."
-  (interactive "P")
-  (let ((completions
-         (apply #'append
-                (mapcar (lambda (x)
-                          (aj/get-dir-list (car x) (cadr x) (or files-too (nth 2 x))))
-                        aj/favorite-directories)))
-        (helm-candidate-number-limit nil))
-    (dired
-     (helm-comp-read "Open directory: " completions
-                     :input-history aj/fav-dir-history))))
-
-
-(defun aj/get-dir-list (dir level &optional files-too)
-  "Get list of directories (or files with FILES-TOO) to a certain level"
-  (if (and (file-directory-p dir) (> level 0))
-      ;; recurse into directories if we have levels left
-      (apply #'append
-             (list dir)
-             (mapcar
-              (lambda (sdir) (aj/get-dir-list sdir (1- level) files-too))
-              (mapcar
-               #'abbreviate-file-name
-               (cl-remove-if-not
-                (if files-too #'file-readable-p
-                  #'file-directory-p)
-                (directory-files
-                 (expand-file-name dir)
-                 t "^[^\.].*" t)))))
-    ;; just return dir or file
-    (list dir)))
-
-;;TODO, define as helm-source
-;; (defclass aj/helm-favorit-dir-class (helm-source-sync helm-type-timers)
-;;   ((candidates :initform timer-idle-list)
-;;    (allow-dups :initform t)
-;;    (volatile :initform t)
-;;    (filtered-candidate-transformer
-;;     :initform
-;;     (lambda (candidates _source)
-;;       (cl-loop for timer in candidates
-;;                collect (cons (helm-elisp--format-timer timer) timer))))))
-
-;; (defvar helm-source-idle-time-timers
-;;   (helm-make-source "Idle Time Timers" 'helm-idle-time-timers-class))
-#+end_src
-
-Note that C-x d is usually bound to dired. I find
-this redundant with C-x C-f, so I don't mind
-overriding it, but you should know before you do.
-#+begin_src emacs-lisp
-(define-key ctl-x-map "d" #'aj/visit-favorite-dir)
-
-#+end_src
-
 *** Anzu: Shows number of search matches in modeline, replacements inline etc.
 #+BEGIN_SRC emacs-lisp
 (use-package anzu
-  :ensure t
   :delight
   :defer 12
   :bind (("M-%" . anzu-query-replace)
@@ -2070,6 +2108,7 @@ overriding it, but you should know before you do.
 
 ;; see https://github.com/sebastiencs/company-box/pull/65
 (use-package company-box
+  :straight nil
   :load-path "~/kodat/elisp/company-box"
   :delight ""
   :after company
@@ -2155,7 +2194,7 @@ overriding it, but you should know before you do.
                 try-expand-line)))
 #+END_SRC
 
-** info+
+** info+ :ARCHIVE: 
 #+begin_src emacs-lisp
 (use-package info+
   ;; :after info
@@ -2184,8 +2223,7 @@ overriding it, but you should know before you do.
 *** Magit config
 #+begin_src emacs-lisp
 (use-package magit
-  :ensure t
-  :pin melpa-stable
+  ;; :pin melpa-stable
   :bind ("C-x g" . magit-status)
   :config
   (magit-auto-revert-mode -1) ;; I use global-auto-revert
@@ -2243,7 +2281,6 @@ overriding it, but you should know before you do.
 ** visible-bookmarks (bm)
 #+begin_src emacs-lisp
 (use-package bm
-  :ensure t
   :defer 2
   :init (setq bm-restore-repository-on-load t)
 
@@ -2269,6 +2306,7 @@ overriding it, but you should know before you do.
 ** uniquify
 #+begin_src emacs-lisp
 (use-package uniquify
+  :straight nil
   :demand t
   :config (setq uniquify-buffer-name-style 'post-forward-angle-brackets
                 uniquify-after-kill-buffer-p t ; rename after killing uniquified
@@ -2278,7 +2316,11 @@ overriding it, but you should know before you do.
 
 ** New (custom) utility commands
 #+begin_src emacs-lisp
+(use-package request) ;; TODO, fixa som dep för aj-custom-commands
+(use-package xah-replace-pairs)
 (use-package aj-custom-commands
+  :straight nil
+  :demand t ;; TODO fixa autoloads
   :bind (("C-x C-k" . aj/delete-current-buffer-file)
          ("C-x C-r" . aj/rename-current-buffer-file)
          ("C-S-<return>" . ergoemacs-open-in-external-app)
@@ -2292,7 +2334,6 @@ overriding it, but you should know before you do.
 *** Whole-line-or-region
 #+BEGIN_SRC emacs-lisp
 (use-package whole-line-or-region
-  :ensure t
   :demand t
   :config (whole-line-or-region-global-mode)
   :delight whole-line-or-region-local-mode)
@@ -2301,7 +2342,6 @@ overriding it, but you should know before you do.
 Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
 #+BEGIN_SRC emacs-lisp
 (use-package volatile-highlights
-  :ensure t
   :delight
   :commands volatile-highlights-mode
   :init (volatile-highlights-mode t)
@@ -2326,7 +2366,6 @@ Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
 *** [[https://github.com/rejeep/drag-stuff.el][Drag stuff]]
 #+BEGIN_SRC emacs-lisp
 (use-package drag-stuff
-  :ensure t
   :delight drag-stuff-mode
   :config
   (defhydra aj/hydra-drag-stuff (:color pink)
@@ -2345,7 +2384,6 @@ Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
 *** expand-region
 #+begin_src emacs-lisp
 (use-package expand-region
-  :ensure t
   :bind ("C-ä" . er/expand-region))
 #+end_src
 
@@ -2450,7 +2488,6 @@ When called in the minibuffer, get out of the minibuffer using
 #+BEGIN_SRC emacs-lisp
 (use-package which-key
   :delight
-  :ensure t
   :defer 4
   :config (which-key-setup-side-window-right-bottom)
   (which-key-mode)
@@ -2679,7 +2716,6 @@ Needed when starting in a non-interactive shell.
 Dims parantheses in lisp modes.
 #+BEGIN_SRC emacs-lisp
 (use-package paren-face
-  :ensure t
   :init (global-paren-face-mode))
 #+END_SRC
 *** Elisp
@@ -2701,7 +2737,6 @@ Dims parantheses in lisp modes.
 **** Elisp-slime-nav
 #+BEGIN_SRC emacs-lisp
 (use-package elisp-slime-nav
-  :ensure t
   :init (add-hook 'emacs-lisp-mode-hook #'elisp-slime-nav-mode)
   :config
   (defun aj/find-elisp-thing-at-point-other-window (sym-name)
@@ -2751,7 +2786,6 @@ Argument SYM-NAME is the thing to find."
 **** Nameless
 #+BEGIN_SRC emacs-lisp
 (use-package nameless
-  :ensure t
   :defer t
   :init (add-hook 'emacs-lisp-mode-hook #'nameless-mode)
   (setq nameless-private-prefix t
@@ -2780,7 +2814,6 @@ Could be used better some day, need to define good keybindings and stuff, and th
 http://www.modernemacs.com/post/outline-ivy/
 #+BEGIN_SRC emacs-lisp
 (use-package outshine
-  :ensure t
   :init
   (add-hook 'outline-minor-mode-hook 'outshine-hook-function)
   :config  (setq outshine-use-speed-commands t))
@@ -2839,7 +2872,6 @@ _d_: subtree     _<tab>_: toggle
 #+BEGIN_SRC emacs-lisp
 (use-package origami
   :commands origami-mode
-  :ensure t
   :config (bind-keys :map origami-mode-map
                      ("<tab>" . origami-recursively-toggle-node)
                      ("<backtab>" . origami-toggle-all-nodes))
@@ -2858,7 +2890,12 @@ _d_: subtree     _<tab>_: toggle
 (defvaralias 'c-basic-offset 'tab-width)
 (defvaralias 'cperl-indent-level 'tab-width)
 (defvaralias 'js-indent-level 'tab-width)
-(smart-tabs-insinuate 'c 'c++ 'java 'javascript 'cperl 'python 'ruby 'nxml)
+
+(use-package smart-tabs-mode
+  :commands smart-tabs-insinuate
+  :init (smart-tabs-insinuate 'c 'c++ 'java 'javascript 'cperl 'python 'ruby 'nxml)
+  )
+
 (add-hook 'emacs-lisp-mode-hook
 		  (lambda ()
 			;; Use spaces, not tabs.
@@ -2867,8 +2904,8 @@ _d_: subtree     _<tab>_: toggle
 
 *** smartparens
 #+begin_src emacs-lisp
-(use-package smartparens-config
-  :demand t
+(use-package smartparens
+  :init (require 'smartparens-config)
   :config
   (smartparens-global-mode t)
   (add-to-list 'sp-ignore-modes-list 'org-agenda-mode)
@@ -2888,7 +2925,6 @@ _d_: subtree     _<tab>_: toggle
 To only activate it in prog-mode, we define a minor mode with the binding.
 #+begin_src emacs-lisp
 (use-package comment-dwim-2
-  :ensure t
   :init
   (defvar comment-dwim-2-mode-map
     (let ((map (make-sparse-keymap)))
@@ -2911,14 +2947,11 @@ To only activate it in prog-mode, we define a minor mode with the binding.
 cperl instead of perl-mode
 #+begin_src emacs-lisp
 (use-package cperl-mode
+  :straight nil
   :defer t
   :init (defalias 'perl-mode 'cperl-mode)
   :functions cperl-set-style
   :config (cperl-set-style "GNU")
-  ;; helm-perldoc:setup takes long time on low power platform
-  (helm-perldoc:setup)
-  (add-hook 'cperl-mode-hook 'helm-perldoc:carton-setup)
-
   (defun aj/cperl-eldoc-documentation-function ()
     "Return meaningful doc string for `eldoc-mode'."
     (car (let ((cperl-message-on-help-error nil))
@@ -2927,9 +2960,12 @@ cperl instead of perl-mode
   (add-hook 'cperl-mode-hook
             (lambda () (set (make-local-variable 'eldoc-documentation-function)
                        'aj/cperl-eldoc-documentation-function))))
+
+;; ;; helm-perldoc:setup takes long time on low power platform
+;; (helm-perldoc:setup)
+;; (add-hook 'cperl-mode-hook 'helm-perldoc:carton-setup)
+
 #+end_src
-
-
 
 *** Notifications while compiling
 #+begin_src emacs-lisp
@@ -2950,16 +2986,13 @@ cperl instead of perl-mode
   (setq-local comment-auto-fill-only-comments t)
   (auto-fill-mode t))
 
-;; (defun esk-add-watchwords ()
-;;   (font-lock-add-keywords
-;;    nil '(("\\<\\(FIX\\(ME\\)?\\|TODO\\|HACK\\|REFACTOR\\|NOCOMMIT\\)"
-;;           1 font-lock-warning-face t))))
-;;(remove-hook 'prog-mode-hook 'esk-add-watchwords)
-
 (add-hook 'prog-mode-hook 'esk-local-comment-auto-fill)
-(add-hook 'prog-mode-hook 'idle-highlight-mode)
 #+end_src
-
+*** Idle-highlight-mode 
+#+begin_src emacs-lisp
+(use-package idle-highlight-mode
+  :hook prog-mode)
+#+end_src
 ** Text-modes and spelling
 
 *** Visual-line-mode
@@ -3096,12 +3129,14 @@ I also define abbrevs for english which expand "dont" to "do not" etc. in the ta
 Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t seem to preserve properties. Therefore properties are added below.
 #+BEGIN_SRC emacs-lisp
 (use-package abbrev
+  :straight nil
   :delight
   :init
   (add-hook 'text-mode-hook #'abbrev-mode)
   (setq abbrev-file-name "~/.emacs.d/config/abbrev_defs")
   :config
   ;; Define a special abbrev for i->I, use it only when writing non-Swedish
+  (require 'ispell)
   (defun aj/make-i-I ()
     (when (or (bound-and-true-p orgqda-transcript-mode)
               (and
@@ -3299,7 +3334,6 @@ personal dictionaries into a combined personal dictionary."
 **** Guess language, conditional enabling of flyspell and setting of languages for flyspell, typo and langtool.
 #+BEGIN_SRC emacs-lisp
 (use-package guess-language
-  :ensure t
   :defer t
   :config
   (setq guess-language-langcodes '((en . ("en_GB" "English"))
@@ -3365,7 +3399,6 @@ personal dictionaries into a combined personal dictionary."
 **** Helm flyspell, on C-ö
 #+BEGIN_SRC emacs-lisp
 (use-package helm-flyspell
-  :ensure t
   :commands helm-flyspell-correct
   :init (with-eval-after-load 'flyspell
           (bind-key "C-ö" 'helm-flyspell-correct flyspell-mode-map)))
@@ -3444,7 +3477,6 @@ personal dictionaries into a combined personal dictionary."
 For doing smart (curly) quotes, mainly in mails since org has it’s own mechanism
 #+BEGIN_SRC emacs-lisp
 (use-package typo
-  :ensure t
   :after mu4e
   :config
   (add-to-list 'typo-quotation-marks  '("Swedish" "»" "«" "›" "‹")
@@ -3465,7 +3497,6 @@ For doing smart (curly) quotes, mainly in mails since org has it’s own mechani
 *** [[https://github.com/mhayashi1120/Emacs-langtool][Language tool]]
 #+BEGIN_SRC emacs-lisp
 (use-package langtool
-  :ensure t
   :bind (("C-x 4 w" . langtool-check)
          ("C-x 4 W" . langtool-check-done)
          ("C-x 4 l" . langtool-switch-default-language)
@@ -3487,20 +3518,22 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
 
 #+BEGIN_SRC emacs-lisp
 (use-package define-word
-  ;; :ensure t
-  :load-path "~/kodat/elisp/define-word/"
+  ;; :load-path "~/kodat/elisp/define-word/"
   :commands (define-word define-word-at-point))
 
 (use-package define-word-thesaurus
-  :load-path "~/kodat/elisp/define-word-thesaurus/"
+  :straight (:host gitlab :repo "andersjohansson/define-word-thesaurus")
+  ;; :load-path "~/kodat/elisp/define-word-thesaurus/"
   :after define-word)
 (use-package define-word-tyda
-  :load-path "~/kodat/elisp/define-word-tyda/"
+  :straight (:host gitlab :repo "andersjohansson/define-word-tyda")
+  ;; :load-path "~/kodat/elisp/define-word-tyda/"
   :after define-word)
-(use-package define-word-synonymer
-  :load-path "~/kodat/elisp/define-word-tyda/"
-  :after define-word)
+;; (use-package define-word-synonymer
+;;   :load-path "~/kodat/elisp/define-word-tyda/"
+;;   :after define-word)
 (use-package sdcv-mode
+  :straight nil
   :commands 'sdcv-search)
 (use-package google-translate
   :commands 'google-translate-smooth-translate
@@ -3509,8 +3542,7 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
 
 ;; needs wn, installed with aur package wordnet-cli
 (use-package synosaurus
-  :ensure t
-  :pin "melpa"
+  ;; :pin "melpa"
   :commands (synosaurus-lookup synosaurus-choose-and-replace)
   :init
   ;; this means completing-read, which gives me helm completion
@@ -3537,16 +3569,16 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
 *** Spotify
 #+begin_src emacs-lisp
 (use-package spotify
-  :load-path "~/kodat/elisp/spotify.el/"
   :defer t
   :custom
   (spotify-transport 'connect)
   (spotify-api-locale "sv_SE")
   (spotify-api-country "SE")
-  (spotify-mode-line-playing-text (all-the-icons-faicon "play-circle" :v-adjust 0.01))
-  (spotify-mode-line-paused-text (all-the-icons-faicon "pause-circle" :v-adjust 0.01))
-  (spotify-mode-line-stopped-text (all-the-icons-faicon "stop-circle" :v-adjust 0.01))
-  (spotify-mode-line-format  " %p %a: %t "))
+  (spotify-mode-line-format  " %p %a: %t ")
+  :config
+  (setq spotify-mode-line-playing-text (all-the-icons-faicon "play-circle" :v-adjust 0.01)
+        spotify-mode-line-paused-text (all-the-icons-faicon "pause-circle" :v-adjust 0.01)
+        spotify-mode-line-stopped-text (all-the-icons-faicon "stop-circle" :v-adjust 0.01)))
 #+end_src
 *** Extra definitions for ~auto-mode-alist~
 #+begin_src emacs-lisp
@@ -3557,9 +3589,9 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
 **** Main settings
 pdf-loader handles deferred loading. Then settings are applied after loading pdf-view
 #+BEGIN_SRC emacs-lisp
-(use-package pdf-loader
+(use-package pdf-tools
   ;; :load-path "~/kodat/elisp/pdf-tools/"
-  :commands pdf-loader-install
+  :commands pdf-loader-install ;; TODO (fel?)
   :init (pdf-loader-install))
 
 (with-eval-after-load 'pdf-view
@@ -3682,6 +3714,7 @@ Copying from a pdf with correct org-zotxt references and page numbers
 https://gitlab.com/andersjohansson/pdf-zotxt-quote
 #+BEGIN_SRC emacs-lisp
 (use-package pdf-zotxt-quote
+  :straight nil
   :load-path ("~/kodat/elisp/pdf-zotxt-quote/" "~/kodat/elisp/zotxt-emacs/")
   :commands pdf-zotxt-quote-mode
   :config
@@ -3707,6 +3740,7 @@ But also with some inspiration from here: https://lepisma.github.io/2017/10/28/r
 #+begin_src emacs-lisp
 (use-package doc-font
   ;; in /lisp
+  :straight nil
   :commands doc-font-mode)
 
 #+end_src
@@ -3758,7 +3792,6 @@ A way of higlighting where you are, don’t use it now.
 *** Stripe-buffer :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (use-package stripe-buffer
-  :ensure t
   :config (progn
             (add-hook 'dired-mode-hook 'turn-on-stripe-buffer-mode)
             (add-hook 'org-mode-hook 'turn-on-stripe-table-mode)))
@@ -3766,8 +3799,7 @@ A way of higlighting where you are, don’t use it now.
 *** all the icons
 **** Base package
 #+BEGIN_SRC emacs-lisp
-(use-package all-the-icons
-  :ensure t)
+(use-package all-the-icons)
 #+END_SRC
 
 **** All the icons dired
@@ -3794,12 +3826,9 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 *** Modeline
 **** Doom-modeline
 #+BEGIN_SRC emacs-lisp
-(use-package eldoc-eval
-  :ensure t
-  :pin "melpa")
+(use-package eldoc-eval)
 (use-package doom-modeline
-  :ensure t
-  :pin "melpa"
+  ;;:pin "melpa"
   :defer t
   :hook (after-init . doom-modeline-mode)
   :custom
@@ -4064,7 +4093,6 @@ Add ADDITIONAL-SEGMENTS to the end of the theme."
 ***** Weather :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (use-package yahoo-weather
-  :ensure t
   :after spaceline-all-the-icons
   :config (yahoo-weather-mode))
 #+END_SRC
@@ -4191,7 +4219,9 @@ Also runs hook aj/face-definitions-hook."
 #+END_SRC
 **** Gruvbox
 #+BEGIN_SRC emacs-lisp
+(use-package autothemer) ;; TODO, fix as dep of gruvbox
 (use-package gruvbox
+  :straight nil
   :load-path "~/kodat/elisp/gruvbox-theme/"
   :init
   (add-to-list 'custom-theme-load-path "~/kodat/elisp/gruvbox-theme/"))
@@ -4241,7 +4271,6 @@ Which are nice?
 
 #+BEGIN_SRC emacs-lisp
 (use-package base16-theme
-  :ensure t
   :config
   (load-theme 'base16-mexico-light t))
 #+END_SRC
@@ -4249,14 +4278,12 @@ Which are nice?
 Is almost good, but it lacks some definitions, and the yellow and orange have bad contrast against white (too bright)
 #+BEGIN_SRC emacs-lisp
 (use-package color-theme-sanityinc-tomorrow
-:ensure t
 :init (load-theme 'sanityinc-tomorrow-day))
 
 #+END_SRC
 **** bbatsov’s solarized :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package solarized-theme
-  :ensure t
   :init
   (setq solarized-scale-org-headlines nil
         solarized-distinct-fringe-background t
@@ -4383,6 +4410,7 @@ From: http://stackoverflow.com/questions/4726220/how-to-have-colors-in-the-outpu
 Some special functions for managing my data files.
 #+begin_src emacs-lisp
 (use-package aj-forskning
+  :straight nil
   :load-path "~/kodat/elisp/orgqda"
   :defer t)
 
@@ -4403,6 +4431,7 @@ Some special functions for managing my data files.
 I use my fork, available here: https://github.com/andersjohansson/mplayer-mode/tree/org-sessions
 #+BEGIN_SRC emacs-lisp
   (use-package mplayer-mode
+    :straight nil
 	:load-path "~/kodat/elisp/mplayer-mode/"
 	:defer t
 	:config (setq mplayer-display-time-in-modeline nil
@@ -4412,27 +4441,9 @@ I use my fork, available here: https://github.com/andersjohansson/mplayer-mode/t
 *** orgqda
 Available at: https://github.com/andersjohansson/orgqda
 #+BEGIN_SRC emacs-lisp
-(use-package orgqda
-  :load-path "~/kodat/elisp/orgqda"
-  :defer t
-  :init (put 'orgqda-csv-dir 'safe-local-variable #'file-directory-p)
-  :config (setq orgqda-exclude-tags
-                (append (mapcar #'car org-tag-persistent-alist)
-                        '("ARCHIVE" "Reflektion" "Observation" "Forskningsdagbok")))
-  (defhydra aj/orgqda-hydra (:color blue :hint t)
-	("m" #'orgqda-mode "Toggle mode")
-	("ö" #'orgqda-list-tags "List tags")
-	("C-ö" #'orgqda-list-tags nil)
-	("ä" #'normal-mode "Normal mode")
-	("Ö" #'orgqda-list-tags-full "List and extract")
-	("c" #'orgqda-collect-tagged "Collect tagged")
-	("C-c" #'orgqda-collect-tagged "Collect tagged")
-	("v" #'orgqda-collect-tagged-csv "Collect csv")
-	("V" #'orgqda-collect-tagged-csv-save "Collect csv save")
-	("b" #'orgqda-collect-tagged-csv-save-all "Save all as csv"))
-  (bind-key "C-c C-ö" 'aj/orgqda-hydra/body orgqda-mode-map))
 
 (use-package orgqda-helm-tags
+  :straight nil
   :after orgqda
   :config (setq orgqda-helm-tags-include-excluded t))
 #+END_SRC
@@ -4441,6 +4452,7 @@ Available at: https://github.com/andersjohansson/orgqda
 Also at: https://github.com/andersjohansson/orgqda
 #+BEGIN_SRC emacs-lisp
 (use-package orgqda-transcript
+  :straight nil
   :load-path "~/kodat/elisp/orgqda"
   :defer t
   :config (setq orgqda-transcript-bind-fn-keys t
@@ -4565,7 +4577,7 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
 #+end_src
 
 * Final
-** Load custom loaddefs :org_async:
+** Load custom loaddefs :org_async:ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (load-file aj/custom-loaddefs-file)
 #+END_SRC

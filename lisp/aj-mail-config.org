@@ -156,6 +156,7 @@ EMAILREGEXP"
 *** org-mu4e
 #+BEGIN_SRC emacs-lisp
 (use-package org-mu4e
+  :straight nil
   :commands org-mu4e-store-link org-mu4e-open)
 #+END_SRC
 
@@ -163,7 +164,6 @@ EMAILREGEXP"
 #+BEGIN_SRC emacs-lisp
 (use-package mu4e-maildirs-extension
   :after mu4e
-  :ensure t
   :config (setq mu4e-maildirs-extension-use-bookmarks t
                 mu4e-maildirs-extension-toggle-maildir-key (kbd "TAB"))
   (mu4e-maildirs-extension-load))
@@ -172,7 +172,6 @@ EMAILREGEXP"
 *** helm-mu
 #+BEGIN_SRC emacs-lisp
 (use-package helm-mu
-  :ensure t
   :commands (helm-mu helm-mu-contacts)
   :config (require 'mu4e-headers)
   (bind-key "S" #'helm-mu mu4e-main-mode-map))
@@ -182,15 +181,15 @@ EMAILREGEXP"
 Insert contacts with helm
 https://gitlab.com/andersjohansson/mu4e-helm-contact
 #+BEGIN_SRC emacs-lisp
-(use-package mu4e-helm-contact
-  :load-path "~/kodat/elisp/mu4e-helm-contact"
-  :after mu4e-compose)
+  (use-package mu4e-helm-contact
+	:straight nil
+	:load-path "~/kodat/elisp/mu4e-helm-contact"
+	:after mu4e-compose)
 #+END_SRC
 
 *** mu4e-alert
 #+BEGIN_SRC emacs-lisp
 (use-package mu4e-alert
-  :ensure t
   :after mu4e
   :defer t
   :init
@@ -246,12 +245,13 @@ Some completion for searching.
 Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 
 #+BEGIN_SRC emacs-lisp
-(use-package mu4e-query-helper
-  :load-path "~/kodat/elisp/mu4e-query-helper/"
-  :after mu4e-headers
-  :bind (:map mu4e-headers-mode-map
-         ("s" . mu4e-query-helper-search)
-         ("S" . mu4e-query-helper-search-edit)))
+  (use-package mu4e-query-helper
+	:straight nil
+	:load-path "~/kodat/elisp/mu4e-query-helper/"
+	:after mu4e-headers
+	:bind (:map mu4e-headers-mode-map
+		   ("s" . mu4e-query-helper-search)
+		   ("S" . mu4e-query-helper-search-edit)))
 #+END_SRC
 
 ** View mode settings
