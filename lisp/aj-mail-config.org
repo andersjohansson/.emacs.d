@@ -1270,16 +1270,16 @@ Some of the functions are redefined.
 
 ** Contacts
 #+begin_src emacs-lisp
-(defvar aj/mu4e-contacts-exclude-patterns
-  '("no-reply" "noreply" "github.com" " donotreply"))
+(defvar aj/mu4e-contacts-exclude-pattern
+  (regexp-opt
+   '("no-reply" "noreply" "github.com" "donotreply" "newsletter" "launchpad.net"
+     "notification")))
 
 (setq mu4e-contact-process-function #'aj/mu4e-contact-process-function)
 
 (defun aj/mu4e-contact-process-function (c)
-  (unless (string-match-p (regexp-opt aj/mu4e-contacts-exclude-patterns) c)
+  (unless (string-match-p aj/mu4e-contacts-exclude-pattern c)
     c))
-
-
 #+end_src
 * Provide statement
 #+BEGIN_SRC emacs-lisp

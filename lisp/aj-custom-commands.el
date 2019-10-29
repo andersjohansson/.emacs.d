@@ -182,27 +182,24 @@ documentation for `ido-completing-read' for details on the
 other parameters."
   (let ((sentinel (or sentinel "*done*"))
         this-choice res done-reading)
-	;; uniquify the SENTINEL value
-	(while (cl-find sentinel choices)
-	  (setq sentinel (concat sentinel "_")))
-	(setq choices (cons sentinel choices))
-	;; read some choices
-	(while (not done-reading)
-	  (setq this-choice
+    ;; uniquify the SENTINEL value
+    (while (cl-find sentinel choices)
+      (setq sentinel (concat sentinel "_")))
+    (setq choices (cons sentinel choices))
+    ;; read some choices
+    (while (not done-reading)
+      (setq this-choice
             (helm-completing-read-default-1
              prompt choices predicate require-match initial-input hist def inherit-input-method
              name buffer nil t))
-	  (if (equal this-choice sentinel)
-		  (setq done-reading t)
-		(setq res (cons this-choice res))))
+      (if (equal this-choice sentinel)
+          (setq done-reading t)
+        (setq res (cons this-choice res))))
     ;; return the result
-	res))
+    res))
 
 
 ;;; sudo-edit
-
-;; (defvar find-file-root-history nil
-;;   "History list for files found using `find-file-root'.")
 
 ;;;###autoload
 (defvar aj/sudo-edit-hook nil

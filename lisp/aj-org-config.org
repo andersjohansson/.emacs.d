@@ -1719,102 +1719,106 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 
 *** Zotxt configuration :org_async:
 #+begin_src emacs-lisp
-  (use-package zotxt
-  	:straight (zotxt-emacs :host gitlab :repo "egh/zotxt-emacs"
-						   :fork (:host gitlab :repo "andersjohansson/zotxt-emacs"))
-	;; :load-path "~/kodat/elisp/zotxt-emacs/"
-	:custom (zotxt-default-bibliography-style "apa")
-	:config
-	(defconst zotxt-url-base
-	  "http://127.0.0.1:23200/zotxt"
-	  "Base URL to contact.")
-	:commands zotxt--json-read)
+(straight-use-package 'request) ;; TODO, dependency for zotxt. Fix!
+(straight-use-package 'deferred)
+(straight-use-package 'request-deferred)
 
-  (use-package org-pdcite
-	:straight nil
-	:load-path "~/kodat/elisp/org-pdcite"
-	:commands 'org-pdcite-full-cite-parser)
+(use-package zotxt
+  :straight (zotxt-emacs :host gitlab :repo "egh/zotxt-emacs"
+						 :fork (:host gitlab :repo "andersjohansson/zotxt-emacs"))
+  ;; :load-path "~/kodat/elisp/zotxt-emacs/"
+  :custom (zotxt-default-bibliography-style "apa")
+  :config
+  (defconst zotxt-url-base
+	"http://127.0.0.1:23200/zotxt"
+	"Base URL to contact.")
+  :commands zotxt--json-read)
 
-  (use-package zotxt-extra
-	:straight nil
-	:load-path "~/kodat/elisp/zotxt-extra"
-	:after zotxt
-	:demand t
-	:commands zotxt-extra-maybe-edit-description
-	zotxt-extra-link-parse-desc zotxt-extra--replace-consecutive
-	:config (zotxt-extra-complete-citation-help-echo-activate))
+(use-package org-pdcite
+  :straight nil
+  :load-path "~/kodat/elisp/org-pdcite"
+  :commands 'org-pdcite-full-cite-parser)
 
-  (defvar-local zotxt-helm-citation-files nil)
-  (put 'zotxt-helm-citation-files 'safe-local-variable
-	   #'orgqda--string-or-list-of-strings-p)
-  (use-package zotxt-helm
-	:straight nil
-	:after zotxt
-	:demand t
-	:init (setq zotxt-helm-method 'async)
-	:commands zotxt-helm-link-to-disp-real
-	:config
-	;; this could be added to zotxt-helm, but it’s depending so much on
-	;; orgqda and I don’t want to require or copy that to zotxt-helm
-	(require 'orgqda)
+(use-package zotxt-extra
+  :straight nil
+  :load-path "~/kodat/elisp/zotxt-extra"
+  :after zotxt
+  :demand t
+  :commands zotxt-extra-maybe-edit-description
+  zotxt-extra-link-parse-desc zotxt-extra--replace-consecutive
+  :config (zotxt-extra-complete-citation-help-echo-activate))
 
-	(defun zotxt-helm-get-current-refs ()
-	  (let* ((orgqda-tag-files zotxt-helm-citation-files)
-			 (manyfiles (and zotxt-helm-citation-files
-							 (orgqda-tag-files))))
-		(cl-remove-duplicates
-		 (if manyfiles
-			 (cl-loop for file in manyfiles
-					  append
-					  (orgqda--inhibit-org-startups
-					   (with-current-buffer (find-file-noselect file)
-						 (zotxt-helm-get-current-refs-in-buffer))))
-		   (zotxt-helm-get-current-refs-in-buffer))
-		 :test 'equal)))
+(defvar-local zotxt-helm-citation-files nil)
+(put 'zotxt-helm-citation-files 'safe-local-variable
+	 #'orgqda--string-or-list-of-strings-p)
+(use-package zotxt-helm
+  :straight nil
+  :after zotxt
+  :demand t
+  :init (setq zotxt-helm-method 'async)
+  :commands zotxt-helm-link-to-disp-real
+  :config
+  ;; this could be added to zotxt-helm, but it’s depending so much on
+  ;; orgqda and I don’t want to require or copy that to zotxt-helm
+  (require 'orgqda)
 
-	(defun zotxt-helm-get-current-refs-in-buffer ()
-	  (org-element-map
-		  (if zotxt-helm-current-refs-in-widened-buffer
-			  (save-restriction
-				(widen)
-				(org-element-parse-buffer))
-			(org-element-parse-buffer))
-		  'link #'zotxt-helm-link-to-disp-real)))
+  (defun zotxt-helm-get-current-refs ()
+	(let* ((orgqda-tag-files zotxt-helm-citation-files)
+		   (manyfiles (and zotxt-helm-citation-files
+						   (orgqda-tag-files))))
+	  (cl-remove-duplicates
+	   (if manyfiles
+		   (cl-loop for file in manyfiles
+					append
+					(orgqda--inhibit-org-startups
+					 (with-current-buffer (find-file-noselect file)
+					   (zotxt-helm-get-current-refs-in-buffer))))
+		 (zotxt-helm-get-current-refs-in-buffer))
+	   :test 'equal)))
 
-  (use-package org-zotxt
-	:straight nil
-	:commands org-zotxt-mode
-	:demand t
-	:delight "𝐙 "
-	:init (setq org-zotxt-link-description-style :betterbibtexkey)
-	:commands org-zotxt-extract-link-id-at-point org-zotxt-choose-path
-	:custom (org-zotxt-default-search-method :title-creator-year)
-	:config
-	;;prompt to add page references in quotes
-	(advice-add 'org-zotxt-insert-reference-link-to-item
-				:after #'zotxt-extra-maybe-edit-description)
+  (defun zotxt-helm-get-current-refs-in-buffer ()
+	(org-element-map
+		(if zotxt-helm-current-refs-in-widened-buffer
+			(save-restriction
+			  (widen)
+			  (org-element-parse-buffer))
+		  (org-element-parse-buffer))
+		'link #'zotxt-helm-link-to-disp-real)))
 
-	;; Special fontification, I often manipulate rows of references,
-	;; and then it’s useful to display the outer brackets, for easy
-	;; killing and yanking.
-	(org-link-set-parameters "zotero"
-							 :face 'org-scheduled
-							 :activate-func #'aj/org-zotxt-activate)
+(use-package org-zotxt
+  :straight nil
+  :commands org-zotxt-mode
+  :demand t
+  :delight "𝐙 "
+  :init (setq org-zotxt-link-description-style :betterbibtexkey)
+  :commands org-zotxt-extract-link-id-at-point org-zotxt-choose-path
+  :custom (org-zotxt-default-search-method :title-creator-year)
+  :config
+  ;;prompt to add page references in quotes
+  (advice-add 'org-zotxt-insert-reference-link-to-item
+			  :after #'zotxt-extra-maybe-edit-description)
 
-	(defun aj/org-zotxt-activate (start end _path bracketp)
-	  "Add text properties to display annotation links in a special way"
-	  (when bracketp
-		(save-match-data
-		  (save-excursion
-			(goto-char start)
-			(when (and (re-search-forward org-bracket-link-analytic-regexp end t)
-					   (match-end 4))
-			  (let ((bracket '(invisible nil))
-					(inv '(invisible t)))
-				(add-text-properties start (1+ start) bracket)
-				(add-text-properties end (1- end) bracket)
-				(add-text-properties (1+ start) (match-beginning 5) inv)
-				(add-text-properties (1- end) (- end 2) inv))))))))
+  ;; Special fontification, I often manipulate rows of references,
+  ;; and then it’s useful to display the outer brackets, for easy
+  ;; killing and yanking.
+  (org-link-set-parameters "zotero"
+						   :face 'org-scheduled
+						   :activate-func #'aj/org-zotxt-activate)
+
+  (defun aj/org-zotxt-activate (start end _path bracketp)
+	"Add text properties to display annotation links in a special way"
+	(when bracketp
+	  (save-match-data
+		(save-excursion
+		  (goto-char start)
+		  (when (and (re-search-forward org-bracket-link-analytic-regexp end t)
+					 (match-end 4))
+			(let ((bracket '(invisible nil))
+				  (inv '(invisible t)))
+			  (add-text-properties start (1+ start) bracket)
+			  (add-text-properties end (1- end) bracket)
+			  (add-text-properties (1+ start) (match-beginning 5) inv)
+			  (add-text-properties (1- end) (- end 2) inv))))))))
 #+end_src
 
 *** My own view attachment which parses page numbers and jumps to page
@@ -1855,6 +1859,8 @@ Also a function to get all annotations in a pdf file
                                           (org-element-property :contents-end ct))
         nil)))
 
+  (autoload 'pdf-zotxt-quote-get-all-annots-in-buffer-or-file "pdf-zotxt-quote")
+  
   (defun aj/get-zotxt-pdf-annotations ()
     (interactive)
     (let ((item-id (org-zotxt-extract-link-id-at-point)))

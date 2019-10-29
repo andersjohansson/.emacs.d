@@ -170,7 +170,7 @@ To be loaded [[*Load custom loaddefs][at the end of init]].
 (advice-add 'byte-compile-file :after #'aj/generate-loaddefs-after-byte-compile)
 #+END_SRC
 
-** Early settings
+** Early settings and loading
 *** garbage-collection settings
 Avoid garbage collection when initializing and in minibuffer.
 https://bling.github.io/blog/2016/01/18/why-are-you-changing-gc-cons-threshold/
@@ -259,11 +259,12 @@ Some variables are not suitable to keep in the init-file, I add these via custom
   (add-to-list 'load-path  "~/.emacs.d/lisp"))
 #+end_src
 
-*** Package-manager setup (use straight.el):org_async:
+*** Package-manager setup (use straight.el) :org_async:
 #+begin_src emacs-lisp
 (setq straight-use-package-by-default t
       straight-vc-git-default-clone-depth 1
-      straight-cache-autoloads t)
+      straight-cache-autoloads t
+      straight-repository-branch "develop")
 
 (defvar bootstrap-version)
 (let ((bootstrap-file
@@ -303,6 +304,67 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 
   (use-package delight
 	:demand t)
+#+end_src
+
+*** Hydra (used for definitions later on) :org_async:
+#+BEGIN_SRC emacs-lisp
+(use-package hydra
+  :demand t)
+#+END_SRC
+
+*** Activate org early :ARCHIVE:
+To get the fix for ~org-version~ from straight org needs to be activated early
+#+begin_src emacs-lisp
+(straight-use-package 'org)
+#+end_src
+*** Org init
+**** org init
+#+begin_src emacs-lisp
+(use-package org-re-reveal
+  :straight nil
+  :defer t
+  :load-path "~/kodat/elisp/org-re-reveal")
+
+(use-package org
+  :bind (("C-c a" . org-agenda) ("C-c c" . org-capture))
+  :commands org-mode
+  :defer t
+  :init
+  ;; (require 'org-protocol) ;; move to modules? autoload the entry commands (don’t seem to be)
+  (setq org-directory "~/org"
+        org-ellipsis " ⤵"
+        org-export-backends '(re-reveal beamer odt ascii html icalendar latex)
+        org-modules '(org-habit org-inlinetask org-mu4e org-id org-bullets org-pdfview)
+        org-list-allow-alphabetical t
+        org-id-link-to-org-use-id 'use-existing
+        org-agenda-files (expand-file-name "agenda-files" org-directory))
+  (defcustom aj/org-work-agenda-files nil
+    "Agenda files connected to work"
+    :group 'aj
+    :type '(repeat file))
+  :config
+  ;; (message "Laddade org")
+  ;; (load-library "helm-mode)"
+  (load-library "aj-org-config")
+  ;; (require 'helm-mode)
+  ;; (require 'aj-org-config)
+  )
+#+end_src
+**** org init async                             :org_async:no_default_tangle:
+#+begin_src emacs-lisp
+(use-package org
+  :demand t
+  :commands org-mode
+  :init (progn
+          (setq org-directory "~/org"
+                org-export-backends '(beamer odt ascii html icalendar latex)
+                org-modules '(org-inlinetask org-zotxt org-id)
+                org-list-allow-alphabetical t))
+  :config (require 'ox) (require 'aj-org-config-org-async))
+#+end_src
+*** Swallow
+#+begin_src emacs-lisp
+
 #+end_src
 
 *** No littering! :org_async:
@@ -349,11 +411,6 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 (setq x-gtk-use-system-tooltips t)
 #+end_src
 
-*** Hydra (used for definitions later on) :org_async:
-#+BEGIN_SRC emacs-lisp
-(use-package hydra
-  :demand t)
-#+END_SRC
 *** Center frame (used for helm)
 Code adapted from ime-frame
 #+begin_src emacs-lisp
@@ -384,6 +441,7 @@ of the box `(w h)' inside the box `(cw ch)'."
 
 #+end_src
 *** Helm
+**** Loading helm
 (Really too much in config section here. Should probably move it to another file)
 #+begin_src emacs-lisp
 (defcustom aj/shortened-helm-paths nil
@@ -399,6 +457,7 @@ Example of alist entry:
 (use-package helm
   :bind (("<f2>" . helm-imenu))
   :delight helm-mode
+  :defer 2
   :config
   (setq-default helm-command-prefix-key "C-c h")
   (require 'helm-config)
@@ -734,7 +793,7 @@ Different fuzzy search algorithm, is this needed?
       (delete-frame))))
 #+END_SRC
 **** TODO Utvärdera om vi borde använda helm-multi-files istället för att lägga allt i helm-mini
-**** COMMENT Helm omni-files, buffers, recentf :ARCHIVE:
+**** COMMENT Helm omni-files, buffers, recentf                      :ARCHIVE:
 
 #+BEGIN_SRC emacs-lisp
   (global-set-key (kbd "C-x C-b") 'aj/helm-omni-buffers)
@@ -782,7 +841,7 @@ Different fuzzy search algorithm, is this needed?
 #+END_SRC
 
 
-**** Helm-recoll :ARCHIVE:
+**** Helm-recoll                                                    :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package helm-recoll
   :commands helm-recoll
@@ -908,19 +967,18 @@ overriding it, but you should know before you do.
 #+end_src
 
 
-*** org-mode
-**** org init
+*** org-mode extra
+
+**** Things to load with org
+***** Stuff
 #+begin_src emacs-lisp
 ;;load local org-reveal
-(use-package org-re-reveal
-  :straight nil
-  :defer t
-  :load-path "~/kodat/elisp/org-re-reveal")
 
 ;; TODO, why here?
 (use-package orgqda
   :straight (:host gitlab :repo "andersjohansson/orgqda")
   :defer t
+  :after org
   :init (put 'orgqda-csv-dir 'safe-local-variable #'file-directory-p)
   :config (setq orgqda-exclude-tags
                 (append (mapcar #'car org-tag-persistent-alist)
@@ -938,54 +996,19 @@ overriding it, but you should know before you do.
 	("b" #'orgqda-collect-tagged-csv-save-all "Save all as csv"))
   (bind-key "C-c C-ö" 'aj/orgqda-hydra/body orgqda-mode-map))
 
-(use-package org-pomodoro)
-(use-package org-download)
-(use-package request-deferred)
+(use-package org-pomodoro
+  :after org)
+(use-package org-download
+  :after org)
+(straight-use-package 'request-deferred) ;; TODO, dep for zotxt, fix.
 
-(use-package org
-  :bind (("C-c a" . org-agenda) ("C-c c" . org-capture))
-  :commands org-mode
-  :defer t
-  :init
-  ;; (require 'org-protocol) ;; move to modules? autoload the entry commands (don’t seem to be)
-  (setq org-directory "~/org"
-        org-ellipsis " ⤵"
-        org-export-backends '(re-reveal beamer odt ascii html icalendar latex)
-        org-modules '(org-habit org-inlinetask org-mu4e org-id org-bullets org-pdfview)
-        org-list-allow-alphabetical t
-        org-id-link-to-org-use-id 'use-existing
-        org-agenda-files (expand-file-name "agenda-files" org-directory))
-  (defcustom aj/org-work-agenda-files nil
-    "Agenda files connected to work"
-    :group 'aj
-    :type '(repeat file))
-  :config
-  ;; (message "Laddade org")
-  (load-library "helm-mode")
-  (load-library "aj-org-config")
-  ;; (require 'helm-mode)
-  ;; (require 'aj-org-config)
-  )
 #+end_src
-**** org init async :org_async:no_default_tangle:
-#+begin_src emacs-lisp
-(use-package org
-  :demand t
-  :commands org-mode
-  :init (progn
-          (setq org-directory "~/org"
-                org-export-backends '(beamer odt ascii html icalendar latex)
-                org-modules '(org-inlinetask org-zotxt org-id)
-                org-list-allow-alphabetical t))
-  :config (require 'ox) (require 'aj-org-config-org-async))
-#+end_src
-**** Things to load with org
 ***** org-pdfview
 #+BEGIN_SRC emacs-lisp
 (use-package org-pdfview
   :after org)
 #+END_SRC
-**** org clock hydra
+***** org clock hydra
 #+BEGIN_SRC emacs-lisp
 (bind-key "C-c w" #'hydra-org-clock/body)
 ;; make byte-compiler happy?
@@ -1125,8 +1148,12 @@ Disable it for now.
   :bind ("C-x y" . elfeed)
   :config (add-hook 'elfeed-show-mode-hook #'visual-line-mode))
 
-;; just the split-pane part extracted from the elfeed-goodies package
+;;just the split-pane part extracted from the elfeed-goodies package
 ;; (use-package elfeed-goodies-split-pane
+;;   :straight (elfeed-goodies-split-pane
+;;              :host github
+;;              :repo "algernon/elfeed-goodies"
+;;              :files ("elfeed-goodies-split-pane.el"))
 ;;   :after elfeed
 ;;   :demand t
 ;;   :bind (:map elfeed-show-mode-map
@@ -1357,7 +1384,7 @@ Store visited directories in a list, make it accessible from helm
   (recentf-mode 1))
 #+end_src
 
-*** Zeitgeist
+*** Zeitgeist :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (use-package zeitgeist
   :straight nil
@@ -1862,7 +1889,73 @@ https://github.com/andersjohansson/tex-fold-linebreaks
   :config (cl-loop for x in beginend-modes do
                    (delight (cdr x) "" 'beginend)))
 #+END_SRC
+*** Buffer flip :ARCHIVE:
+#+begin_src emacs-lisp
+(use-package buffer-flip
+  :bind ("C-<tab>" . #'buffer-flip)
+  :init
+  ;; transient keymap used once cycling starts
+  (setq buffer-flip-map
+        (let ((map (make-sparse-keymap)))
+          (define-key map (kbd "C-<tab>")   'buffer-flip-forward) 
+          (define-key map (kbd "C-S-<iso-lefttab>") 'buffer-flip-backward)
+          (define-key map (kbd "ESC")     'buffer-flip-abort)
+          map))
+  (setq buffer-flip-skip-patterns helm-boring-buffer-regexp-list)
+  (with-eval-after-load "org-keys"
+    (bind-key "C-<tab>" nil org-mode-map)))
+#+end_src
+*** Med iflipb? :ARCHIVE:
+#+begin_src emacs-lisp
+(setq iflipb-wrap-around t)
+(setq iflipb-ignore-buffers helm-boring-buffer-regexp-list)
 
+(bind-key "C-§" #'iflipb-previous-buffer)
+(bind-key "C-½" #'iflipb-next-buffer)
+
+
+(defun aj/switch-to-other-buffer ()
+  (interactive)
+  (iflipb-next-buffer nil)
+  (aj/cycle-buffers/body))
+
+(bind-key "C-x C-b" #'aj/switch-to-other-buffer)
+
+(defhydra aj/cycle-buffers (:color red)
+  "Cycle buffers"
+  ("n" #'iflipb-next-buffer "Next buffer")
+  ("b" #'iflipb-previous-buffer "Previous buffer")
+  ("q" nil "Quit"))
+
+(setq iflipb-wrap-around t)
+#+end_src
+*** Flip buffers with nswbuff :ARCHIVE:
+#+begin_src emacs-lisp
+(use-package nswbuff)
+
+(setq nswbuff-exclude-buffer-regexps helm-boring-buffer-regexp-list
+      nswbuff-start-with-current-centered t
+      nswbuff-display-intermediate-buffers t
+      nswbuff-status-window-layout 'scroll)
+
+(set-face-attribute 'nswbuff-special-buffers-face nil :foreground nil :inherit 'shadow)
+(set-face-attribute 'nswbuff-current-buffer-face nil :foreground nil)
+(set-face-attribute 'nswbuff-separator-face nil :foreground nil :inherit 'shadow)
+
+
+(defun aj/switch-to-other-buffer ()
+  (interactive)
+  (nswbuff-switch-to-next-buffer)
+  (aj/cycle-buffers/body))
+
+(bind-key "C-x C-b" #'aj/switch-to-other-buffer)
+
+(defhydra aj/cycle-buffers (:color red)
+  "Cycle buffers"
+  ("n" #'nswbuff-switch-to-previous-buffer "Previous buffer")
+  ("b" #'nswbuff-switch-to-next-buffer "Next buffer")
+  ("q" nil "Quit"))
+#+end_src
 *** aj/switch-to-buffer
 #+BEGIN_SRC emacs-lisp
 (defun aj/switch-to-other-buffer ()
@@ -2038,7 +2131,8 @@ already narrowed."
   (declare (interactive-only))
   (cond ((and (buffer-narrowed-p) (not p)) (widen))
         ((and (boundp 'org-src-mode) org-src-mode (not p))
-         (org-edit-src-exit)) ;leave org-src, we don’t narrow there
+         (org-edit-src-exit)) ;leave org-src, we don’t narrow
+                                        ;automatically there
         ((region-active-p)
          (narrow-to-region (region-beginning) (region-end)))
         ((derived-mode-p 'org-mode)
@@ -2051,13 +2145,12 @@ already narrowed."
                (t (org-narrow-to-subtree))))
         (t (narrow-to-defun))))
 
-
-;; This line actually replaces Emacs' entire narrowing keymap, that's
-;; how much I like this command. Only copy it if that's what you want.
 (define-key ctl-x-map "n" #'aj/narrow-or-widen-dwim)
+(with-eval-after-load 'org-keys ; override three separate C-x n * bindings
+  (bind-key "C-x n" #'aj/narrow-or-widen-dwim org-mode-map))
 
 ;; For leaving org-src-edit, use C-c C-c, like magit-commit etc.
-(with-eval-after-load 'xhorg-src
+(with-eval-after-load 'org-src
   (define-key org-src-mode-map "\C-c\C-c" #'org-edit-src-exit))
 
 (defun aj/narrow-clone ()
@@ -2219,7 +2312,7 @@ already narrowed."
               #'aj/undo-tree-compress))
 #+end_src
 
-** Magit
+** Version control, git and magit
 *** Magit config
 #+begin_src emacs-lisp
 (use-package magit
@@ -2243,7 +2336,11 @@ already narrowed."
   :commands magit-todos-mode
   :config (magit-todos-mode t))
 #+end_src
-
+*** forge
+#+begin_src emacs-lisp
+(use-package forge
+  :after magit)
+#+end_src
 *** Use visual-line-mode in magit for repositories with mostly prose text
 #+BEGIN_SRC emacs-lisp
 (defvar-local aj/magit-visual-line-mode nil
@@ -2278,6 +2375,11 @@ already narrowed."
                 (list (cons default-directory (point-min-marker))))))
 
 #+END_SRC
+
+*** git-timemachine
+#+begin_src emacs-lisp
+(use-package git-timemachine)
+#+end_src
 ** visible-bookmarks (bm)
 #+begin_src emacs-lisp
 (use-package bm
@@ -2316,18 +2418,16 @@ already narrowed."
 
 ** New (custom) utility commands
 #+begin_src emacs-lisp
-(use-package request) ;; TODO, fixa som dep för aj-custom-commands
-(use-package xah-replace-pairs)
 (use-package aj-custom-commands
-  :straight nil
-  :demand t ;; TODO fixa autoloads
+  :straight (aj-custom-commands :repo "/home/aj/kodat/elisp/aj-custom-commands/" :host nil)
+  :defer t
   :bind (("C-x C-k" . aj/delete-current-buffer-file)
          ("C-x C-r" . aj/rename-current-buffer-file)
          ("C-S-<return>" . ergoemacs-open-in-external-app)
          ("C-c m" . aj/message-peek))
   :init (bind-key "C-a" 'aj/beginning-or-indentation prog-mode-map)
   (with-eval-after-load "dired"
-    (bind-key "<s-return>" 'sudo-edit-current-file dired-mode-map)))
+    (bind-key "<s-return>" #'aj/sudo-edit dired-mode-map)))
 #+end_src
 
 ** Editing. Marking, killing, yanking, etc.
@@ -2363,7 +2463,7 @@ Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
   (aj/vhl-face)
   (add-hook 'aj/face-definitions-hook #'aj/vhl-face))
 #+END_SRC
-*** [[https://github.com/rejeep/drag-stuff.el][Drag stuff]]
+*** [[https://github.com/rejeep/drag-stuff.el][Drag stuff]] :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (use-package drag-stuff
   :delight drag-stuff-mode
@@ -2387,7 +2487,7 @@ Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
   :bind ("C-ä" . er/expand-region))
 #+end_src
 
-*** Join line is my favourite command
+*** Join line to following is my favourite command
 #+begin_src emacs-lisp
 (bind-key "M-j" #'aj/join-following)  ;; no use for comment-indent-new-line
 (defun aj/join-following ()
@@ -2398,6 +2498,14 @@ Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
 *** cycle-spacing
 #+begin_src emacs-lisp
 (global-set-key (kbd "S-SPC") 'cycle-spacing)
+#+end_src
+
+*** hungry-delete                                                   :ARCHIVE:
+Deleting a whitespace character deletes all whitespace up till non ws
+#+begin_src emacs-lisp
+(use-package hungry-delete
+  :demand t
+  :config (global-hungry-delete-mode))
 #+end_src
 
 ** Various key binding customizations
@@ -2648,8 +2756,9 @@ non-empty directories is allowed."
   (interactive "P")
   (dired-internal-do-deletions
    ;; this may move point if ARG is an integer
-   (dired-map-over-marks (cons (dired-get-filename) (point))
-						 arg)
+   (nreverse
+    (dired-map-over-marks (cons (dired-get-filename) (point))
+                          arg))
    arg nil))
 
 (eval-after-load 'dired
@@ -2662,6 +2771,47 @@ non-empty directories is allowed."
   (interactive)
   (dired (concat (or (getenv "XDG_DATA_HOME") "~/.local/share") "/Trash/files"))
   (setq-local delete-by-moving-to-trash nil))
+
+(defun aj/dired-restore-from-trash (&optional arg)
+  "Restore marked (or next ARG) files in dired from Trash.
+
+Only works with XDG trash dir."
+  (interactive "P")
+  (let* ((xdg-data-dir ;; these variables copied from ‘move-file-to-trash’
+          (directory-file-name
+           (expand-file-name "Trash"
+                             (or (getenv "XDG_DATA_HOME")
+                                 "~/.local/share"))))
+         (trash-files-dir (expand-file-name "files" xdg-data-dir))
+         (trash-info-dir (expand-file-name "info" xdg-data-dir)))
+
+    (cl-loop for file in (dired-map-over-marks (dired-get-filename) arg)
+             if (string-prefix-p trash-files-dir file) do
+             (if-let ((trashinfo (expand-file-name
+                                  (concat (file-name-nondirectory file)
+                                          ".trashinfo")
+                                  trash-info-dir))
+                      (restorepath (with-temp-buffer
+                                     (save-match-data
+                                       (insert-file-contents trashinfo)
+                                       (when (search-forward-regexp "^Path=\\(.+\\)$")
+                                         (decode-coding-string
+                                          (url-unhex-string (match-string 1))
+                                          'utf-8 t)
+                                         )))))
+                 (when (y-or-n-p
+                        (format "Restore %s → %s" (file-name-nondirectory file) restorepath))
+                   (dired-rename-file file restorepath t)
+                   (delete-file trashinfo))
+               (user-error "Couldn’t find path to restore to."))
+             else do (user-error "Can only restore files in trash dir"))))
+
+(defun aj/dired-trash-remove (&optional arg)
+  "Remove marked (or next ARG) files from trash using the trash-rm program."
+  (interactive "P")
+  (cl-loop for file in (dired-map-over-marks (dired-get-filename) arg) do
+           (shell-command (format "trash-rm %s" (file-name-nondirectory file)))
+           (dired-remove-file file)))
 #+END_SRC
 
 *** Fix ediff locale
@@ -3512,7 +3662,7 @@ For doing smart (curly) quotes, mainly in mails since org has it’s own mechani
 #+END_SRC
 
 *** Word lookups (definition, translation, synonyms). Use define-word for online word definitions and SDCV for Webster's dictionary installed locally
-My extra libraries can be found at:  https://gitlab.com/andersjohansson/define-word-thesaurus and  https://gitlab.com/andersjohansson/definew-word-tyda.
+My extra libraries can be found at:  https://gitlab.com/andersjohansson/define-word-thesaurus and  https://gitlab.com/andersjohansson/define-word-tyda.
 
 Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_now_using_the_right_dictionary
 
@@ -3522,12 +3672,12 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
   :commands (define-word define-word-at-point))
 
 (use-package define-word-thesaurus
-  :straight (:host gitlab :repo "andersjohansson/define-word-thesaurus")
-  ;; :load-path "~/kodat/elisp/define-word-thesaurus/"
+  :straight (:host gitlab
+                   :repo "andersjohansson/define-word-thesaurus"
+                   :files ("*.el" "*.py"))
   :after define-word)
 (use-package define-word-tyda
   :straight (:host gitlab :repo "andersjohansson/define-word-tyda")
-  ;; :load-path "~/kodat/elisp/define-word-tyda/"
   :after define-word)
 ;; (use-package define-word-synonymer
 ;;   :load-path "~/kodat/elisp/define-word-tyda/"
@@ -3544,9 +3694,8 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
 (use-package synosaurus
   ;; :pin "melpa"
   :commands (synosaurus-lookup synosaurus-choose-and-replace)
-  :init
-  ;; this means completing-read, which gives me helm completion
-  (setq synosaurus-choose-method 'default))
+  :custom (synosaurus-choose-method 'default) ; this means completing-read, which gives me helm completion
+  )
 
 (defhydra hydra-word-lookup
   (:color blue)
@@ -3565,20 +3714,21 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
 
 (bind-key "C-x l"  #'hydra-word-lookup/body)
 #+END_SRC
-** Special modes
+** Special modes 
 *** Spotify
 #+begin_src emacs-lisp
 (use-package spotify
+  :straight (spotify :host github :repo "danielfm/spotify.el" :files ("*.el" "*.py"))
   :defer t
   :custom
   (spotify-transport 'connect)
   (spotify-api-locale "sv_SE")
   (spotify-api-country "SE")
-  (spotify-mode-line-format  " %p %a: %t ")
+  (spotify-player-status-format " %p %a: %t ")
   :config
-  (setq spotify-mode-line-playing-text (all-the-icons-faicon "play-circle" :v-adjust 0.01)
-        spotify-mode-line-paused-text (all-the-icons-faicon "pause-circle" :v-adjust 0.01)
-        spotify-mode-line-stopped-text (all-the-icons-faicon "stop-circle" :v-adjust 0.01)))
+  (setq spotify-player-status-playing-text (all-the-icons-faicon "play-circle" :v-adjust 0.01)
+        spotify-player-status-paused-text (all-the-icons-faicon "pause-circle" :v-adjust 0.01)
+        spotify-player-status-stopped-text (all-the-icons-faicon "stop-circle" :v-adjust 0.01)))
 #+end_src
 *** Extra definitions for ~auto-mode-alist~
 #+begin_src emacs-lisp
@@ -3828,7 +3978,6 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 #+BEGIN_SRC emacs-lisp
 (use-package eldoc-eval)
 (use-package doom-modeline
-  ;;:pin "melpa"
   :defer t
   :hook (after-init . doom-modeline-mode)
   :custom
@@ -4441,7 +4590,6 @@ I use my fork, available here: https://github.com/andersjohansson/mplayer-mode/t
 *** orgqda
 Available at: https://github.com/andersjohansson/orgqda
 #+BEGIN_SRC emacs-lisp
-
 (use-package orgqda-helm-tags
   :straight nil
   :after orgqda
