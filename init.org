@@ -3731,6 +3731,7 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
   (spotify-api-locale "sv_SE")
   (spotify-api-country "SE")
   (spotify-player-status-format " %p %a: %t ")
+  (spotify-api-search-limit 100)
   :config
   (setq spotify-player-status-playing-text (all-the-icons-faicon "play-circle" :v-adjust 0.01)
         spotify-player-status-paused-text (all-the-icons-faicon "pause-circle" :v-adjust 0.01)
