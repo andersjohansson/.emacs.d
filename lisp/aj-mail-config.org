@@ -254,20 +254,11 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 		   ("S" . mu4e-query-helper-search-edit)))
 #+END_SRC
 
-** View mode settings
-#+BEGIN_SRC emacs-lisp
-(add-hook 'mu4e-view-mode-hook #'visual-line-mode)
-(add-hook 'mu4e-view-mode-hook #'variable-pitch-mode)
-(require 'mu4e-contrib)
-;; (add-to-list 'mu4e-view-actions '("Webkit-widget" . mu4e-action-view-with-xwidget))
-(setq mu4e-html2text-command 'mu4e-shr2text)
-#+END_SRC
-
-** Conversation-view
+*** Conversation-view
 #+BEGIN_SRC emacs-lisp
 (use-package mu4e-conversation
   :load-path "~/kodat/elisp/mu4e-conversation"
-  :init (bind-key "C-<return>" #'mu4e-conversation 'mu4e-headers-mode-map)
+  :init (bind-key "C-<return>" #'mu4e-conversation mu4e-headers-mode-map)
   :config
   (set-face-attribute 'mu4e-conversation-header nil :foreground
                       nil :background nil :inherit 'magit-branch-current)
@@ -281,6 +272,15 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
   (set-face-attribute 'mu4e-conversation-sender-8 nil :inherit 'org-level-8))
 
 #+END_SRC
+** View mode settings
+#+BEGIN_SRC emacs-lisp
+(add-hook 'mu4e-view-mode-hook #'visual-line-mode)
+(add-hook 'mu4e-view-mode-hook #'variable-pitch-mode)
+(require 'mu4e-contrib)
+;; (add-to-list 'mu4e-view-actions '("Webkit-widget" . mu4e-action-view-with-xwidget))
+(setq mu4e-html2text-command 'mu4e-shr2text)
+#+END_SRC
+
 ** Command for quick check of new mails
 #+BEGIN_SRC emacs-lisp
 ;;(defvar aj/mu4e-get-mail-command-quick "mbsync --new -qq uu-inbox gmail-inbox ajf-inbox")
