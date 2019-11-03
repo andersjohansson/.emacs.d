@@ -898,19 +898,22 @@ That is, always create a new buffer. (Is there anything more changed?)
                 org-download-image-dir "./bilder"))
 
 #+END_SRC
-** File-associations :org_async:
+** File-associations, opening links externally :org_async:
 #+BEGIN_SRC emacs-lisp
 (add-to-list 'org-file-apps '("\\.pdf\\'" . emacs)) ; open pdfs in emacs
 ;;use xdg-open instead of mailcap
 ;; this won’t work in a real console, but I won’t open files from org in a real console
 (setq org-file-apps-defaults-gnu '((remote . emacs) (system . "aj-open %s") (t . "aj-open %s")))
 
-;; what’s the point of this?
+;; disassociates started processes so they wont get killed if emacs is killed.
 (advice-add 'org-open-file :around  #'aj/org-open-file-around-advice)
 (defun aj/org-open-file-around-advice (fn &rest args)
   "Set `process-connection-type' to nil"
   (let ((process-connection-type nil))
     (apply fn args)))
+
+(defun aj/org-open-file-with-system (path)
+  (org-open-file path 'system))
 #+END_SRC
 
 ** Local variables headings
@@ -991,9 +994,9 @@ A local variables comment block that is placed at the end of the file may be los
   :custom (helm-org-format-outline-path t)
   :commands helm-org-goto-marker
   :bind (:map org-mode-map
-          ("<f2>" . helm-org-in-buffer-headings)
-          :map helm-org-headings-map
-          ("C-c C-x b" . helm-org-run-open-heading-in-indirect-buffer))
+              ("<f2>" . helm-org-in-buffer-headings)
+              :map helm-org-headings-map
+              ("C-c C-x b" . helm-org-run-open-heading-in-indirect-buffer))
   :config
   (advice-add 'helm-org-insert-link-to-heading-at-marker :override
               #'aj/helm-org-insert-link-to-heading-at-marker)
@@ -1010,7 +1013,7 @@ Uses CUSTOM_ID or `org-store-link' for linking."
                   (file-name (buffer-file-name)))
               (setq link
                     (if custom-id
-                        (org-make-link-string
+                        (org-link-make-string
                          (if (string= (with-helm-current-buffer
                                         (buffer-file-name))
                                       file-name)
@@ -1487,8 +1490,8 @@ I keep some notes for papers in org-mode, but sort my papers in Zotero. With thi
                  :function aj/org-resolve-link))
 
   (defun aj/org-resolve-link (plist)
-    (org-open-link-from-string
-     (org-make-link-string (plist-get plist :link))))
+    (org-link-open-from-string
+     (org-link-make-string (plist-get plist :link))))
 
   (defun aj/get-org-protocol-link ()
     (format "org-protocol://link?link=id:%s" (org-id-get-create)))
@@ -1645,12 +1648,7 @@ List of prefix strings or regex."
 
 
   ;; following should just edit!
-  (org-link-set-parameters "note" :follow #'aj/org-annotate-edit)
-
-  (defun aj/org-annotate-edit (_linkstring)
-    (let ((org-link-escape-chars nil))
-      (org-insert-link)))
-
+  (org-link-set-parameters "note" :follow #'org-insert-link)
 
   ;; ascii-export
   (defvar org-annotate-ascii-export-function #'aj/org-annotate-export-ascii)
@@ -1811,13 +1809,13 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 	  (save-match-data
 		(save-excursion
 		  (goto-char start)
-		  (when (and (re-search-forward org-bracket-link-analytic-regexp end t)
-					 (match-end 4))
+		  (when (and (looking-at org-link-bracket-re)
+					 (match-end 2))
 			(let ((bracket '(invisible nil))
 				  (inv '(invisible t)))
 			  (add-text-properties start (1+ start) bracket)
 			  (add-text-properties end (1- end) bracket)
-			  (add-text-properties (1+ start) (match-beginning 5) inv)
+			  (add-text-properties (1+ start) (match-beginning 2) inv)
 			  (add-text-properties (1- end) (- end 2) inv))))))))
 #+end_src
 
@@ -1926,7 +1924,7 @@ Mostly for html and reveal
 (org-link-set-parameters "video"
                          :export #'aj/org-video-export
                          :complete #'aj/org-video-complete-link
-                         :follow #'org-open-file-with-system)
+                         :follow #'aj/org-open-file-with-system)
 
 (defun aj/org-video-export (path desc backend)
   (let ((sources (split-string path "::" t)))
@@ -2227,7 +2225,7 @@ is defined for the subtree during org subtree export."
 (defun aj/org-complete-link (rep)
   "Helper function to enable correct handling of relative/absolute
 paths also for links of special types."
-  (let ((link (org-file-complete-link)))
+  (let ((link (org-link-complete-file)))
     (when (string-match "^\\(file:\\)\\(.*\\)" link)
       (let* ((type (match-string 1 link))
              (origpath (match-string 2 link))
@@ -3016,6 +3014,7 @@ hacks working for async)"
 
 (autoload #'TeX-command "tex-buf")
 (defvar aj/org-export-tex-auctex-curr-file nil)
+(defvar TeX-master)
 
 (defun aj/org-export-tex-auctex-run-tex (file)
   (setq aj/org-export-tex-auctex-curr-file file) ; stupid
@@ -3131,7 +3130,7 @@ hacks working for async)"
   (aj/org-complete-link "vframe:"))
 
 (org-link-set-parameters "vframe"
-                         :follow #'org-open-file-with-system
+                         :follow #'aj/org-open-file-with-system
                          :export #'org-vframe-export-handler
                          :complete #'org-vframe-complete-link)
 #+end_src
@@ -3154,7 +3153,7 @@ hacks working for async)"
   (aj/org-complete-link "bfimg:"))
 
 (org-link-set-parameters "bfimg"
-                         :follow #'org-open-file-with-system
+                         :follow #'aj/org-open-file-with-system
                          :export #'org-bfimg-export-handler
                          :complete #'org-bfimg-complete-link)
 #+end_src
@@ -3820,20 +3819,17 @@ This one is based on regex walking and skipping though. And that is quite fast.
               ("C-c C-=" . org-wc-display)))
 #+END_SRC
 
-** org-outline-numbering
-Small mode for showing a numbered outline as overlays at beginning of headlines.
+** org-num-mode -- overlays for numbering outlines
+Org 9.3 introduces a brilliant real-time solution for numbering outlines while editing.
+
+Previous, slow solution:
 https://gitlab.com/andersjohansson/org-outline-numbering
-Adapted from code posted by John Kitchin at: https://emacs.stackexchange.com/a/32422
-
-See also the amazing real-time overlay solution posted here:
-https://lists.gnu.org/archive/html/emacs-orgmode/2018-11/msg00015.html
-
 #+BEGIN_SRC emacs-lisp
-(use-package org-outline-numbering
-  :straight (:host gitlab :repo "andersjohansson/org-outline-numbering")
-  ;; :load-path "~/kodat/elisp/org-outline-numbering"
-  :init (setq org-outline-numbering-ignored-tags
-              '("ignoreheading" "ignoreheadinglocal")))
+(use-package org-num
+  :straight nil
+  :custom (org-num-skip-tags '("ignoreheading" "ignoreheadinglocal" "ARCHIVE"))
+  (org-num-skip-unnumbered t)
+  (org-num-skip-commented t))
 #+END_SRC
 
 ** Open org links with alternate programs :ARCHIVE:

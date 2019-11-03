@@ -2146,8 +2146,14 @@ already narrowed."
         (t (narrow-to-defun))))
 
 (define-key ctl-x-map "n" #'aj/narrow-or-widen-dwim)
-(with-eval-after-load 'org-keys ; override three separate C-x n * bindings
-  (bind-key "C-x n" #'aj/narrow-or-widen-dwim org-mode-map))
+(with-eval-after-load 'org-keys
+  ;; override three separate C-x n * bindings
+  (bind-keys :map org-mode-map
+             ("C-x n s" . nil)
+             ("C-x n b" . nil)
+             ("C-x n e" . nil)
+             ("C-x n" . aj/narrow-or-widen-dwim)))
+;; (unbind-key "C-x n" org-mode-map)
 
 ;; For leaving org-src-edit, use C-c C-c, like magit-commit etc.
 (with-eval-after-load 'org-src
