@@ -1113,7 +1113,7 @@ Use mu4e, the extensive config is in an [[file:lisp/aj-mail-config.org][external
 		   ("C-x i" . mu4e~headers-jump-to-maildir)
 		   ("C-x å" . mu4e-headers-search-bookmark))
 	:defer 10
-	:init (setq mu4e-get-mail-command "mailsync" ; bash script running 3 offlineimap
+	:init (setq mu4e-get-mail-command "aj-mailsync" ; bash script running 3 offlineimap
 				mu4e-update-interval 1800
 				mu4e-view-show-images t
 				mu4e-use-fancy-chars t
@@ -2818,7 +2818,7 @@ Only works with XDG trash dir."
 ediff expects diff to return results in C-locale, I’ve made a wrapper script
 (it’s: ~LANG=C diff "$1" "$2"~) to solve this.
 #+begin_src emacs-lisp
-(setq ediff-diff-program "diff-no-locale")
+(setq ediff-diff-program "aj-diff-no-locale")
 #+end_src
 
 

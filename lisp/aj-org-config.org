@@ -504,7 +504,7 @@ Downloads and converts ics-files from google calendar (where I keep my appointme
     (let ((mtime (nth 5 (file-attributes "~/org/imp/J-allmänt.org"))))
       (when (or force (not mtime)
                 (< 0.2 (time-to-number-of-days (time-subtract (current-time) mtime))))
-        (call-process "gcal-to-org")))))
+        (call-process "aj-gcal-to-org")))))
 
 (add-hook 'org-finalize-agenda-hook 'aj/org-update-gcal)
 
@@ -2087,7 +2087,8 @@ Mostly for html and reveal
 (cl-defun aj/org-reveal-try-server-start (&key _data &allow-other-keys)
   (let ((proc
          (start-process "revealserver"
-                        (generate-new-buffer "revealserver") "startreveal")))
+                        (generate-new-buffer "revealserver")
+                        "aj-startreveal")))
     ;; (sleep-for 3)
     (set-process-filter
      proc

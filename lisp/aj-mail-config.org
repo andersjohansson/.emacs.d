@@ -284,7 +284,7 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 ** Command for quick check of new mails
 #+BEGIN_SRC emacs-lisp
 ;;(defvar aj/mu4e-get-mail-command-quick "mbsync --new -qq uu-inbox gmail-inbox ajf-inbox")
-(defvar aj/mu4e-get-mail-command-quick "mailsync-quick")
+(defvar aj/mu4e-get-mail-command-quick "aj-mailsync-quick")
 
 (defun aj/mu4e-update-mail-and-index (full?)
   (interactive "P")
