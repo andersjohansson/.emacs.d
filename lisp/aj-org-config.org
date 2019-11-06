@@ -1556,7 +1556,7 @@ Can be passed any ox BACKEND in a non-interactive call"
               ("C-c C-Ä" . org-annotate-delete-note)
               ("C-c C-x C-ä" . org-annotate-display-notes))
   :custom
-  (org-annotate-special-brackets '("╣" "║" "╠"))
+  (org-annotate-special-brackets '("{" ":" "}"))
   ;; functions defined below
   (org-annotate-latex-export-function #'aj/org-annotate-export-latex-fixme-and-inline)
   (org-annotate-odt-export-function #'aj/org-annotate-export-odt-annotation-or-inline)
