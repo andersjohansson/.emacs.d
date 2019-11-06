@@ -3217,10 +3217,12 @@ I’m trying out ox-reveal, but they have different ways of adding notes (subtre
 ;; (bind-key "C-M-c C-M-e" #'aj/org-export-no-sections org-mode-map)
 #+end_src
 
-*** Export parent subtree
+*** TODO Export parent subtree :ARCHIVE:
 :PROPERTIES:
 :CUSTOM_ID: parent-subtree
 :END:
+
+This needs to be updated using ~org-num~ (check numbering in overlays). Until I need it, disable.
 
 #+BEGIN_SRC emacs-lisp
 ;; this one is what I most often want
@@ -3295,16 +3297,16 @@ is defined the subtree during org subtree export."
 ;; hack for that now.
 
 (defun aj/org-get-current-hl-numbering ()
-  (let ((outline-active org-outline-numbering-mode))
+  (let ((outline-active org-num-mode))
     (unwind-protect
         (progn
-          (org-outline-numbering-mode 1)
-          (when-let ((ov (car (overlays-at (point))))
-                     (nh (overlay-get ov 'numbered-heading))
+          (org-num-mode 1)
+          (when-let ((ov (nth 1 (overlays-in (point) (point-at-eol))))
+                     (nh (overlay-get ov 'org-num))
                      (num (overlay-get ov 'display)))
             (split-string num "\\." t "[[:space:]]+")))
       (unless outline-active
-        (org-outline-numbering-mode -1)))))
+        (org-num-mode -1)))))
 
 (defvar aj/org-latex-numbering-start '("1"))
 
