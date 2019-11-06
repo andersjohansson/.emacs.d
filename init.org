@@ -3674,7 +3674,6 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
 
 #+BEGIN_SRC emacs-lisp
 (use-package define-word
-  ;; :load-path "~/kodat/elisp/define-word/"
   :commands (define-word define-word-at-point))
 
 (use-package define-word-thesaurus
@@ -3747,7 +3746,6 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
 pdf-loader handles deferred loading. Then settings are applied after loading pdf-view
 #+BEGIN_SRC emacs-lisp
 (use-package pdf-tools
-  ;; :load-path "~/kodat/elisp/pdf-tools/"
   :commands pdf-loader-install ;; TODO (fel?)
   :init (pdf-loader-install))
 
