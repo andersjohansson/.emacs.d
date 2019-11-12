@@ -3283,7 +3283,7 @@ In the abbrev-file I have defined two tables to use as parents of ~text-mode-abb
 
 I also define abbrevs for english which expand "dont" to "do not" etc. in the table ~aj/formal-english-abbrevs~. This is activated via the minor mode ~aj/formal-english-minor-mode~.
 
-Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t seem to preserve properties. Therefore properties are added below.
+Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t seem to preserve properties. Therefore properties are added below (Some of this will be fixed in 27.1).
 #+BEGIN_SRC emacs-lisp
 (use-package abbrev
   :straight nil
