@@ -3435,7 +3435,9 @@ Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t
   ("q" nil))
 
 (defun aj/ispell-change-dictionary (dict)
+  "Change dictionary, enable ‘flyspell-mode’, disable ‘guess-language-mode’"
   (ispell-change-dictionary dict)
+  (flyspell-mode)
   (guess-language-mode -1))
 
 (defun aj/disable-enable-flyspell-permanently-in-file ()
@@ -3458,9 +3460,8 @@ Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t
                       "Dictionary: "
                       (mapcar #'car ispell-dictionary-alist))))
   (save-excursion
-    (ispell-change-dictionary dict)
-    (add-file-local-variable 'ispell-local-dictionary dict)
-    (guess-language-mode -1)))
+    (aj/ispell-change-dictionary dict)
+    (add-file-local-variable 'ispell-local-dictionary dict)))
 
 (advice-add 'ispell-change-dictionary :after #'aj/ispell-change-dictionary-merge-personal)
 
