@@ -2343,6 +2343,24 @@ already narrowed."
   :commands magit-todos-mode
   :config (magit-todos-mode t))
 #+end_src
+*** Display tracked files
+Sometimes I want to see what is tracked in a repository.
+Define this as a global minor mode which adds a section in the magit status buffer (global because it seemed buggy to modify local value of ~magit-status-sections-hook~).  Inspired by magit-todos mode definition.
+
+~j t~ (default magit binding) jumps to the section of tracked files.
+#+begin_src emacs-lisp
+(define-minor-mode magit-tracked-files-mode
+  "Show list of tracked files in magit status buffer"
+  nil
+  :global t
+  (if magit-tracked-files-mode
+      (magit-add-section-hook 'magit-status-sections-hook
+                              #'magit-insert-tracked-files
+                              nil
+                              'append)
+    (remove-hook 'magit-status-sections-hook #'magit-insert-tracked-files))
+  (magit-refresh))
+#+end_src
 *** forge
 #+begin_src emacs-lisp
 (use-package forge
