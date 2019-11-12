@@ -2031,6 +2031,8 @@ Mostly for html and reveal
 (with-eval-after-load "savehist" (add-to-list 'savehist-additional-variables 'aj/org-reveal-last-url))
 (defvar aj/org-reveal-current-file nil)
 (defvar aj/org-reveal-current-slide-id nil)
+(defvar-local aj/org-reveal-url-parameters "")
+(put 'aj/org-reveal-url-parameters 'safe-local-variable #'stringp)
 
 (defun aj/org-reveal-export-to-html-link-and-browse (&optional async subtreep visible-only body-only ext-plist)
   "Export current buffer to a reveal.js, launch server and browse file"
@@ -2052,6 +2054,7 @@ Mostly for html and reveal
            aj/org-reveal-current-url
            (concat aj/revealjs-base-url (file-name-nondirectory (directory-file-name (file-name-directory aj/org-reveal-current-file)))
                    "/" (file-name-nondirectory aj/org-reveal-current-file)
+                   aj/org-reveal-url-parameters
                    (when aj/org-reveal-current-slide-id
                      (concat "#slide-" aj/org-reveal-current-slide-id)))
            aj/org-reveal-last-url aj/org-reveal-current-url)
