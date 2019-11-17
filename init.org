@@ -3899,7 +3899,7 @@ https://gitlab.com/andersjohansson/pdf-zotxt-quote
   (delight 'pdf-zotxt-quote-mode (all-the-icons-material "format_quote" :v-adjust 0) t))
 #+END_SRC
 
-** Various display customizations
+** Display customizations: theme, modeline, etc.
 *** Variable pitch
 I want to use variable pitch for most things. But changing the default face to a variable pitch font is not a good idea, since so many tabular modes etc. depend on a monospace font. Setting it for ~prog-mode~, ~text-mode~ and in the modeline is good though.
 
@@ -4335,6 +4335,7 @@ Also runs hook aj/face-definitions-hook."
 
     (with-eval-after-load 'org-faces
 
+      (set-face-attribute 'org-document-title nil :height 1.5 :weight 'bold)
       (set-face-attribute 'org-meta-line nil :inherit 'org-drawer)
 
       (set-face-attribute 'org-block-begin-line nil :height 0.9)
