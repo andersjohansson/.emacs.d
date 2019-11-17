@@ -400,6 +400,7 @@ To get the fix for ~org-version~ from straight org needs to be activated early
                   shell-command-history))
 (savehist-mode)
 #+END_SRC
+
 *** Tooltip-mode
 #+begin_src emacs-lisp
 (tooltip-mode t)
@@ -1157,7 +1158,7 @@ Disable it for now.
 ;;         elfeed-show-entry-delete #'elfeed-goodies/delete-pane))
 
 #+END_SRC
-** Unfixed dependencies
+** TODO Unfixed dependencies
 #+BEGIN_SRC emacs-lisp
 (use-package dash-functional)
 #+END_SRC
@@ -1416,33 +1417,6 @@ This works for instance in ~dired-do-rename~ or ~mu4e-view-save-attachment~ (als
 
 (add-hook 'find-file-hook 'aj/ff-mkdir)
 (add-hook 'before-save-hook 'aj/ff-mkdir)
-#+end_src
-
-
-*** Auto reverting
-#+begin_src emacs-lisp
-(global-auto-revert-mode t)
-;; Don't update pdfs in process of being built though:
-(setq global-auto-revert-ignore-modes '(pdf-view-mode))
-;; why ever query if not changed?
-(setq revert-without-query '(".*"))
-;; Also auto refresh dired, but be quiet about it
-(setq global-auto-revert-non-file-buffers t)
-(setq auto-revert-verbose nil)
-;; I’m always on a reasonable system
-(setq auto-revert-use-notify t)
-#+end_src
-
-A function for reverting all opened files, even remote files (because auto-revert doesn’t work there)
-#+begin_src emacs-lisp
-(defun aj/revert-all-buffers ()
-  "Refreshes all open buffers from their respective files."
-  (interactive)
-  (dolist (buf (buffer-list))
-	(with-current-buffer buf
-	  (when (and (buffer-file-name) (not (buffer-modified-p)))
-		(revert-buffer t t t) )))
-  (message "Refreshed open files."))
 #+end_src
 
 ** Password-store
@@ -4751,6 +4725,95 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
     (set-frame-parameter nil 'top 0))
 
   (add-hook 'after-init-hook #'aj/frame-to-left))
+#+end_src
+
+** Auto-saving and reverting
+*** Auto-saving of all buffers in visited files
+Inspired by https://github.com/grettke/lolsmacs, it’s better to not keep inconsistent state in non-saved buffers. Especially since Emacs or my computer crashes from time to time.
+
+#+begin_src emacs-lisp
+(setq auto-save-default nil)
+(auto-save-visited-mode)
+
+;; also auto-save on various hooks
+
+(defvar aj/save-all-buffers-hooks
+  (append
+   '(focus-out-hook mouse-leave-buffer-hook kill-emacs-hook suspend-hook))
+  "When they run save all file buffers.")
+(defvar aj/save-current-buffer-before-functions
+  (append
+   '(tex-compile vc-diff vc-next-action vc-revert))
+  "Before they run save the buffer.")
+(defvar aj/save-all-buffers-before-functions
+  (append
+   '(dired eshell grep ibuffer shell tex-compile)
+   '(compile ns-do-hide-emacs goto-line)
+   '(eval-buffer)
+   '(org-export-dispatch org-babel-tangle org-babel-detangle)
+   '(kill-current-buffer list-buffers save-buffers-kill-emacs save-buffers-kill-terminal switch-to-buffer pop-to-buffer)
+   '(delete-frame delete-other-frames other-frame suspend-frame)
+   '(delete-window quit-window)
+   ;; doesn’t work with helm
+   ;; other-window select-window
+   )
+  "Before they run save all file buffers.")
+
+(defvar aj/save-buffers-debug nil "When non-nil message debug information for `aj/save-all-buffers'.")
+
+(defun aj/save-all-buffers (&rest _args)
+  "Save all file buffers.
+
+When `aj/save-buffers-debug' is non-nil display performance information in
+,*Messages* buffer.
+Ignore all _ARGS. "
+  (interactive)
+  (let ((time (current-time)))
+    (save-some-buffers t nil)
+    (when aj/save-buffers-debug
+      (message "aj/save-bufs completed in: %.06f seconds" (float-time (time-since time))))))
+
+;; activate it all:
+(cl-loop for hook in aj/save-all-buffers-hooks do
+         (add-hook hook #'aj/save-all-buffers))
+
+(cl-loop for fn in aj/save-all-buffers-before-functions do
+         (advice-add fn :before #'aj/save-all-buffers))
+
+;; (cl-loop for fn in aj/save-all-buffers-before do
+;;          (advice-remove fn #'aj/save-all-buffers))
+
+(cl-loop for fn in aj/save-current-buffer-before-functions do
+         (advice-add fn :before #'basic-save-buffer))
+
+
+(define-key special-event-map [sigusr1] #'aj/save-all-buffers)
+#+end_src
+
+*** Auto reverting
+#+begin_src emacs-lisp
+(global-auto-revert-mode t)
+;; Don't update pdfs in process of being built though:
+(setq global-auto-revert-ignore-modes '(pdf-view-mode))
+;; why ever query if not changed?
+(setq revert-without-query '(".*"))
+;; Also auto refresh dired, but be quiet about it
+(setq global-auto-revert-non-file-buffers t)
+(setq auto-revert-verbose nil)
+;; I’m always on a reasonable system
+(setq auto-revert-use-notify t)
+#+end_src
+
+A function for reverting all opened files, even remote files (because auto-revert doesn’t work there)
+#+begin_src emacs-lisp
+(defun aj/revert-all-buffers ()
+  "Refreshes all open buffers from their respective files."
+  (interactive)
+  (dolist (buf (buffer-list))
+	(with-current-buffer buf
+	  (when (and (buffer-file-name) (not (buffer-modified-p)))
+		(revert-buffer t t t) )))
+  (message "Refreshed open files."))
 #+end_src
 
 * Final
