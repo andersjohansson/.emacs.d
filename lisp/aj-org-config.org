@@ -1969,6 +1969,13 @@ Mostly for html and reveal
 #+end_src
 
 *** org-re-reveal, reveal.js
+**** Loading
+#+begin_src emacs-lisp
+(use-package org-re-reveal
+  :straight nil
+  :demand t
+  :load-path "~/kodat/elisp/org-re-reveal")
+#+end_src
 **** Settings
 #+BEGIN_SRC emacs-lisp
 (defvar aj/path-to-revealjs "~/lib/reveal.js/")
@@ -2132,6 +2139,7 @@ Mostly for html and reveal
     ("n" (hot-expand "<n") "Notes")
     ("i" (aj/org-insert-list-attributes (format "#+ATTR_REVEAL: :frag t :frag_idx !!" )) "Frag id")
     ("s" (insert "#+REVEAL: split") "Split frame")
+    ("c" (org-set-property "reveal_data_state" "centered-headline") "Centered headline")
     ("F" (insert (completing-read "Frag style" '(grow shrink roll-in fade-out highlight-red highlight-green highlight-blue appear))) "Frag style")
     ("H" (insert "#+REVEAL_HTML: ") "HTML")
     ("b" (progn

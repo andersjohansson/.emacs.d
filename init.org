@@ -320,11 +320,6 @@ To get the fix for ~org-version~ from straight org needs to be activated early
 *** Org init
 **** org init
 #+begin_src emacs-lisp
-(use-package org-re-reveal
-  :straight nil
-  :defer t
-  :load-path "~/kodat/elisp/org-re-reveal")
-
 (use-package org
   :bind (("C-c a" . org-agenda) ("C-c c" . org-capture))
   :commands org-mode
@@ -333,7 +328,7 @@ To get the fix for ~org-version~ from straight org needs to be activated early
   ;; (require 'org-protocol) ;; move to modules? autoload the entry commands (don’t seem to be)
   (setq org-directory "~/org"
         org-ellipsis " ⤵"
-        org-export-backends '(re-reveal beamer odt ascii html icalendar latex)
+        org-export-backends '(beamer odt ascii html icalendar latex)
         org-modules '(org-habit org-inlinetask org-mu4e org-id org-bullets org-pdfview)
         org-list-allow-alphabetical t
         org-id-link-to-org-use-id 'use-existing
