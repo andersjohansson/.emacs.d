@@ -2132,7 +2132,7 @@ Mostly for html and reveal
     "Reveal templates"
     ("+" (aj/org-insert-list-attributes "#+ATTR_REVEAL: :frag (t)") "Piecewise list")
     ("f" (aj/org-insert-list-attributes "#+ATTR_REVEAL: :frag t") "Appear (frag)")
-    ("n" (hot-expand "<n") "Notes")
+    ("n" (aj/org-keyword-expand "n") "Notes")
     ("i" (aj/org-insert-list-attributes (format "#+ATTR_REVEAL: :frag t :frag_idx !!" )) "Frag id")
     ("s" (insert "#+REVEAL: split") "Split frame")
     ("c" (org-set-property "reveal_data_state" "centered-headline") "Centered headline")
