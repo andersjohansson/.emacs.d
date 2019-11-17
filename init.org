@@ -4615,12 +4615,13 @@ I use my fork, available here: https://github.com/andersjohansson/mplayer-mode/t
 				  mplayer-default-seek-step 2))
 #+END_SRC
 
-*** orgqda
+*** orgqda-helm-tags
 Available at: https://github.com/andersjohansson/orgqda
 #+BEGIN_SRC emacs-lisp
 (use-package orgqda-helm-tags
   :straight nil
   :after orgqda
+  :hook (org-mode . orgqda-helm-tags-mode)
   :config (setq orgqda-helm-tags-include-excluded t))
 #+END_SRC
 
