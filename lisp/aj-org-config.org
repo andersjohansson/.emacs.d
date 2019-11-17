@@ -2141,14 +2141,15 @@ Mostly for html and reveal
     ("c" (org-set-property "reveal_data_state" "centered-headline") "Centered headline")
     ("F" (insert (completing-read "Frag style" '(grow shrink roll-in fade-out highlight-red highlight-green highlight-blue appear))) "Frag style")
     ("H" (insert "#+REVEAL_HTML: ") "HTML")
-    ("b" (progn
-           (org-set-property "reveal_background"
-                             (file-relative-name
-                              (read-file-name "Background image: "
-                                              nil nil nil nil)))
-           (when (y-or-n-p "Slide instead of trans?")
-             (org-set-property "reveal_background_trans" "slide")))
+    ("b" (org-set-property "reveal_background"
+                           (file-relative-name
+                            (read-file-name "Background image: "
+                                            nil nil nil nil)))
      "Background image")
+    ("B" (org-set-property "reveal_background_trans"
+                           (completing-read "Transition: "
+                                            '("none" "fade" "slide" "convex" "concave" "zoom")))
+     "Background image-transition")
     ("s" (aj/org-insert-list-attributes "#+ATTR_HTML: :style font-size: 0.9em;") "Style element etc.")
     ("p" (insert (format
                   "#+ATTR_HTML: :class stretch\n%s"
