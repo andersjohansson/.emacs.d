@@ -3647,23 +3647,23 @@ argument, reset to default."
                              0.8)))))))
 
 #+end_src
-*** Special tag faces
+*** Special tag faces and highlighting of special headlines
 Add special tag faces, add for file-local select/exclude-tags. Highlight the entire headline for some tags.
 #+begin_src emacs-lisp
-(defface aj/org-special-tags-face '((t . (:inherit org-tag :box t)))
+(defface aj/org-special-tags-face '((t . (:inherit org-tag :underline t)))
   "Face for special tags"
-:group 'aj)
+  :group 'aj)
 
 (defface aj/org-select-tags-face
-  '((t . (:inherit (hydra-face-teal org-tag aj/org-special-tags-face))))
+  '((t . (:inherit (hydra-face-teal aj/org-special-tags-face))))
   "Face for select tags"
   :group 'aj)
 (defface aj/org-exclude-tags-face
-  '((t . (:inherit (hydra-face-red org-tag aj/org-special-tags-face))))
+  '((t . (:inherit (hydra-face-red aj/org-special-tags-face))))
   "Face for exclude tags"
   :group 'aj)
 (defface aj/org-ignoreheading-tags-face
-  '((t . (:inherit (aj/org-special-tags-face))))
+  '((t . (:inherit (hydra-face-amaranth aj/org-special-tags-face))))
   "Face for ignoreheading tags"
   :group 'aj)
 
