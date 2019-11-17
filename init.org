@@ -967,8 +967,6 @@ overriding it, but you should know before you do.
 **** Things to load with org
 ***** Stuff
 #+begin_src emacs-lisp
-;;load local org-reveal
-
 ;; TODO, why here?
 (use-package orgqda
   :straight (:host gitlab :repo "andersjohansson/orgqda")
@@ -995,8 +993,6 @@ overriding it, but you should know before you do.
   :after org)
 (use-package org-download
   :after org)
-(straight-use-package 'request-deferred) ;; TODO, dep for zotxt, fix.
-
 #+end_src
 ***** org-pdfview
 #+BEGIN_SRC emacs-lisp

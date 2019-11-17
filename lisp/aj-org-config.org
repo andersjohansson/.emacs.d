@@ -1728,14 +1728,10 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 
 *** Zotxt configuration :org_async:
 #+begin_src emacs-lisp
-(straight-use-package 'request) ;; TODO, dependency for zotxt. Fix!
-(straight-use-package 'deferred)
-(straight-use-package 'request-deferred)
-
 (use-package zotxt
-  :straight (zotxt-emacs :host gitlab :repo "egh/zotxt-emacs"
-						 :fork (:host gitlab :repo "andersjohansson/zotxt-emacs"))
-  ;; :load-path "~/kodat/elisp/zotxt-emacs/"
+  :straight (zotxt :host gitlab :repo "egh/zotxt-emacs" :depth 'full
+                   ;; :local-repo "zotxt"
+                   :fork (:host gitlab :repo "andersjohansson/zotxt-emacs" :branch "ajfixes"))
   :custom (zotxt-default-bibliography-style "apa")
   :config
   (defconst zotxt-url-base
@@ -1795,7 +1791,7 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 		'link #'zotxt-helm-link-to-disp-real)))
 
 (use-package org-zotxt
-  :straight nil
+  :straight nil ;; already installed with zotxt-emacs above
   :commands org-zotxt-mode
   :demand t
   :delight "𝐙 "
