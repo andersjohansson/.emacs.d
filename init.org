@@ -2165,6 +2165,11 @@ already narrowed."
 #+END_SRC
 
 ** Searching, file-management, completion (helm and others)
+*** Smarter default search with char-folding
+#+begin_src emacs-lisp
+(setq search-default-mode #'char-fold-to-regexp)
+#+end_src
+
 *** Anzu: Shows number of search matches in modeline, replacements inline etc.
 #+BEGIN_SRC emacs-lisp
 (use-package anzu
