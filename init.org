@@ -2452,6 +2452,12 @@ Define this as a global minor mode which adds a section in the magit status buff
 #+end_src
 
 ** Editing. Marking, killing, yanking, etc.
+
+*** Delete-selection-mode
+#+begin_src emacs-lisp
+(delete-selection-mode)
+#+end_src
+
 *** Whole-line-or-region
 #+BEGIN_SRC emacs-lisp
 (use-package whole-line-or-region
