@@ -12,6 +12,7 @@
 ** Customize some variables :org_async:
 #+begin_src emacs-lisp
 (setq
+ org-hidden-keywords '(title author date)
  org-refile-allow-creating-parent-nodes 'confirm
  org-special-ctrl-k t
  org-fontify-quote-and-verse-blocks t
@@ -1558,6 +1559,7 @@ Can be passed any ox BACKEND in a non-interactive call"
   :options-alist '((:ascii-charset nil nil 'utf-8)
                    (:ascii-text-width nil nil 3000)))
 #+end_src
+
 ** Org-annotate :org_async:
 #+BEGIN_SRC emacs-lisp
 (use-package org-annotate
@@ -1566,6 +1568,7 @@ Can be passed any ox BACKEND in a non-interactive call"
               ("C-c C-ä" . org-annotate-add-note)
               ("C-c C-Ä" . org-annotate-delete-note)
               ("C-c C-x C-ä" . org-annotate-display-notes))
+  :demand t
   :custom
   (org-annotate-special-brackets '("{" ":" "}"))
   ;; functions defined below
