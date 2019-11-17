@@ -196,66 +196,69 @@ Org emphasize: _b_old  _i_talic _u_nderline _c_ode _v_erbatim _s_trikethrough  _
           (er/expand-region 1)
           (sp-wrap-with-pair wrap))))))
 #+END_SRC
-*** Templates hydra
+*** Template inserting (hydra)
+If before headline, insert options template with completion.
+
+Otherwise hydra for template insertion.
+
 #+begin_src emacs-lisp
-(defhydra hydra-org-template (:color blue :hint nil)
-  "
-_c_enter  _q_uote     _e_macs-lisp    _L_aTeX:   _A_TTR_LATEX:
-_l_atex   _E_xample   _p_erl          _i_ndex:   _B_TTR_BEAMER:
-_a_scii   _v_erse     _P_erl tangled  _I_NCLUDE:
-_s_rc     _n_ote      ^ ^             _H_TML:
-_h_tml    ^ ^         ^ ^
-"
-  ("s" (hot-expand "<s"))
-  ("E" (hot-expand "<e"))
-  ("q" (hot-expand "<q"))
-  ("v" (hot-expand "<v"))
-  ("c" (hot-expand "<c"))
-  ("l" (hot-expand "<l"))
-  ("h" (hot-expand "<h"))
-  ("n" (hot-expand "<n"))
-  ("a" (hot-expand "<a"))
-  ("L" (hot-expand "<L"))
-  ("i" (hot-expand "<i"))
-  ("e" (progn
-         (hot-expand "<s" "emacs-lisp")
-         (forward-line)))
-  ("p" (progn
-         (hot-expand "<s" "perl")
-         (forward-line)))
-  ;; ("u" (progn
-  ;;        (hot-expand "<s")
-  ;;        (insert "plantuml :file CHANGE.png")
-  ;;        (forward-line)))
-  ("P" (progn
-         (insert "#+HEADERS: :results output :exports both :shebang \"#!/usr/bin/env perl\"\n")
-         (hot-expand "<s" "perl")
-         (forward-line)))
-  ("I" (hot-expand "<I"))
-  ("H" (hot-expand "<H"))
-  ("A" (insert "#+ATTR_LATEX: :height 0.7\\textheight"))
-  ("B" (insert "#+ATTR_BEAMER: :environment :overlay :options"))
-  ("<" self-insert-command "ins")
-  ("o" nil "quit"))
+(defvar aj/org-header-keywords-history nil)
+(add-to-list 'savehist-additional-variables 'aj/org-header-keywords-history)
+(defun aj/org-insert-header-keyword ()
+  (interactive)
+  (insert "#+"
+          (completing-read "Keyword: "
+                           (append org-options-keywords
+                                   (mapcar (lambda (x) (concat x ":")) (org-get-export-keywords)))
+                           nil t nil
+                           aj/org-header-keywords-history)
+          " "))
+
+(require 'org-tempo)
+(setq org-structure-template-alist
+      '(("a" . "export ascii")
+        ("c" . "center")
+        ("C" . "comment")
+        ("e" . "src emacs-lisp")
+        ("E" . "example")
+        ("h" . "export html")
+        ("l" . "export latex")
+        ("n" . "notes")
+        ("q" . "quote")
+        ("s" . "src")
+        ("v" . "verse")
+        ("x" . "export")))
+
+(defun aj/org-insert-attr (str)
+  (insert "#+attr_" str ": "))
+
+(eval `(defhydra aj/hydra-org-template (:hint t :color blue :columns 4)
+         "Great stuff"
+         ,@(cl-loop for (key . word) in org-tempo-keywords-alist collect
+                    (list key `(aj/org-keyword-expand ,key) word))
+         ("I" (aj/org-keyword-expand "I") "include")
+         ("ö l" (aj/org-insert-attr "latex") "attr_latex")
+         ("ö h" (aj/org-insert-attr "html") "attr_html")
+         ("ö r" (aj/org-insert-attr "reveal") "attr_reveal")
+         ,@(cl-loop for (key . word) in org-structure-template-alist collect
+                    (list key `(org-insert-structure-template ,word) word))
+         ))
 
 (autoload 'org-tempo-complete-tag "org-tempo")
-(defun hot-expand (str &optional suffix)
-  "Expand org template."
-  (let (text)
-    (when (region-active-p)
-      (progn
-        (setq text (buffer-substring (region-beginning) (region-end)))
-        (delete-region (region-beginning) (region-end))))
-    (insert str)
-    (org-tempo-complete-tag)
-    (when suffix (insert suffix "\n"))
-    (when text (insert text))))
+(defun aj/org-keyword-expand (str)
+  "Expand ‘org-tempo-keywords-alist’ template."
+  (insert "<" str)
+  (org-tempo-complete-tag))
 
-(define-key org-mode-map "<"
-  (lambda () (interactive)
-    (if (or (region-active-p) (looking-back "^" (point-at-bol)))
-        (hydra-org-template/body)
-      (self-insert-command 1))))
+(defun aj/org-template-completion ()
+  (interactive)
+  (if (or (region-active-p) (looking-back "^" (point-at-bol)))
+      (if (org-before-first-heading-p)
+          (aj/org-insert-header-keyword)
+        (aj/hydra-org-template/body))
+    (self-insert-command 1)))
+
+(bind-key "<" #'aj/org-template-completion org-mode-map)
 #+end_src
 
 *** Speed commands at more places?
