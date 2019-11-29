@@ -3792,6 +3792,7 @@ Add special tag faces, add for file-local select/exclude-tags. Highlight the ent
         ("notitle" aj/org-special-tags-face)
         ,@(cl-loop for i in aj/org-ignoreheading-tags
                    collect (list i 'aj/org-ignoreheading-tags-face))
+        ("stripheading" aj/org-ignoreheading-tags-face)
         ("read_only" :inherit (aj/org-special-tags-face hydra-face-pink))
         ,@(cl-loop
            for b in org-export-backends
@@ -3806,7 +3807,8 @@ Add special tag faces, add for file-local select/exclude-tags. Highlight the ent
 (defvar aj/org-special-tag-headline-faces
   '(("noexport" nil aj/org-exclude-line-face)
     ("export" nil aj/org-select-line-face)
-    ("notitle" nil aj/org-ignoreheading-line-face)))
+    ("notitle" nil aj/org-ignoreheading-line-face)
+    ("stripheading" nil aj/org-ignoreheading-line-face)))
 
 (defun aj/org-local-special-tag-faces ()
   "Possibly add local SELECT and EXCLUDE tags to
