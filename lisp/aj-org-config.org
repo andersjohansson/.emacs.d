@@ -2183,16 +2183,52 @@ Mostly for html and reveal
     "Minor mode with some custom keybindings for help in creating org-reveal presentations"
     :keymap `((,(kbd "C-c C-ö") . aj/hydra-org-reveal-templates/body)))
 
-  (defhydra aj/hydra-org-reveal-templates (:color blue)
+  (defvar aj/org-reveal-classes
+    '(("stretch" . "stretch")
+      ("fillheight" . "fillheight")
+      ("large" . "large")
+      ("Large" . "Large")
+      ("LARGE" . "LARGE")
+      ("huge" . "huge")
+      ("small" . "small")
+      ("footnotesize" . "footnotesize")
+      ("tiny" . "tiny")
+      ("larger" . "larger")
+      ("much-larger" . "much-larger")
+      ("very-much-larger" . "very-much-larger")
+      ("smaller" . "smaller")
+      ("much-smaller" . "much-smaller")
+      ("attrib (picture attributions)" . "attrib")
+      ("whiteoverlay (overlay over background)" . "whiteoverlay")
+      ("pic-row (for pictures in row)" . "pic-row")
+      ("shadow (box shadow)" . "shadow")
+      ("shapeshadow (shadow for complex shapes)" . "shapeshadow")
+      ("columns (wrapper for flexing elements)" . "columns")
+      ("vertical-center" . "vertical-center")
+      ("center-emphasize" . "center-emphasize")
+      ("bottom-note" . "bottom-note")
+      ("random-container" . "random-container")
+      ("absolute-random (elements inside random-container)" . "absolute-random"))
+    "Classes for elements in reveal.js presentations")
+
+  (defhydra aj/hydra-org-reveal-templates (:color blue :columns 4)
     "Reveal templates"
-    ("+" (aj/org-insert-list-attributes "#+ATTR_REVEAL: :frag (t)") "Piecewise list")
-    ("f" (aj/org-insert-list-attributes "#+ATTR_REVEAL: :frag t") "Appear (frag)")
+    ("+" (aj/org-insert-element-attributes "#+attr_reveal: :frag (t)") "Piecewise list")
+    ("f" (aj/org-insert-element-attributes "#+attr_reveal: :frag t") "Appear (frag)")
     ("n" (aj/org-keyword-expand "n") "Notes")
-    ("i" (aj/org-insert-list-attributes (format "#+ATTR_REVEAL: :frag t :frag_idx !!" )) "Frag id")
-    ("s" (insert "#+REVEAL: split") "Split frame")
-    ("c" (org-set-property "reveal_data_state" "centered-headline") "Centered headline")
+    ("i" (aj/org-insert-element-attributes (format "#+attr_reveal: :frag t :frag_idx !!" )) "Frag id")
+    ("s" (insert "#+reveal: split") "Split frame")
+    ("c" (aj/org-insert-element-attributes
+          (concat "#+attr_html: :class "
+                  (helm :prompt "Class: "
+                        :sources
+                        (list (helm-build-sync-source "Reveal classes"
+                                :candidates aj/org-reveal-classes)
+                              (helm-build-dummy-source "Custom class")))))
+     "Insert html class for element")
+    ("C" (org-set-property "reveal_data_state" "centered-headline") "Centered headline")
     ("F" (insert (completing-read "Frag style" '(grow shrink roll-in fade-out highlight-red highlight-green highlight-blue appear))) "Frag style")
-    ("H" (insert "#+REVEAL_HTML: ") "HTML")
+    ("H" (insert "#+reveal_html: ") "HTML")
     ("b" (org-set-property "reveal_background"
                            (file-relative-name
                             (read-file-name "Background image: "
@@ -2202,12 +2238,12 @@ Mostly for html and reveal
                            (completing-read "Transition: "
                                             '("none" "fade" "slide" "convex" "concave" "zoom")))
      "Background image-transition")
-    ("s" (aj/org-insert-list-attributes "#+ATTR_HTML: :style font-size: 0.9em;") "Style element etc.")
+    ("s" (aj/org-insert-element-attributes "#+attr_html: :style font-size: 0.9em;") "Style element etc.")
     ("p" (insert (format
-                  "#+ATTR_HTML: :class stretch\n%s"
+                  "#+attr_html: :class stretch\n%s"
                   (with-temp-buffer (org-insert-link '(4) nil "") (buffer-string))))
      "Picture with stretch")
-    ("z" (insert "#+HTML: <div id=\"zotxtbibliography\"></div>") "Bibliography")
+    ("z" (insert "#+html: <div id=\"zotxtbibliography\"></div>") "Bibliography")
     ("N" (org-toggle-tag "notitle") "No title headline")
     ("q" nil)))
 #+END_SRC
@@ -2284,14 +2320,18 @@ is defined for the subtree during org subtree export."
 *** Helper functions
 **** For inserting list attributes
 #+BEGIN_SRC emacs-lisp
-(defun aj/org-insert-list-attributes (attr)
-  (if-let ((p (org-in-item-p))
-           (tp (org-list-get-top-point (org-list-struct))))
-      (save-excursion
-        (goto-char tp)
-        (open-line 1)
-        (insert attr))
-    (insert attr)))
+(defun aj/org-insert-element-attributes (attr)
+  (save-excursion
+    (if-let ((p (org-in-item-p))
+             (tp (org-list-get-top-point (org-list-struct))))
+        (progn
+          (goto-char tp)
+          (open-line 1)
+          (insert attr))
+      (unless (looking-at-p "^$")
+        (org-backward-paragraph)
+        (open-line 1))
+      (insert attr))))
 #+END_SRC
 
 **** CHECK For special completion in custom link types
@@ -3261,8 +3301,8 @@ I’m trying out ox-reveal, but they have different ways of adding notes (subtre
     ("b" (insert "#+BEAMER: ") "Beamer:")
     ("p" (insert "#+BEAMER: \\pause") "Pause")
     ("s" (insert "#+BEAMER: \\small") "Small")
-    ("+" (aj/org-insert-list-attributes "#+ATTR_BEAMER: :overlay +-") "Overlay +-")
-    ("T" (aj/org-insert-list-attributes "#+ATTR_BEAMER: :environment tightitemize") "Tightitemize"))
+    ("+" (aj/org-insert-element-attributes "#+ATTR_BEAMER: :overlay +-") "Overlay +-")
+    ("T" (aj/org-insert-element-attributes "#+ATTR_BEAMER: :environment tightitemize") "Tightitemize"))
   )
 #+END_SRC
 **** Latex-check
