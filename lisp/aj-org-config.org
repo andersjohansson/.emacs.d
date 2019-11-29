@@ -639,6 +639,17 @@ current buffer but don’t limit accepted values."
 (put 'org-clock-in-switch-to-state 'safe-local-variable 'stringp)
 #+END_SRC
 
+***** Only clock in items in a TODO state.
+Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we can throw ~abort~, to abort the clock-in.
+#+begin_src emacs-lisp
+(defun aj/org-only-clock-in-todos ()
+  (unless (member (org-get-todo-state) org-not-done-keywords)
+    (message "Not a todo item!")
+    (throw 'abort nil)))
+
+(add-hook 'org-clock-in-prepare-hook #'aj/org-only-clock-in-todos)
+#+end_src
+
 ***** org-pomodoro
 #+BEGIN_SRC emacs-lisp
 (use-package org-pomodoro
