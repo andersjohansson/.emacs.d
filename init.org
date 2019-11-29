@@ -3335,7 +3335,7 @@ Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t
   `((,(regexp-opt aj/formal-english-highlights) 0 'hi-pink prepend)))
 #+END_SRC
 
-*** Ispell + flyspell
+*** Spelling: Ispell + flyspell
 **** Options, define languages, hunspell, etc.
 #+begin_src emacs-lisp
 (setq-default ispell-program-name "hunspell")
@@ -3503,41 +3503,35 @@ personal dictionaries into a combined personal dictionary."
   :delight guess-language-mode)
 
 
-
 (defvar aj/flyspell-modes '(org-mode mu4e-compose-mode))
 (defvar-local aj/inhibit-flyspell nil)
 (put 'aj/inhibit-flyspell 'safe-local-variable #'booleanp)
 
-;; DISABLE AUTO-activation for a while. See if this leads to less
-;; multiple ispell-processes bugs.
+;; Activate flyspell if local ispell-language defined.
 
+;; Functions that maybe enables flyspell and guess-language, a second
+;; after local variables are read (to ensure ispell language and
+;; aj/inhabit-flyspell is set).
 
-;; ;; Functions that maybe enables flyspell and guess-language, a second
-;; ;; after local variables are read (to ensure ispell language and
-;; ;; aj/inhabit-flyspell is set).
+(add-hook 'hack-local-variables-hook #'aj/maybe-enable-flyspell)
 
-;; (add-hook 'hack-local-variables-hook #'aj/maybe-enable-flyspell-and-guess-language)
+(defun aj/maybe-enable-flyspell ()
+  (run-with-idle-timer 1 nil #'aj/maybe-enable-flyspell-fn (current-buffer)))
 
-;; (defun aj/maybe-enable-flyspell-and-guess-language ()
-;;   (run-with-idle-timer 1 nil #'aj/maybe-enable-flyspell-and-guess-language-fn (current-buffer)))
+(defun aj/maybe-enable-flyspell-fn (buf)
+  (when (buffer-live-p buf)
+    (with-current-buffer buf
+      (when (and (not aj/inhibit-flyspell)
+                 (member major-mode aj/flyspell-modes)
+                 ispell-local-dictionary)
+        (flyspell-mode 1)
+        (aj/set-langtool-language-from-ispell-dict)))))
 
-;; (defun aj/maybe-enable-flyspell-and-guess-language-fn (buf)
-;;   (when (buffer-live-p buf)
-;;     (with-current-buffer buf
-;;       (when (and (not aj/inhibit-flyspell)
-;;                  (member major-mode aj/flyspell-modes))
-;;         (flyspell-mode 1)
-;;         (aj/set-langtool-language-from-ispell-dict))
-;;       (if (or (eq major-mode 'mu4e-compose-mode)
-;;               (and flyspell-mode (not ispell-local-dictionary)))
-;;           (guess-language-mode 1)
-;;         (guess-language-mode -1)))))
-
-;; (defun aj/set-langtool-language-from-ispell-dict ()
-;;   (when (and ispell-local-dictionary
-;;              (< (length ispell-local-dictionary) 7))
-;;     (setq-local langtool-default-language
-;;                 (replace-regexp-in-string "\_" "-" ispell-local-dictionary))))
+(defun aj/set-langtool-language-from-ispell-dict ()
+  (when (and ispell-local-dictionary
+             (< (length ispell-local-dictionary) 7))
+    (setq-local langtool-default-language
+                (replace-regexp-in-string "\_" "-" ispell-local-dictionary))))
 #+END_SRC
 
 **** Extra flyspell bindings
@@ -3563,7 +3557,6 @@ personal dictionaries into a combined personal dictionary."
     (funcall fun)))
 
 (advice-add 'org-mode-flyspell-verify :around #'aj/org-flyspell-skip-links)
-
 #+END_SRC
 
 **** Ispell-multi, keep processes for multiple languages going. :ARCHIVE:
@@ -3626,7 +3619,7 @@ personal dictionaries into a combined personal dictionary."
 #+END_SRC
 
 *** Typo
-For doing smart (curly) quotes, mainly in mails since org has it’s own mechanism
+For doing smart (curly) quotes, mainly in emails since org has it’s own mechanism
 #+BEGIN_SRC emacs-lisp
 (use-package typo
   :after mu4e
