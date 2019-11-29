@@ -647,7 +647,7 @@ From: http://mbork.pl/2015-11-28_Fixing_mml-attach-file_using_advice
 #+BEGIN_SRC emacs-lisp
 (defun aj/copy-to-dropbox-return-link (file)
   "Copies a file to public dropbox folder and returns public url"
-  (let ((newfile (expand-file-name (file-name-nondirectory file) "~/Dropbox/delning")))
+  (let ((newfile (expand-file-name (file-name-nondirectory file) "~/Dropbox/delning-publikt")))
     (copy-file file newfile 1)
     (aj/dropbox-get-link newfile)))
 
@@ -656,8 +656,10 @@ From: http://mbork.pl/2015-11-28_Fixing_mml-attach-file_using_advice
 
 Non-interactive use returns link"
   (interactive "f")
-  (let ((link (shell-command-to-string
-               (format "dropbox-cli sharelink %s" (shell-quote-argument filename)))))
+  (let ((link (replace-regexp-in-string
+               "dl=0" "dl=1"
+               (shell-command-to-string
+                (format "dropbox-cli sharelink %s" (shell-quote-argument filename))))))
     (if (called-interactively-p)
         (kill-new link)
       link)))
