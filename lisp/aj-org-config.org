@@ -149,9 +149,9 @@ By default, ~smartparens-org~ defines wrappers for all the emphasize characters 
 #+BEGIN_SRC emacs-lisp
 (with-eval-after-load 'smartparens-org
   (sp-local-pair 'org-mode "\\(" "\\)" :trigger "$$")
-  (sp-local-pair 'org-mode  "+" "+" :unless
-                 '(sp-point-after-word-p) :post-handlers '(("[d1]" "SPC"))))
-
+  ;; (sp-local-pair 'org-mode  "+" "+" :unless
+  ;;                '(sp-point-after-word-p) :post-handlers '(("[d1]" "SPC")))
+  )
 #+END_SRC
 
 *** Hydra for emphasize functions
