@@ -241,9 +241,9 @@ Otherwise hydra for template insertion.
          ("ö l" (aj/org-insert-attr "latex") "attr_latex")
          ("ö h" (aj/org-insert-attr "html") "attr_html")
          ("ö r" (aj/org-insert-attr "reveal") "attr_reveal")
+         ("." (org-insert-structure-template (read-string "Block type: ")) "Custom block type")
          ,@(cl-loop for (key . word) in org-structure-template-alist collect
-                    (list key `(org-insert-structure-template ,word) word))
-         ))
+                    (list key `(org-insert-structure-template ,word) word))))
 
 (autoload 'org-tempo-complete-tag "org-tempo")
 (defun aj/org-keyword-expand (str)
