@@ -4748,7 +4748,8 @@ Inspired by https://github.com/grettke/lolsmacs, it’s better to not keep incon
 (defvar aj/save-all-buffers-before-functions
   (append
    '(dired eshell grep ibuffer shell tex-compile)
-   '(compile ns-do-hide-emacs goto-line)
+   '(;; compile
+     ns-do-hide-emacs goto-line)
    '(eval-buffer)
    '(org-export-dispatch org-babel-tangle org-babel-detangle)
    '(kill-current-buffer list-buffers save-buffers-kill-emacs save-buffers-kill-terminal switch-to-buffer pop-to-buffer)
@@ -4780,7 +4781,7 @@ Ignore all _ARGS. "
 (cl-loop for fn in aj/save-all-buffers-before-functions do
          (advice-add fn :before #'aj/save-all-buffers))
 
-;; (cl-loop for fn in aj/save-all-buffers-before do
+;; (cl-loop for fn in aj/save-all-buffers-before-functions do
 ;;          (advice-remove fn #'aj/save-all-buffers))
 
 (cl-loop for fn in aj/save-current-buffer-before-functions do
