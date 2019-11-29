@@ -282,25 +282,24 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 
 *** Bootstrap ~use-package~ :org_async:
 #+begin_src emacs-lisp
-  ;; (unless (package-installed-p 'use-package)
-  ;;   (package-refresh-contents)
-  ;;   (package-install 'use-package))
-  ;; (unless (package-installed-p 'validate)
-  ;;   (package-refresh-contents)
-  ;;   (package-install 'validate))
-  ;; (eval-when-compile
-  ;;   (require 'validate)
-  ;;   (require 'use-package))
+;; (unless (package-installed-p 'use-package)
+;;   (package-refresh-contents)
+;;   (package-install 'use-package))
+;; (unless (package-installed-p 'validate)
+;;   (package-refresh-contents)
+;;   (package-install 'validate))
+;; (eval-when-compile
+;;   (require 'validate)
+;;   (require 'use-package))
 
-  ;; (setq use-package-compute-statistics t)
+;; (setq use-package-compute-statistics t)
 
-  (straight-use-package 'use-package)
+(straight-use-package 'use-package)
 
-  (use-package validate
-	:demand t)
-  (use-package bind-key
-	:demand t)
-  ;;(require 'bind-key)
+(use-package validate
+  :demand t)
+(use-package bind-key
+  :demand t)
 
   (use-package delight
 	:demand t)
@@ -312,11 +311,6 @@ Some variables are not suitable to keep in the init-file, I add these via custom
   :demand t)
 #+END_SRC
 
-*** Activate org early :ARCHIVE:
-To get the fix for ~org-version~ from straight org needs to be activated early
-#+begin_src emacs-lisp
-(straight-use-package 'org)
-#+end_src
 *** Org init
 **** org init
 #+begin_src emacs-lisp
