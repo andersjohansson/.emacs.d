@@ -1773,7 +1773,7 @@ Filnamnet måste skickas med till "processen" emacsclient, hur inline en emacsva
 *** Extra modes to enable for latex-mode
 #+BEGIN_SRC emacs-lisp
 (dolist (mode '(turn-on-reftex
-                latex-extra-mode
+                ;; latex-extra-mode
                 TeX-fold-mode))
   (add-hook 'LaTeX-mode-hook mode))
 #+END_SRC
