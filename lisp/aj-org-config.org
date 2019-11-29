@@ -2261,6 +2261,13 @@ Mostly for html and reveal
          h :tags (delete "notitle" (org-element-property :tags h)))))
     info nil)
   data)
+
+(add-hook 'org-export-filter-final-output-functions #'aj/org-reveal-prune-empty-headlines)
+
+(defun aj/org-reveal-prune-empty-headlines (string backend _info)
+  (if (eq backend 're-reveal)
+      (replace-regexp-in-string "<h2[^>]+></h2>" "" string)
+    string))
 #+END_SRC
 
 **** Use ~data-src~ instead of ~src~ for images etc.
