@@ -1420,6 +1420,15 @@ This works for instance in ~dired-do-rename~ or ~mu4e-view-save-attachment~ (als
 (add-hook 'before-save-hook 'aj/ff-mkdir)
 #+end_src
 
+*** Read-only-directories
+Define a dir-locals class and add directories which should by default be read-only there. (most importantly ~straight/build~)
+#+begin_src emacs-lisp
+(dir-locals-set-class-variables 'read-only-dir '((nil (eval read-only-mode))))
+
+(dir-locals-set-directory-class
+ "~/.emacs.d/straight/build/" 'read-only-dir)
+#+end_src
+
 ** Password-store
 Customizations for ~password-store~ and ~pass-mode.~
 In particular, I want good completion when generating a password, so, inspired by the directory-completion in ~helm-find-files~, I define a helm source which lists the password directories and allows completion on them.
