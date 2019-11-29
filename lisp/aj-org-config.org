@@ -3330,6 +3330,7 @@ I’m trying out ox-reveal, but they have different ways of adding notes (subtre
   (plist-put opt :headline-levels 0))
 
 (defun aj/org-export-no-sections (prefix)
+  "Export without headlines (list-outline, h:0)"
   (interactive "P")
   (let ((org-export-filter-options-functions
          (cons 'aj/org-export-opt-no-hl org-export-filter-options-functions)))
@@ -3752,8 +3753,8 @@ argument, reset to default."
              (list :height (if current
                                (+ current (if increase 0.1 -0.1))
                              0.8)))))))
-
 #+end_src
+
 *** Special tag faces and highlighting of special headlines
 Add special tag faces, add for file-local select/exclude-tags. Highlight the entire headline for some tags.
 #+begin_src emacs-lisp
