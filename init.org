@@ -330,6 +330,8 @@ Some variables are not suitable to keep in the init-file, I add these via custom
         org-export-backends '(beamer odt ascii html icalendar latex)
         org-modules '(org-habit org-inlinetask org-mu4e org-id org-bullets org-pdfview)
         org-list-allow-alphabetical t
+        org-id-method 'ts
+        org-id-prefix "aj"
         org-id-link-to-org-use-id 'use-existing
         org-agenda-files (expand-file-name "agenda-files" org-directory))
   (defcustom aj/org-work-agenda-files nil
