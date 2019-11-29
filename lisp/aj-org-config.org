@@ -1574,7 +1574,8 @@ Can be passed any ox BACKEND in a non-interactive call"
 ** Org-annotate :org_async:
 #+BEGIN_SRC emacs-lisp
 (use-package org-annotate
-  :straight (:host github :repo "girzel/org-annotate")
+  :straight (:host github :repo "girzel/org-annotate"
+                   :fork (:host github :repo "andersjohansson/org-annotate" :branch "org9.3"))
   :bind (:map org-mode-map
               ("C-c C-ä" . org-annotate-add-note)
               ("C-c C-Ä" . org-annotate-delete-note)
@@ -1588,6 +1589,9 @@ Can be passed any ox BACKEND in a non-interactive call"
 
   :config
   (set-face-attribute 'org-annotate-bracket-face nil :inherit 'font-lock-variable-name-face :weight 'bold)
+  (set-face-attribute 'org-annotate-face nil
+                      :weight 'unspecified :underline nil :italic t :inherit '(default))
+
 
   (defun aj/org-annotate-extract-author (note)
     (if (string-match "{\\([^}]+\\)} *" note)
@@ -1653,10 +1657,6 @@ List of prefix strings or regex."
 
   (advice-add 'org-annotate-export-note :around #'aj/org-annotate-maybe-ignore)
 
-  (set-face-attribute 'org-annotate-bracket-face nil :inherit 'font-lock-function-name-face)
-  (set-face-attribute 'org-annotate-face nil
-                      :weight 'unspecified :underline nil :italic t :inherit '(default))
-
   ;; I wan’t my text-mode abbreviations to work when I enter a note,
   (defun aj/org-annotate-add-note-advice (fun &rest args)
     (let ((minibuffer-setup-hook
@@ -1672,8 +1672,10 @@ List of prefix strings or regex."
   (advice-add 'org-annotate-add-note :around #'aj/org-annotate-add-note-advice)
 
 
-  ;; following should just edit!
-  (org-link-set-parameters "note" :follow #'org-insert-link)
+
+  (org-link-set-parameters "note" :follow #'org-insert-link ; following should just edit!
+                           :activate-func #'aj/org-annotate-activate-note ; highlight author as well
+                           )
 
   ;; ascii-export
   (defvar org-annotate-ascii-export-function #'aj/org-annotate-export-ascii)
@@ -1720,7 +1722,46 @@ List of prefix strings or regex."
         (setq aj/org-annotate-name-history
               (delete el aj/org-annotate-name-history))))
     (helm-force-update))
-  
+
+  (defun aj/org-annotate-activate-note (start end _path _bracketp)
+    "Add text properties to display annotation links in a special way"
+    (save-match-data
+      (save-excursion
+        (goto-char start)
+        (when (looking-at org-link-bracket-re)
+          (let ((url-beg (match-beginning 1))
+                (url-end (match-end 1))
+                (desc-beg (match-beginning 2))
+                (desc-end (match-end 2)))
+            (goto-char url-beg)
+            (when (looking-at "\\(note:\\)\\({[^}]+}\\)?")
+              (add-text-properties start (+ 2 start) ; start bracket
+                                   `(invisible nil
+                                               face org-annotate-bracket-face
+                                               display ,(nth 0 org-annotate-special-brackets)))
+              (add-text-properties (- end 2) end ; end bracket
+                                   `(invisible nil
+                                               face org-annotate-bracket-face
+                                               display ,(nth 2 org-annotate-special-brackets)))
+              (add-text-properties (match-beginning 1) (match-end 1) ; hide "note:"
+                                   '(invisible t))
+              (when (match-end 2) ;; fontify author
+                (add-text-properties (match-beginning 2) (1+ (match-beginning 2)) ; hide first {
+                                     '(invisible t))
+                (add-text-properties (1+ (match-beginning 2)) (match-end 2) ; bold author
+                                     '(face bold))
+                (add-text-properties (1- (match-end 2)) (match-end 2) ; display } as :
+                                     '(display ":")))
+
+              (add-text-properties (match-end 0) url-end ; note
+                                   '(invisible nil face org-annotate-face))
+              (when desc-end ; with desc
+                (add-text-properties desc-beg desc-end
+                                     '(invisible nil face org-annotate-text-face))
+                (add-text-properties url-end desc-beg ; middle bracket
+                                     `(invisible nil
+                                                 face org-annotate-bracket-face
+                                                 display ,(nth 1 org-annotate-special-brackets))))))))))
   )
 
 #+END_SRC
