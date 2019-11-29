@@ -301,8 +301,13 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 (use-package bind-key
   :demand t)
 
-  (use-package delight
-	:demand t)
+;; delight depends on nadvice, but will bring in and load the
+;; backwards-compatible version from GNU ELPA. This should solve that.
+(use-package nadvice
+  :straight (nadvice :type built-in)
+  :demand t)
+(use-package delight
+  :demand t)
 #+end_src
 
 *** Hydra (used for definitions later on) :org_async:
