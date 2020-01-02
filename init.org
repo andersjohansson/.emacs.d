@@ -2382,16 +2382,34 @@ Define this as a global minor mode which adds a section in the magit status buff
   :after magit)
 #+end_src
 *** Use visual-line-mode in magit for repositories with mostly prose text
+This can be enabled with a local variable ~aj/magit-visual-line-mode~ (set it as dir-local) or automatically if all the checked in files are org- or text-mode-based.
 #+BEGIN_SRC emacs-lisp
 (defvar-local aj/magit-visual-line-mode nil
-  "Enable visual-line-mode for magit if non-nil.")
+  "Enable visual-line-mode for magit if non-nil.
+Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
 (put 'aj/magit-visual-line-mode 'safe-local-variable #'booleanp)
 
 (add-hook 'magit-mode-hook #'aj/magit-maybe-enable-visual-line-mode)
 (defun aj/magit-maybe-enable-visual-line-mode ()
   "Enables ‘visual-line-mode’ for repositories with mostly prose."
-  (when aj/magit-visual-line-mode
+  (when (and (not (eq 'disable aj/magit-visual-line-mode))
+             (or aj/magit-visual-line-mode
+                 (cl-every #'aj/text-file-p (magit-list-files))))
     (visual-line-mode)))
+
+(defun aj/text-file-p (file)
+  (let ((case-fold-search nil))
+    (aj/mode-equal-or-derived-p
+     (assoc-default file auto-mode-alist
+                    'string-match)
+     '(text-mode org-mode))))
+
+(defun aj/mode-equal-or-derived-p (mode modes)
+  "Non-nil if MODE is one of MODES or derived from one of MODES"
+  (or (memq mode modes)
+      (apply #'provided-mode-derived-p mode modes)))
+
+
 #+END_SRC
 
 *** Dired display of untracked git files
