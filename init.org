@@ -4453,12 +4453,10 @@ Also runs hook aj/face-definitions-hook."
 #+END_SRC
 **** Gruvbox
 #+BEGIN_SRC emacs-lisp
-(use-package autothemer) ;; TODO, fix as dep of gruvbox
 (use-package gruvbox
-  :straight nil
-  :load-path "~/kodat/elisp/gruvbox-theme/"
-  :init
-  (add-to-list 'custom-theme-load-path "~/kodat/elisp/gruvbox-theme/"))
+  :straight (gruvbox-theme
+             :depth nil
+             :fork (:host github :repo "andersjohansson/emacs-theme-gruvbox" :branch "ajfixes")))
 #+END_SRC
 
 **** Define themes to use for dark and light and load light theme
