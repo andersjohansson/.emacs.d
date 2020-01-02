@@ -310,6 +310,12 @@ Some variables are not suitable to keep in the init-file, I add these via custom
   :demand t)
 #+end_src
 
+
+*** Edit definitions with el-patch
+#+begin_src emacs-lisp
+(use-package el-patch)
+#+end_src
+
 *** Hydra (used for definitions later on) :org_async:
 #+BEGIN_SRC emacs-lisp
 (use-package hydra
@@ -403,9 +409,38 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 #+END_SRC
 
 *** Tooltip-mode
+I want to use the echo area (hence ~(tooltip-mode -1)~), but don’t want help echo messages to be truncated, so I need to patch ~tooltip-show-help-non-mode~.
 #+begin_src emacs-lisp
-(tooltip-mode t)
-(setq x-gtk-use-system-tooltips t)
+(tooltip-mode -1)
+
+(with-eval-after-load 'tooltip
+  (el-patch-defun tooltip-show-help-non-mode (help)
+    "Function installed as `show-help-function' when Tooltip mode is off.
+It is also called if Tooltip mode is on, for text-only displays."
+    (when (and (not (window-minibuffer-p)) ;Don't overwrite minibuffer contents.
+               (not cursor-in-echo-area))  ;Don't overwrite a prompt.
+      (cond
+       ((stringp help)
+        (setq help (replace-regexp-in-string "\n" ", " help))
+        (unless (or tooltip-previous-message
+                    (equal-including-properties help (current-message))
+                    (and (stringp tooltip-help-message)
+                         (equal-including-properties tooltip-help-message
+                                                     (current-message))))
+          (setq tooltip-previous-message (current-message)))
+        (setq tooltip-help-message help)
+        (let ((message-truncate-lines (el-patch-swap t nil))
+              (message-log-max nil))
+          (message "%s" help)))
+       ((stringp tooltip-previous-message)
+        (let ((message-log-max nil))
+          (message "%s" tooltip-previous-message)
+          (setq tooltip-previous-message nil)))
+       (t
+        (message nil))))))
+
+
+
 #+end_src
 
 *** Center frame (used for helm)
