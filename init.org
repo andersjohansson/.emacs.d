@@ -4479,12 +4479,17 @@ Also runs hook aj/face-definitions-hook."
       (load-theme aj/dark-theme t t))
     (enable-theme aj/dark-theme)
     (call-process-shell-command
-     "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc-Dark'\""))
+     "xfconf-query -c xsettings -p /Net/ThemeName -s \"Arc-Dark\""
+     ;; for gnome:
+     ;; "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc-Dark'\""
+     ))
    ((custom-theme-enabled-p aj/dark-theme)
     (disable-theme aj/dark-theme)
     (enable-theme aj/light-theme)
     (call-process-shell-command
-     "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc'\""))
+     "xfconf-query -c xsettings -p /Net/ThemeName -s \"Arc\""
+     ;; "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc'\""
+     ))
    (t
     (enable-theme 'aj/light-theme))))
 
