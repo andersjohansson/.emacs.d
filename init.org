@@ -4399,18 +4399,34 @@ Also runs hook aj/face-definitions-hook."
       (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
       (set-face-attribute 'org-table nil :family "Input Mono Compressed")
 
+      ;; avoid tags inheriting headline color, make them bold but subdued.
+      (set-face-attribute 'org-tag nil :inherit 'shadow)
+
+      ;; level colors in gruvbox are bad... (I don’t like the red...)
+      ;; (when (eq theme 'gruvbox-light-hard)
+      ;;   (gruvbox-light-hard-with-palette
+      ;;    (set-face-attribute 'org-level-1 nil :foreground gruvbox-bright_blue)
+      ;;    (set-face-attribute 'org-level-2 nil :foreground gruvbox-bright_aqua)
+      ;;    (set-face-attribute 'org-level-3 nil :foreground gruvbox-bright_purple)
+      ;;    (set-face-attribute 'org-level-4 nil :foreground gruvbox-bright_green)
+      ;;    (set-face-attribute 'org-level-5 nil :foreground gruvbox-bright_yellow)
+      ;;    (set-face-attribute 'org-level-6 nil :foreground gruvbox-bright_orange)
+      ;;    (set-face-attribute 'org-level-7 nil :foreground gruvbox-faded_blue)
+      ;;    (set-face-attribute 'org-level-8 nil :foreground gruvbox-faded_aqua)))
+
       ;; specific for solarized
-      ;; level colors in solarized are bad
-      (when (aj/solarized-theme-p)
-        (solarized-with-color-variables 'dark
-                                        (set-face-attribute 'org-level-1 nil :foreground violet)
-                                        (set-face-attribute 'org-level-2 nil :foreground blue)
-                                        (set-face-attribute 'org-level-3 nil :foreground cyan)
-                                        (set-face-attribute 'org-level-4 nil :foreground green)
-                                        (set-face-attribute 'org-level-5 nil :foreground yellow)
-                                        (set-face-attribute 'org-level-6 nil :foreground orange)
-                                        (set-face-attribute 'org-level-7 nil :foreground red)
-                                        (set-face-attribute 'org-level-8 nil :foreground magenta))))
+      ;; level colors in solarized are bad (demote red)
+      ;; (when (aj/solarized-theme-p)
+      ;;   (solarized-with-color-variables 'dark
+      ;;                                   (set-face-attribute 'org-level-1 nil :foreground violet)
+      ;;                                   (set-face-attribute 'org-level-2 nil :foreground blue)
+      ;;                                   (set-face-attribute 'org-level-3 nil :foreground cyan)
+      ;;                                   (set-face-attribute 'org-level-4 nil :foreground green)
+      ;;                                   (set-face-attribute 'org-level-5 nil :foreground yellow)
+      ;;                                   (set-face-attribute 'org-level-6 nil :foreground orange)
+      ;;                                   (set-face-attribute 'org-level-7 nil :foreground red)
+      ;;                                   (set-face-attribute 'org-level-8 nil :foreground magenta)))
+      )
 
     (cond
      ((eq theme 'solarized-light)
@@ -4427,11 +4443,6 @@ Also runs hook aj/face-definitions-hook."
 
     (with-eval-after-load 'idle-highlight-mode
       (set-face-attribute 'idle-highlight nil :inherit nil :underline t))
-
-    ;; Makes text indent kind of correct amount (I use a variable-pitch
-    ;; face as standard)
-    ;; (with-eval-after-load 'org-indent
-    ;;   (set-face-attribute 'org-indent nil :inherit 'org-hide))
 
     (with-eval-after-load 'org-inlinetask
       (set-face-attribute 'org-inlinetask nil :inherit 'org-level-5))
