@@ -1033,17 +1033,21 @@ Uses CUSTOM_ID or `org-store-link' for linking."
           (save-excursion
             (goto-char (marker-position marker))
             (let ((custom-id (org-entry-get nil "CUSTOM_ID"))
+                  (id (org-entry-get nil "ID"))
                   (file-name (buffer-file-name)))
               (setq link
-                    (if custom-id
-                        (org-link-make-string
-                         (if (string= (with-helm-current-buffer
-                                        (buffer-file-name))
-                                      file-name)
-                             (concat "#" custom-id)
-                           (concat "file:" (abbreviate-file-name
-                                            file-name) "::#" custom-id)))
-                      (org-store-link nil)))))
+                    (cond
+                     (custom-id
+                      (org-link-make-string
+                       (if (string= (with-helm-current-buffer
+                                      (buffer-file-name))
+                                    file-name)
+                           (concat "#" custom-id)
+                         (concat "file:" (abbreviate-file-name
+                                          file-name) "::#" custom-id))))
+                     (id
+                      (org-id-store-link))
+                     (t (org-store-link nil nil))))))
           (with-helm-current-buffer
             (insert link " "))))))
 
