@@ -605,7 +605,7 @@ Example of alist entry:
   
   (setq helm-mini-default-sources
         '(helm-source-buffers-list
-          aj/helm-source-favourite-files
+          ;;aj/helm-source-favourite-files
           helm-source-recentf
           helm-source-files-in-current-dir
           aj/helm-source-dired-recent
@@ -880,7 +880,7 @@ Different fuzzy search algorithm, is this needed?
   :config (helm-recoll-create-source "default" "~/.recoll/"))
 #+end_src
 
-**** Favourite files (to mark files which should be prioritized in helm matches)
+**** Favourite files (to mark files which should be prioritized in helm matches) :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (defvar aj/favourite-files nil)
 (with-eval-after-load "savehist-mode"
