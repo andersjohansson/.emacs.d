@@ -2502,7 +2502,7 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
   :config (whole-line-or-region-global-mode)
   :delight whole-line-or-region-local-mode)
 #+END_SRC
-*** Volatile-highlight
+*** Volatile-highlight :ARCHIVE:
 Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
 #+BEGIN_SRC emacs-lisp
 (use-package volatile-highlights
