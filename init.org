@@ -3706,9 +3706,6 @@ For doing smart (curly) quotes, mainly in emails since org has it’s own mechan
 (use-package typo
   :after mu4e
   :config
-  (add-to-list 'typo-quotation-marks  '("Swedish" "»" "«" "›" "‹")
-               ;; '("Swedish" "”" "”" "’" "’")
-               )
   (setq-default typo-language "Swedish")
   (typo-global-mode 1)
   (add-hook 'mu4e-compose-mode-hook #'typo-mode)
