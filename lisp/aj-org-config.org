@@ -1634,8 +1634,8 @@ Can be passed any ox BACKEND in a non-interactive call"
 
   :config
   (set-face-attribute 'org-annotate-bracket-face nil :inherit 'font-lock-variable-name-face :weight 'bold)
-  (set-face-attribute 'org-annotate-face nil
-                      :weight 'unspecified :underline nil :italic t :inherit '(default))
+  (set-face-attribute 'org-annotate-face nil :height 0.7
+                      :weight 'unspecified :underline nil :inherit '(default))
 
 
   (defun aj/org-annotate-extract-author (note)
@@ -1716,8 +1716,6 @@ List of prefix strings or regex."
 
   (advice-add 'org-annotate-add-note :around #'aj/org-annotate-add-note-advice)
 
-
-
   (org-link-set-parameters "note" :follow #'org-insert-link ; following should just edit!
                            :activate-func #'aj/org-annotate-activate-note ; highlight author as well
                            )
@@ -1768,45 +1766,94 @@ List of prefix strings or regex."
               (delete el aj/org-annotate-name-history))))
     (helm-force-update))
 
+
+  ;;; NOTES IN MARGINS!!
+  (add-hook 'org-mode-hook #'aj/org-annotate-maybe-add-right-margin)
+  (defun aj/org-annotate-maybe-add-right-margin ()
+    (org-with-wide-buffer
+     (goto-char (point-min))
+     (when (search-forward "[[note:" nil t)
+       (aj/org-annotate-add-right-margin))))
+
+  (defun aj/org-annotate-add-right-margin (&rest _ignore)
+    (when (< (or (cdr (window-margins)) 0) 50)
+      (set-window-margins (selected-window) nil 50)))
+
+  (advice-add 'org-annotate-add-note :after #'aj/org-annotate-add-right-margin)
+
   (defun aj/org-annotate-activate-note (start end _path _bracketp)
     "Add text properties to display annotation links in a special way"
     (save-match-data
       (save-excursion
         (goto-char start)
         (when (looking-at org-link-bracket-re)
-          (let ((url-beg (match-beginning 1))
-                (url-end (match-end 1))
-                (desc-beg (match-beginning 2))
-                (desc-end (match-end 2)))
-            (goto-char url-beg)
-            (when (looking-at "\\(note:\\)\\({[^}]+}\\)?")
-              (add-text-properties start (+ 2 start) ; start bracket
-                                   `(invisible nil
-                                               face org-annotate-bracket-face
-                                               display ,(nth 0 org-annotate-special-brackets)))
-              (add-text-properties (- end 2) end ; end bracket
-                                   `(invisible nil
-                                               face org-annotate-bracket-face
-                                               display ,(nth 2 org-annotate-special-brackets)))
-              (add-text-properties (match-beginning 1) (match-end 1) ; hide "note:"
-                                   '(invisible t))
-              (when (match-end 2) ;; fontify author
-                (add-text-properties (match-beginning 2) (1+ (match-beginning 2)) ; hide first {
-                                     '(invisible t))
-                (add-text-properties (1+ (match-beginning 2)) (match-end 2) ; bold author
-                                     '(face bold))
-                (add-text-properties (1- (match-end 2)) (match-end 2) ; display } as :
-                                     '(display ":")))
+          (add-text-properties start (1+ start) ;;first bracket
+                               '(invisible nil face org-annotate-bracket-face display "/"))
 
-              (add-text-properties (match-end 0) url-end ; note
-                                   '(invisible nil face org-annotate-face))
-              (when desc-end ; with desc
-                (add-text-properties desc-beg desc-end
-                                     '(invisible nil face org-annotate-text-face))
-                (add-text-properties url-end desc-beg ; middle bracket
-                                     `(invisible nil
-                                                 face org-annotate-bracket-face
-                                                 display ,(nth 1 org-annotate-special-brackets))))))))))
+          (add-text-properties (1- (match-beginning 1)) (match-beginning 1) ;; note bracket start
+                               '(invisible t))
+
+          (add-text-properties (match-beginning 1) (match-end 1) ; note
+                               `(invisible nil face org-annotate-face
+                                           display ((margin right-margin)
+                                                    ,(concat "·" (buffer-substring-no-properties
+                                                                  (+ 5 (match-beginning 1)) (match-end 1))))))
+
+          (add-text-properties (match-end 1) (1+ (match-end 1)) ;; note bracket end
+                               '(invisible t))
+
+          (add-text-properties (1- end) end ; end bracket
+                               '(invisible nil face org-annotate-bracket-face display "/"))
+
+          (when (match-end 2) ; make desc visible
+            (add-text-properties (1- (match-beginning 2)) (match-beginning 2)
+                                 '(invisible nil face org-annotate-bracket-face display "·")) ;; start bracket
+            (add-text-properties (match-beginning 2) (match-end 2)
+                                 '(invisible nil face org-annotate-text-face))
+            (add-text-properties (match-end 2) (1+ (match-end 2))
+                                 '(invisible nil face org-annotate-bracket-face display "·")) ;; start bracket
+            )))))
+
+  ;; med author
+  ;; (defun aj/org-annotate-activate-note (start end _path _bracketp)
+  ;;   "Add text properties to display annotation links in a special way"
+  ;;   (save-match-data
+  ;;     (save-excursion
+  ;;       (goto-char start)
+  ;;       (when (looking-at org-link-bracket-re)
+  ;;         (let ((url-beg (match-beginning 1))
+  ;;               (url-end (match-end 1))
+  ;;               (desc-beg (match-beginning 2))
+  ;;               (desc-end (match-end 2)))
+  ;;           (goto-char url-beg)
+  ;;           (when (looking-at "\\(note:\\)\\({[^}]+}\\)?")
+  ;;             (add-text-properties start (+ 2 start) ; start bracket
+  ;;                                  `(invisible nil
+  ;;                                              face org-annotate-bracket-face
+  ;;                                              display ,(nth 0 org-annotate-special-brackets)))
+  ;;             (add-text-properties (- end 2) end ; end bracket
+  ;;                                  `(invisible nil
+  ;;                                              face org-annotate-bracket-face
+  ;;                                              display ,(nth 2 org-annotate-special-brackets)))
+  ;;             (add-text-properties (match-beginning 1) (match-end 1) ; hide "note:"
+  ;;                                  '(invisible t))
+  ;;             (when (match-end 2) ;; fontify author
+  ;;               (add-text-properties (match-beginning 2) (1+ (match-beginning 2)) ; hide first {
+  ;;                                    '(invisible t))
+  ;;               (add-text-properties (1+ (match-beginning 2)) (match-end 2) ; bold author
+  ;;                                    '(face bold invisible nil))
+  ;;               (add-text-properties (1- (match-end 2)) (match-end 2) ; display } as :
+  ;;                                    '(display ":")))
+
+  ;;             (add-text-properties (match-end 0) url-end ; note
+  ;;                                  '(invisible nil face org-annotate-face))
+  ;;             (when desc-end ; with desc
+  ;;               (add-text-properties desc-beg desc-end
+  ;;                                    '(invisible nil face org-annotate-text-face))
+  ;;               (add-text-properties url-end desc-beg ; middle bracket
+  ;;                                    `(invisible nil
+  ;;                                                face org-annotate-bracket-face
+  ;;                                                display ,(nth 1 org-annotate-special-brackets))))))))))
   )
 
 #+END_SRC
@@ -1911,7 +1958,7 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 						   :activate-func #'aj/org-zotxt-activate)
 
   (defun aj/org-zotxt-activate (start end _path bracketp)
-	"Add text properties to display annotation links in a special way"
+	"Add text properties to display zotxt citation links in a good way"
 	(when bracketp
 	  (save-match-data
 		(save-excursion
