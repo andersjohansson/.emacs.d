@@ -1352,6 +1352,47 @@ This function run with ~org-capture-prepare-finalize-hook~ avoids this problem b
 #+END_SRC
 
 *** Capture help functions
+**** Use a datetree only down to month
+This function can be used for ~file+function~ targets in capture templates
+#+begin_src emacs-lisp
+(defun aj/org-datetree-find-month-create (&optional d)
+  "Find or create an entry for date D, up to month"
+  (unless d (setq d (org-date-to-gregorian (org-read-date))))
+  (require 'org-datetree)
+  (setq-local org-datetree-base-level 1)
+  (save-restriction
+    (widen)
+    ;; Support the old way of tree placement, using a property
+    (let ((prop (org-find-property "DATE_TREE")))
+      (when prop
+        (goto-char prop)
+        (setq-local org-datetree-base-level
+                    (org-get-valid-level (org-current-level) 1))
+        (org-narrow-to-subtree)))
+    (goto-char (point-min))
+    (let ((year (calendar-extract-year d))
+          (month (calendar-extract-month d)))
+      (org-datetree--find-create
+       "^\\*+[ \t]+\\([12][0-9]\\{3\\}\\)\\(\\s-*?\
+\\([ \t]:[[:alnum:]:_@#%%]+:\\)?\\s-*$\\)"
+       year)
+      (org-datetree--find-create
+       "^\\*+[ \t]+%d-\\([01][0-9]\\) \\w+$"
+       year month)
+      ;; no day ...
+      )))
+#+end_src
+
+**** Add ID to some notes
+Currently those entered with "a", could of course be generalized.
+#+begin_src emacs-lisp
+(defun aj/org-capture-maybe-add-id ()
+  (when (equal "a" (org-capture-get :key t))
+    (org-id-get-create)))
+
+(add-hook 'org-capture-prepare-finalize-hook #'aj/org-capture-maybe-add-id)
+#+end_src
+
 **** Insert weektree CUSTOM_ID
 #+BEGIN_SRC emacs-lisp
 (advice-add 'org-datetree--find-create :after #'aj/insert-datetree-custom-id)
