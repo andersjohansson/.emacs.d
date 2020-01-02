@@ -2907,6 +2907,25 @@ Needed when starting in a non-interactive shell.
 
 ** prog-modes
 
+*** LSP, language server protocol
+This is the new thing, and it is good, because it knows a lot about the code and provides completion etc.
+#+begin_src emacs-lisp
+(use-package lsp-mode
+  :hook (js-mode . lsp-mode)
+  :config
+  (set-face-attribute 'lsp-face-highlight-read nil :inherit 'idle-highlight)
+  (add-hook 'lsp-mode-hook (lambda () (idle-highlight-mode -1))))
+
+(use-package lsp-ui
+  :hook (lsp-mode . lsp-ui-mode)
+  :config
+  (set-face-attribute 'lsp-ui-sideline-code-action nil :foreground nil :inherit 'font-lock-function-name-face)
+  (set-face-attribute 'lsp-ui-sideline-current-symbol nil :foreground nil :weight 'light :inherit 'highlight))
+(use-package company-lsp :commands company-lsp)
+(use-package helm-lsp :commands helm-lsp-workspace-symbol)
+
+#+end_src
+
 *** Highlight todos (hl-todo)
 #+begin_src emacs-lisp
 (use-package hl-todo
