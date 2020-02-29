@@ -40,11 +40,12 @@
  org-M-RET-may-split-line '((headline . t) (default . t))
  org-agenda-window-setup 'current-window
  org-fontify-whole-heading-line t
+ org-level-color-stars-only t
  org-hide-emphasis-markers t
  org-highlight-latex-fragments-and-specials t
  org-startup-folded nil
  org-startup-indented t
- org-indent-indentation-per-level 1
+org-indent-indentation-per-level 2
  org-url-hexify-p nil)
 #+END_SRC
 ** MobileOrg
@@ -98,17 +99,19 @@ for more information."
 ;; (aj/add-visual-replacement "#+END_QUOTE"   "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▀" aj/org-prettify-symbols)
 ;; (aj/add-visual-replacement "#+end_quote"   "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▀" aj/org-prettify-symbols)
 
-(aj/add-visual-replacement "#+BEGIN_QUOTE" "╱╱" aj/org-prettify-symbols)
-(aj/add-visual-replacement "#+begin_quote" "╱╱" aj/org-prettify-symbols)
-(aj/add-visual-replacement "#+END_QUOTE" "╱╱"  aj/org-prettify-symbols)
-(aj/add-visual-replacement "#+end_quote"  "╱╱" aj/org-prettify-symbols)
+(dolist (kw '(("#+BEGIN_QUOTE" . ?❝)
+              ("#+begin_quote" . ?❝)
+              ("#+END_QUOTE" . ?❞)
+              ("#+end_quote" . ?❞)))
+  (add-to-list 'aj/org-prettify-symbols kw))
+
+
 #+end_src
 **** Prettify dashes
 #+BEGIN_SRC emacs-lisp
 (dolist (kw '(("--" . ?–)
               ("---" . ?—)))
   (add-to-list 'aj/org-prettify-symbols kw))
-
 #+END_SRC
 
 ** Keybindings and templates
@@ -292,8 +295,8 @@ Otherwise hydra for template insertion.
 *** Todo stuff
 **** Todo keywords, Todo states
 #+BEGIN_SRC emacs-lisp
-(defface aj/org-waiting '((t :inherit 'org-formula :bold t)) "Face for waiting org-state" :group 'org-faces)
-(defface aj/org-started '((t :inherit 'org-sexp-date :bold t)) "Face for started org-state" :group 'org-faces)
+(defface aj/org-waiting '((t :inherit org-formula :bold t)) "Face for waiting org-state" :group 'org-faces)
+(defface aj/org-started '((t :inherit org-sexp-date :bold t :underline nil)) "Face for started org-state" :group 'org-faces)
 
 
 ;; more visible than default (cyan) in solarized (good for the small ❢)
@@ -311,7 +314,7 @@ Otherwise hydra for template insertion.
 
 (dolist (kw '(("TODO" . ?❢)
               ("DONE" . ?✔)
-              ("STARTAD" . ?🔁)
+              ("STARTAD" . ?➠)
               ("VÄNTAR" . ?⌛)
               ("AVFÖRD" . ?✘)))
   (add-to-list 'aj/org-prettify-symbols kw))
@@ -365,13 +368,10 @@ all children are done, you can use the following setup:
 (with-eval-after-load 'org-agenda
   (bind-keys :map
              org-agenda-mode-map
-             ;; see definition below
-             ("å" . aj/org-update-gcal-redo-agenda)
              ;; I don’t use diary anyway:
              ("D" . aj/org-agenda-todo-to-done)
              ("C-z" . org-agenda-undo))
-  (defun aj/org-agenda-todo-to-done () (interactive) (org-agenda-todo 'done))
-  )
+  (defun aj/org-agenda-todo-to-done () (interactive) (org-agenda-todo 'done)))
 #+END_SRC
 **** Agenda configuration variables
 #+begin_src emacs-lisp
@@ -387,12 +387,18 @@ all children are done, you can use the following setup:
                              "----------------")
       org-agenda-columns-add-appointments-to-effort-sum t
       org-enforce-todo-dependencies t
-      org-agenda-dim-blocked-tasks t)
+      org-agenda-dim-blocked-tasks t
+      ;; Don’t display deadlines too often
+      org-agenda-skip-deadline-prewarning-if-scheduled t
+      org-agenda-skip-deadline-if-done t
+      ;; By default, I want a 10 day rolling agenda starting from today:
+      org-agenda-span 10
+      org-agenda-start-on-weekday nil
+      org-agenda-start-day nil)
 
-;; add effort to agenda prefix
+;; change agenda prefix format, add effort, wider categories
 (with-eval-after-load 'org-agenda
-  (setf (alist-get 'agenda org-agenda-prefix-format) " %i %-12:c%?-12t% s%?-7e"))
-
+  (setf (alist-get 'agenda org-agenda-prefix-format) " %i %-10c%?-12t% s%-4e"))
 #+END_SRC
 
 **** Agenda custom commands
@@ -446,6 +452,90 @@ all children are done, you can use the following setup:
       nil)))
 #+END_SRC
 
+**** Agenda categories icons :ARCHIVE:
+I don’t use this now, can just put UTF-8, emojis and whatever in category names. Works well
+
+
+I want to be able to use emojis \etc. But that doesn’t work with the way ~org-agenda-category-icon-alist~, hence the patch below.
+
+#+begin_src emacs-lisp
+(el-patch-feature org-agenda)
+(with-eval-after-load 'org-agenda
+  (el-patch-defun org-agenda-get-category-icon (category)
+    "Return an image for CATEGORY according to `org-agenda-category-icon-alist'."
+    (cl-dolist (entry org-agenda-category-icon-alist)
+      (when (string-match-p (car entry) category)
+        (el-patch-swap
+          (if (listp (cadr entry))
+	          (cl-return (cadr entry))
+	        (cl-return (apply #'create-image (cdr entry))))
+          (cond
+           ((listp (cadr entry))
+            (cl-return (cadr entry)))
+           ((characterp (cadr entry))
+            (cl-return (string (cadr entry))))
+           (t
+            (cl-return (apply #'create-image (cdr entry))))
+           ))))))
+
+(setq org-agenda-category-icon-alist
+      '(("^C-.*" ?📅)))
+#+end_src
+
+**** External calendars
+Currently I need to sync both with my work exchange server (via davmail) and some private google calendars.
+***** Functions for syncing some or all external calendars
+#+begin_src emacs-lisp
+(defmacro aj/org-calendar-sync-external-defun (name probefile time syncform)
+  "Defines function aj/org-calendar-sync-NAME for syncing external calendar.
+
+PROBEFILE is a filename whose last modified time should reflect
+the status of the sync, TIME is the number of after which a new
+sync is expected, UPDATEFORM is the form to evaluate for
+syncing."
+  (declare (indent 1))
+  `(defun ,(intern (concat "aj/org-calendar-sync-" name)) (&optional force)
+     ,(concat "Sync external calendar " name ".")
+     (interactive "P")
+     (let ((mtime (nth 5 (file-attributes ,probefile))))
+       (when (or force (not mtime)
+                 (< ,(/ 24 time) (time-to-number-of-days (time-subtract (current-time) mtime))))
+         ,syncform))))
+
+(aj/org-calendar-sync-external-defun "gcal"
+  "~/org/imp/gcal.org" 8 (call-process "aj-gcal-to-org"))
+(aj/org-calendar-sync-external-defun "exchange"
+  "~/org/imp/chalmers-kalender.org" 3 (org-caldav-sync))
+
+(defun aj/org-calendar-sync-all (&optional force)
+  (interactive "P")
+  (aj/org-calendar-sync-gcal force)
+  (aj/org-calendar-sync-exchange force))
+
+(defun aj/org-calendar-sync-all-redo-agenda ()
+  (interactive)
+  (aj/org-calendar-sync-all t)
+  (org-agenda-redo t))
+
+(add-hook 'org-agenda-finalize-hook #'aj/org-calendar-sync-all)
+
+(with-eval-after-load 'org-agenda
+  (bind-key "å" #'aj/org-calendar-sync-all-redo-agenda org-agenda-mode-map))
+#+end_src
+
+***** Syncing with org-caldav
+Settings for calendars kept in custom.el
+#+begin_src emacs-lisp
+(use-package org-caldav
+  :straight (:host github :repo "dengste/org-caldav"
+                   :fork (:host github :repo "andersjohansson/org-caldav" :branch "customize"))
+  :config
+  (setq org-icalendar-timezone "Europe/Stockholm"))
+#+end_src
+
+***** Syncing google calendar
+Downloads and converts ics-files from google calendar (where I keep my appointments) to org. My script ~gcal-to-org~ calls the conversion script from here on all my calendars: http://perlstalker.vuser.org/blog/2014/06/04/importing-ical-into-org-mode/
+
 *** Refile, and agenda refile settings
 I want to be able to refile to all other agenda files, excluding files imported from google calendar (under "imp/" subdirectory).
 In addition, eligible trees should not include TODO entries without subtasks.
@@ -498,24 +588,7 @@ In addition, eligible trees should not include TODO entries without subtasks.
   :commands (aj/org-agenda-weekplan-to-utv
              aj/org-agenda-morningplan aj/org-agenda-days-to-utv))
 #+end_src
-**** Google calendar import
-Downloads and converts ics-files from google calendar (where I keep my appointments) to org. My script ~gcal-to-org~ calls the conversion script from here on all my calendars: http://perlstalker.vuser.org/blog/2014/06/04/importing-ical-into-org-mode/
-#+BEGIN_SRC emacs-lisp
-(defvar aj/org-dont-update-gcal nil)
-
-(defun aj/org-update-gcal (&optional force)
-  (when (not aj/org-dont-update-gcal)
-    (let ((mtime (nth 5 (file-attributes "~/org/imp/J-allmänt.org"))))
-      (when (or force (not mtime)
-                (< 0.2 (time-to-number-of-days (time-subtract (current-time) mtime))))
-        (call-process "aj-gcal-to-org")))))
-
-(add-hook 'org-finalize-agenda-hook 'aj/org-update-gcal)
-
-(defun aj/org-update-gcal-redo-agenda () (interactive) (aj/org-update-gcal t) (org-agenda-redo t))
-#+end_src
-
-***** TODO Check out org-gcal (two-way sync) instead of this custom solution.
+*** TODO Check out org-gcal (two-way sync) instead of this custom solution.
 
 https://github.com/kidd/org-gcal.el
 
@@ -780,6 +853,18 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2015-04/msg00052.html
         :buffer "*helm org headings*"))
 #+END_SRC
 
+** org-id, add id's in this file! And for all org files in a directory.
+#+begin_src emacs-lisp
+(defun aj/org-id-update-id-locations-from-file ()
+  (interactive)
+  (when-let (fn (buffer-file-name))
+    (org-id-update-id-locations (list fn))))
+
+(defun aj/org-id-update-id-locations-recursive (dir)
+  (interactive "D")
+  (org-id-update-id-locations
+   (directory-files-recursively dir ".*\\.org$" nil t t)))
+#+end_src
 ** Visibility, folding, display etc.
 *** Make visibility property "folded" behave as if subtree was archived, i.e. always hidden after visibility cycling
 This is based on ~org-cycle-hide-archived-trees~.
@@ -938,7 +1023,6 @@ That is, always create a new buffer. (Is there anything more changed?)
 (defun aj/org-open-file-with-system (path)
   (org-open-file path 'system))
 #+END_SRC
-
 ** Local variables headings
 A local variables comment block that is placed at the end of the file may be lost or moved if the last subtree (under which it is viewed as being filed) is removed or moved. We don’t want that! Instead, automatically place local variables under their own top-level heading. By default I put the ~ARCHIVE~ tag on this heading, to hide it away a bit and avoid exporting it.
 #+BEGIN_SRC emacs-lisp
@@ -1355,10 +1439,11 @@ This function run with ~org-capture-prepare-finalize-hook~ avoids this problem b
 **** Use a datetree only down to month
 This function can be used for ~file+function~ targets in capture templates
 #+begin_src emacs-lisp
+(require 'org-datetree)
+
 (defun aj/org-datetree-find-month-create (&optional d)
   "Find or create an entry for date D, up to month"
   (unless d (setq d (org-date-to-gregorian (org-read-date))))
-  (require 'org-datetree)
   (setq-local org-datetree-base-level 1)
   (save-restriction
     (widen)
@@ -1386,11 +1471,12 @@ This function can be used for ~file+function~ targets in capture templates
 **** Add ID to some notes
 Currently those entered with "a", could of course be generalized.
 #+begin_src emacs-lisp
-(defun aj/org-capture-maybe-add-id ()
-  (when (equal "a" (org-capture-get :key t))
-    (org-id-get-create)))
+(with-eval-after-load 'org-capture
+  (defun aj/org-capture-maybe-add-id ()
+    (when (equal "a" (org-capture-get :key t))
+      (org-id-get-create)))
 
-(add-hook 'org-capture-prepare-finalize-hook #'aj/org-capture-maybe-add-id)
+  (add-hook 'org-capture-prepare-finalize-hook #'aj/org-capture-maybe-add-id))
 #+end_src
 
 **** Insert weektree CUSTOM_ID
@@ -1588,6 +1674,23 @@ I keep some notes for papers in org-mode, but sort my papers in Zotero. With thi
            ("title" . "org")))
       (user-error "Couldn’t create link"))))
 #+END_SRC
+** Special commands for org-babel-tangle
+#+begin_src emacs-lisp
+(defun aj/org-babel-tangle-tagged (tag)
+  (interactive (list (completing-read "tag: " (org-get-buffer-tags) nil t)))
+  (org-scan-tags
+   (lambda () (save-restriction
+           (org-narrow-to-subtree)
+           (org-babel-tangle)))
+   (org-make-tags-matcher tag)
+   nil))
+
+
+(defun aj/org-tangle-computer-config ()
+  "Tangle config tagged with current ‘system-name’"
+  (interactive)
+  (aj/org-babel-tangle-tagged (system-name)))
+#+end_src
 ** Copy region as html or ascii
 #+begin_src emacs-lisp
 (defun aj/org-export-copy-region-as (&optional backend)
@@ -2012,7 +2115,7 @@ Also a function to get all annotations in a pdf file
         nil)))
 
   (autoload 'pdf-zotxt-quote-get-all-annots-in-buffer-or-file "pdf-zotxt-quote")
-  
+
   (defun aj/get-zotxt-pdf-annotations ()
     (interactive)
     (let ((item-id (org-zotxt-extract-link-id-at-point)))
@@ -2131,7 +2234,6 @@ Mostly for html and reveal
    org-re-reveal-mathjax-url "https://cdnjs.cloudflare.com/ajax/libs/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
    org-re-reveal-plugins '(classList zoom notes)
    org-re-reveal-theme "white"
-   org-re-reveal-extra-css "../assets/ajwhite.css"
    org-re-reveal-transition "slide"
    org-re-reveal-transition-speed "fast"
    org-re-reveal-default-frag-style "appear"
@@ -3814,10 +3916,15 @@ See discussion here: https://lists.gnu.org/archive/html/emacs-orgmode/2019-01/ms
 *** Org Bullets
 #+begin_src emacs-lisp
 (use-package org-bullets
-  :hook (org-mode-hook . org-bullets-mode)
+  :hook (org-mode . org-bullets-mode)
   :custom org-bullets-bullet-list
-  '("✹" "✸" "✷" "✶" "✻" "✼" "✽" "✿" "❀" "❁"
-    "❈" "❉" "❊" "❆" "▹" "▹" "▹" "▹"))
+  ;; '("■" "■" "■""■" "■" "■" "■" "■" "■" "■" "■" "■" "■")
+  '("▌" "▌" "▌" "▌" "▌" "▌" "▌" "▌" "▌" "▌" "▌" "▌" "▌" )
+  ;; '("■" "━" "━" "━" "━" "━" "━" "━" "━" "━" "━"
+  ;; "━" "━" "━" "━" "━" "━" "━" "━" "━" "━" "━")
+  ;; '("✹" "✸" "✷" "✶" "✻" "✼" "✽" "✿" "❀" "❁"
+  ;;   "❈" "❉" "❊" "❆" "▹" "▹" "▹" "▹")
+  )
 #+end_src
 
 *** Scaling command for org tables

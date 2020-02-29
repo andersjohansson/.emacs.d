@@ -194,7 +194,7 @@ https://bling.github.io/blog/2016/01/18/why-are-you-changing-gc-cons-threshold/
 
 (when window-system
   (setq frame-title-format '(buffer-file-name "%f" ("%b")))
-  
+
   (defun aj/deactivate-gui (mode on)
     "Activate or deactivate MODE depending on ON, and defines a variable stating my choice."
     (when (fboundp mode)
@@ -209,22 +209,34 @@ https://bling.github.io/blog/2016/01/18/why-are-you-changing-gc-cons-threshold/
 *** Enable scroll-bars
 #+begin_src emacs-lisp
 (when window-system
-  (scroll-bar-mode t)  
+  (scroll-bar-mode t)
   (set-scroll-bar-mode 'right)
   (set-window-scroll-bars (minibuffer-window) nil nil)
   (set-window-fringes (minibuffer-window) nil 0) ; no right fringe in minibuffer
   )
 
 #+end_src
-*** Fontset stuff
-I never get this to work really well, the issue is with special (fancy) symbols in [[*Mail-config][mu4e]] that gets the columns misaligned when the characters are taken from another font than the default mono-space (I use Ubuntu mono, which lacks many symbols). The "monospacified" version of Symbola is supposed to solve this problem but seemingly doesn’t. For now, I have switched to symbols that are in Ubuntu mono ([[file:lisp/aj-mail-config.org::*Symbols][defined here]]).
+*** Fontset stuff, color emojis (emacs 27, yay!)
 #+BEGIN_SRC emacs-lisp
+;; Not needed.
+;; (set-fontset-font ft nil (font-spec :name "Symbola") nil 'append)
+;; (set-fontset-font ft 'cjk-misc (font-spec :name "Noto Sans CJK") nil)
+
+;; Fonts for some emojis:
+;; Emoticons
+(set-fontset-font t '(#x1f600 . #x1f64f) "Noto Color Emoji")
+;; Misc symbols
+(set-fontset-font t '(#x1f300 . #x1F5ff) "Noto Color Emoji")
+#+end_src
+
+**** Monospacified? :ARCHIVE:
+
+I never get this to work really well, the issue is with special (fancy) symbols in [[*Mail-config][mu4e]] that gets the columns misaligned when the characters are taken from another font than the default mono-space (I use Ubuntu mono, which lacks many symbols). The "monospacified" version of Symbola is supposed to solve this problem but seemingly doesn’t. For now, I have switched to symbols that are in Ubuntu mono ([[file:lisp/aj-mail-config.org::*Symbols][defined here]]).
+#+begin_src emacs-lisp
 (dolist (ft (fontset-list))
-  ;; (set-fontset-font ft 'unicode (font-spec :name "Ubuntu Mono"))
-  (set-fontset-font ft nil (font-spec :name "Symbola") nil 'append)
-  (set-fontset-font ft 'cjk-misc (font-spec :name "Noto Sans CJK") nil)
-  ;; (set-fontset-font ft 'unicode (font-spec :name "Symbola monospacified for Ubuntu Mono") nil 'append)
-  ;; (set-fontset-font ft nil (font-spec :name "Symbola monospacified for Ubuntu Mono") nil 'append)
+  (set-fontset-font ft 'unicode (font-spec :name "Ubuntu Mono"))
+  (set-fontset-font ft 'unicode (font-spec :name "Symbola monospacified for Ubuntu Mono") nil 'append)
+  (set-fontset-font ft nil (font-spec :name "Symbola monospacified for Ubuntu Mono") nil 'append)
   )
 #+end_src
 
@@ -408,38 +420,10 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 #+END_SRC
 
 *** Tooltip-mode
-I want to use the echo area (hence ~(tooltip-mode -1)~), but don’t want help echo messages to be truncated, so I need to patch ~tooltip-show-help-non-mode~.
+I want to use the echo area (hence ~(tooltip-mode -1)~), but don’t want help echo messages to be truncated, but resized!
 #+begin_src emacs-lisp
 (tooltip-mode -1)
-
-(with-eval-after-load 'tooltip
-  (el-patch-defun tooltip-show-help-non-mode (help)
-    "Function installed as `show-help-function' when Tooltip mode is off.
-It is also called if Tooltip mode is on, for text-only displays."
-    (when (and (not (window-minibuffer-p)) ;Don't overwrite minibuffer contents.
-               (not cursor-in-echo-area))  ;Don't overwrite a prompt.
-      (cond
-       ((stringp help)
-        (setq help (replace-regexp-in-string "\n" ", " help))
-        (unless (or tooltip-previous-message
-                    (equal-including-properties help (current-message))
-                    (and (stringp tooltip-help-message)
-                         (equal-including-properties tooltip-help-message
-                                                     (current-message))))
-          (setq tooltip-previous-message (current-message)))
-        (setq tooltip-help-message help)
-        (let ((message-truncate-lines (el-patch-swap t nil))
-              (message-log-max nil))
-          (message "%s" help)))
-       ((stringp tooltip-previous-message)
-        (let ((message-log-max nil))
-          (message "%s" tooltip-previous-message)
-          (setq tooltip-previous-message nil)))
-       (t
-        (message nil))))))
-
-
-
+(setq tooltip-resize-echo-area t)
 #+end_src
 
 *** Center frame (used for helm)
@@ -533,7 +517,7 @@ Example of alist entry:
 
   (setq helm-display-function
         ;;#'aj/helm-display-child-frame
-        #'helm-default-display-buffer 
+        #'helm-default-display-buffer
         helm-display-buffer-reuse-frame t
         helm-display-buffer-width 120
         helm-display-buffer-height 35
@@ -601,7 +585,7 @@ Example of alist entry:
   (global-set-key (kbd "C-c h g") 'helm-google-suggest)
 
 ;;; Helm mini:
-  
+
   (setq helm-mini-default-sources
         '(helm-source-buffers-list
           ;;aj/helm-source-favourite-files
@@ -726,9 +710,6 @@ Different fuzzy search algorithm, is this needed?
 #+END_SRC
 **** Open zotero library files
 #+BEGIN_SRC emacs-lisp
-(use-package dash)
-(eval-when-compile (require 'dash))
-
 (with-eval-after-load 'helm-files
   (defcustom aj/helm-zotero-library nil
     "Directory of Zotero library files"
@@ -760,7 +741,7 @@ Different fuzzy search algorithm, is this needed?
             (list
              (helm-build-sync-source "Zotero recently modified"
                :action active-actions
-               :pattern-transformer 'helm-recentf-pattern-transformer
+               :pattern-transformer #'helm-recentf-pattern-transformer
                :keymap helm-generic-files-map
                :candidates #'aj/helm-zotero-recently-modified)
              (helm-build-sync-source "Zotero recentf"
@@ -801,8 +782,8 @@ Different fuzzy search algorithm, is this needed?
                  t)))))
 
   (defun aj/recentf-list-zotero ()
-    (--filter (string-match-p aj/helm-zotero-library it)
-              recentf-list))
+    (cl-remove-if-not (lambda (it) (string-match-p aj/helm-zotero-library it))
+                      recentf-list))
 
   (defun aj/helm-zotero-files ()
     (when (file-accessible-directory-p aj/helm-zotero-library)
@@ -1133,24 +1114,26 @@ overriding it, but you should know before you do.
 ** Mail-config (mu4e)
 Use mu4e, the extensive config is in an [[file:lisp/aj-mail-config.org][external file]].
 #+BEGIN_SRC emacs-lisp
-(when aj/ajeb
-  (use-package mu4e
-	:bind (("C-x ö" . mu4e)
-		   ("C-x m" . mu4e-compose-new)
-		   ("C-x i" . mu4e~headers-jump-to-maildir)
-		   ("C-x å" . mu4e-headers-search-bookmark))
-	:defer 10
-	:init (setq mu4e-get-mail-command "aj-mailsync" ; bash script running 3 offlineimap
-				mu4e-update-interval 1800
-				mu4e-view-show-images t
-				mu4e-use-fancy-chars t
-                mu4e-headers-results-limit 200 ; easier on my slow computer
-				mu4e-attachment-dir "~/Hämtningar"
-				;; mu4e-change-filenames-when-moving t ;;for mbsync
-				mu4e-completing-read-function #'completing-read) ; hands it to helm
-	:config (require 'aj-mail-config)
-	(mu4e t) ;; start delayed in background
-	))
+(use-package mu4e
+  :bind (("C-x ö" . mu4e)
+         ("C-x m" . mu4e-compose-new)
+         ("C-x i" . mu4e~headers-jump-to-maildir)
+         ("C-x å" . mu4e-headers-search-bookmark))
+  :defer 10
+  :init (setq mu4e-get-mail-command "aj-mailsync" ; bash script
+                                        ; running several offlineimap
+                                        ; processes for syncing
+                                        ; different mailboxes
+              mu4e-update-interval 600
+              mu4e-view-show-images t
+              mu4e-use-fancy-chars t
+              mu4e-headers-results-limit 200 ; easier on my slow computer
+              mu4e-attachment-dir "~/Hämtningar"
+              ;; mu4e-change-filenames-when-moving t ;;for mbsync
+              mu4e-completing-read-function #'completing-read) ; hands it to helm
+  :config (require 'aj-mail-config)
+  (mu4e t) ;; start delayed in background
+  )
 #+END_SRC
 
 *** Fix parse-time-string :ARCHIVE:
@@ -1202,16 +1185,31 @@ Disable it for now.
 #+BEGIN_SRC emacs-lisp
 (setq gnus-select-method '(nntp "news.gmane.org"))
 #+END_SRC
-** Unicode-fonts :ARCHIVE:
-Don’t remember the point of this package
-#+BEGIN_SRC emacs-lisp
-;; (use-package unicode-fonts
-;;   :defer 3
-;;   :config (unicode-fonts-setup))
-
-;;(set-fontset-font t 'unicode (font-spec :name "Symbola monospacified for Ubuntu Mono") nil 'append)
-#+END_SRC
 ** Filetypes etc
+*** Don’t warn about large pdfs
+Patch ~abort-if-file-too-large~ to not complain about pdfs (which are generally handled well by pdf-tools no matter the size).
+#+begin_src emacs-lisp
+(el-patch-feature files)
+(with-eval-after-load 'files
+  (el-patch-defun abort-if-file-too-large (size op-type filename &optional offer-raw)
+    "If file SIZE larger than `large-file-warning-threshold', allow user to abort.
+OP-TYPE specifies the file operation being performed (for message
+to user).  If OFFER-RAW is true, give user the additional option
+to open the file literally.  If the user chooses this option,
+`abort-if-file-too-large' returns the symbol `raw'.  Otherwise,
+it returns nil or exits non-locally."
+    (let ((choice (and large-file-warning-threshold size
+	                   (> size large-file-warning-threshold)
+                       ;; No point in warning if we can't read it.
+                       (file-readable-p filename)
+                       (el-patch-add (not (string= "pdf" (file-name-extension filename))))
+                       (files--ask-user-about-large-file
+                        size op-type filename offer-raw))))
+      (when (eq choice 'abort)
+        (user-error "Aborted"))
+      choice)))
+#+end_src
+
 *** Add pdfbz2 and pdfgz filetypes and decompress correctly
 I need this for adding files with .pdfbz2 or .pdfgz suffixes to Zotero with Zotfile, which can't handle double suffixes like .pdf.bz2.
 
@@ -1298,6 +1296,17 @@ But show cursor in ~wdired-mode~
   :config (validate-setq dired-du-size-format t
                          dired-du-update-headers t))
 #+END_SRC
+
+**** COMMENT Extract archives from dired
+A simple command to run ~file-roller -h~ for extracting archives in current directory
+#+begin_src emacs-lisp
+(defun aj/dired-extract-archive-here (&optional arg)
+  (interactive "P")
+  ;; (dolist (f (dired-map-over-marks
+  ;;             (cons (dired-get-filename) (point)) arg))
+  ;;   (call-process "file-roller" nil nil nil "-h" f))
+  )
+#+end_src
 
 **** Dired-ranger :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
@@ -1389,15 +1398,10 @@ Store visited directories in a list, make it accessible from helm
 #+begin_src emacs-lisp
 (use-package recentf
   :demand t
-  :init (setq-default recentf-exclude '("xhtml-loader\\.rnc$" "\\.elc$"
-                                        "elpa.*-autoloads.el"
-                                        "/tmp/org-init-tangle"
-                                        "~/.emacs.d/init.el"
-                                        "~/.emacs.d/lisp/aj-org-config.el"
-                                        "~/.emacs.d/lisp/aj-mail-config.el"
-                                        aj/recentf-exclude)
-                      recentf-max-menu-items 500
-                      recentf-max-saved-items 500)
+  :init
+  :custom
+  (recentf-max-menu-items 500)
+  (recentf-max-saved-items 500)
   :config
   (defun aj/recentf-exclude (filename)
     (cl-loop for reg in completion-ignored-extensions
@@ -1705,7 +1709,7 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
 
 ;; replacing \\par with a non-displaying character is just stupid
 (with-eval-after-load "tex-mode"
-  (setq tex--prettify-symbols-alist (delete '("\\par" . ?  
+  (setq tex--prettify-symbols-alist (delete '("\\par" . ? 
 ) tex--prettify-symbols-alist)))
 #+END_SRC
 
@@ -1907,7 +1911,7 @@ https://github.com/andersjohansson/tex-fold-linebreaks
   ;; transient keymap used once cycling starts
   (setq buffer-flip-map
         (let ((map (make-sparse-keymap)))
-          (define-key map (kbd "C-<tab>")   'buffer-flip-forward) 
+          (define-key map (kbd "C-<tab>")   'buffer-flip-forward)
           (define-key map (kbd "C-S-<iso-lefttab>") 'buffer-flip-backward)
           (define-key map (kbd "ESC")     'buffer-flip-abort)
           map))
@@ -2308,7 +2312,7 @@ already narrowed."
                 try-expand-line)))
 #+END_SRC
 
-** info+ :ARCHIVE: 
+** info+ :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package info+
   ;; :after info
@@ -2318,7 +2322,8 @@ already narrowed."
   (define-key Info-mode-map [mouse-5] nil))
 #+end_src
 
-** undo-tree
+** TODO undo-tree
+Maybe use: https://github.com/emacsorphanage/undo-tree
 #+begin_src emacs-lisp
 (use-package undo-tree
   :defer 3
@@ -2407,8 +2412,6 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
   "Non-nil if MODE is one of MODES or derived from one of MODES"
   (or (memq mode modes)
       (apply #'provided-mode-derived-p mode modes)))
-
-
 #+END_SRC
 
 *** Dired display of untracked git files
@@ -2473,16 +2476,25 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
   )
 #+end_src
 
+** GhostText + atomic-chrome.el for editing text areas etc. from firefox
+#+begin_src emacs-lisp
+(use-package atomic-chrome
+  :init (atomic-chrome-start-server))
+#+end_src
+
 ** New (custom) utility commands
+
 #+begin_src emacs-lisp
 (use-package aj-custom-commands
-  :straight (aj-custom-commands :repo "/home/aj/kodat/elisp/aj-custom-commands/" :host nil)
+  :straight (aj-custom-commands :host gitlab :repo "andersjohansson/aj-custom-emacs-commands")
   :defer t
   :bind (("C-x C-k" . aj/delete-current-buffer-file)
          ("C-x C-r" . aj/rename-current-buffer-file)
          ("C-S-<return>" . ergoemacs-open-in-external-app)
          ("C-c m" . aj/message-peek))
-  :init (bind-key "C-a" 'aj/beginning-or-indentation prog-mode-map)
+  :init
+  (straight-use-package 'pcsv)
+  (bind-key "C-a" 'aj/beginning-or-indentation prog-mode-map)
   (with-eval-after-load "dired"
     (bind-key "<s-return>" #'aj/sudo-edit dired-mode-map)))
 #+end_src
@@ -3220,7 +3232,7 @@ cperl instead of perl-mode
 
 (add-hook 'prog-mode-hook 'esk-local-comment-auto-fill)
 #+end_src
-*** Idle-highlight-mode 
+*** Idle-highlight-mode
 #+begin_src emacs-lisp
 (use-package idle-highlight-mode
   :hook prog-mode)
@@ -3584,7 +3596,7 @@ personal dictionaries into a combined personal dictionary."
   :delight guess-language-mode)
 
 
-(defvar aj/flyspell-modes '(org-mode mu4e-compose-mode))
+(defvar aj/flyspell-modes '(org-mode))
 (defvar-local aj/inhibit-flyspell nil)
 (put 'aj/inhibit-flyspell 'safe-local-variable #'booleanp)
 
@@ -3600,13 +3612,21 @@ personal dictionaries into a combined personal dictionary."
   (run-with-idle-timer 1 nil #'aj/maybe-enable-flyspell-fn (current-buffer)))
 
 (defun aj/maybe-enable-flyspell-fn (buf)
+  "Possibly enable ‘flyspell-mode’
+
+Enable it for buffers in ‘aj/flyspell-modes’ with defined
+‘ispell-local-dictionary’, or for ‘mu4e-compose-mode’ (then use
+‘guess-language-mode’)"
   (when (buffer-live-p buf)
     (with-current-buffer buf
-      (when (and (not aj/inhibit-flyspell)
-                 (member major-mode aj/flyspell-modes)
-                 ispell-local-dictionary)
-        (flyspell-mode 1)
-        (aj/set-langtool-language-from-ispell-dict)))))
+      (cond ((or (and (not aj/inhibit-flyspell)
+                      (member major-mode aj/flyspell-modes)
+                      ispell-local-dictionary))
+             (flyspell-mode 1)
+             (aj/set-langtool-language-from-ispell-dict))
+            ((eq major-mode 'mu4e-compose-mode)
+             (flyspell-mode 1)
+             (guess-language-mode 1))))))
 
 (defun aj/set-langtool-language-from-ispell-dict ()
   (when (and ispell-local-dictionary
@@ -3763,11 +3783,7 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
               '(("sv" . "en") ("en" . "sv") ("da" . "sv"))))
 
 ;; needs wn, installed with aur package wordnet-cli
-(use-package synosaurus
-  ;; :pin "melpa"
-  :commands (synosaurus-lookup synosaurus-choose-and-replace)
-  :custom (synosaurus-choose-method 'default) ; this means completing-read, which gives me helm completion
-  )
+(use-package wordnut)
 
 (defhydra hydra-word-lookup
   (:color blue)
@@ -3780,13 +3796,59 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
   ("C" (define-word-at-point nil 'synonymer) "Synonymer at point")
   ("s" (define-word (read-from-minibuffer "Thesaurus: " ) 'thesaurus) "Thesaurus")
   ("S" (define-word-at-point nil 'thesaurus) "Thesaurus at point")
-  ("a" synosaurus-lookup "synosaurus")
-  ("A" synosaurus-choose-and-replace "Synosaurus at point")
+  ("n" wordnut-search "wordnut")
   ("g" google-translate-smooth-translate "Google translate"))
 
 (bind-key "C-x l"  #'hydra-word-lookup/body)
 #+END_SRC
-** Special modes 
+** Special modes
+*** Extend archive-mode with functions to extract (copy out) single files
+Taken from: https://emacs.stackexchange.com/a/3843
+#+begin_src emacs-lisp
+(with-eval-after-load 'arc-mode
+  (define-key archive-mode-map "C" #'aj/archive-extract-marked-to-file)
+
+  (defun aj/archive-extract-marked-to-file (output-dir)
+    "Extract marked archive items to OUTPUT-DIR."
+    (interactive "GOutput directory: ")
+    (let ((command (symbol-value (archive-name "extract")))
+          (archive (buffer-file-name))
+          (items (archive-get-marked ?* t))) ; get marked items; t means
+                                        ; get item under point if
+                                        ; nothing is marked
+      (dolist (item items)
+        (archive-extract-to-file
+         archive
+         (aref item 0) ; get the name from the descriptor
+         command output-dir))))
+
+  (defun aj/archive-extract-to-file (archive-name item-name command dir)
+    "Extract ITEM-NAME from ARCHIVE-NAME using COMMAND. Save to
+DIR."
+    (unwind-protect
+        ;; remove the leading / from the file name to force
+        ;; expand-file-name to interpret its path as relative to dir
+        (let* ((file-name (if (string-match "\\`/" item-name)
+                              (substring item-name 1)
+                            item-name))
+               (output-file (expand-file-name file-name dir))
+               (output-dir (file-name-directory output-file)))
+          ;; create the output directory (and its parents) if it does
+          ;; not exist yet
+          (unless (file-directory-p output-dir)
+            (make-directory output-dir t))
+          ;; execute COMMAND, redirecting output to output-file
+          (apply #'call-process
+                 (car command)            ;program
+                 nil                      ;infile
+                 `(:file ,output-file)    ;destination
+                 nil                      ;display
+                 (append (cdr command) (list archive-name item-name))))
+      ;; FIXME: add unwind forms
+      nil))
+  )
+#+end_src
+
 *** Spotify
 #+begin_src emacs-lisp
 (use-package spotify
@@ -3819,14 +3881,14 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
 (with-eval-after-load 'pdf-view
   (defun pdf-view-current-pagelabel (&optional window)
     (nth (1- (pdf-view-current-page window)) (pdf-info-pagelabels)))
-  
+
   (setq-default pdf-view-display-size 'fit-page)
   (add-hook 'pdf-view-mode-hook (lambda () (auto-revert-mode -1) (whole-line-or-region-local-mode -1)))
 
   (delight 'pdf-view-midnight-minor-mode " ☾" "pdf-misc")
   (defvar aj/pdf-view-midnight-list
-    '(("#657b83" . "#fdf6e3")
-      ("#333333" . "#fffff8")))
+    '(("#282828" . "#f9f5d7")
+      ("#fdf4c1" . "#282828")))
   (setq pdf-view-midnight-colors (car aj/pdf-view-midnight-list))
 
   (defun aj/pdf-view-midnight-toggle ()
@@ -3930,6 +3992,15 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
   (bind-keys ("M-n" . aj/other-window-pdf-next-page)
              ("M-p" . aj/other-window-pdf-previous-page)))
 #+END_SRC
+**** Multipage view
+Package adopted from some code with "issues" from politza. But it initially seems to work ok for getting the pdf "book" experience.
+
+https://github.com/politza/pdf-tools/issues/74#issuecomment-90224020
+https://gist.github.com/politza/a3339a4f3b3901fcce4c
+#+begin_src emacs-lisp
+(use-package pdf-view-multipage
+  :straight (:host gitlab :repo "andersjohansson/pdf-view-multipage"))
+#+end_src
 
 **** pdf-zotxt-quote
 Copying from a pdf with correct org-zotxt references and page numbers
@@ -3964,10 +4035,10 @@ But also with some inspiration from here: https://lepisma.github.io/2017/10/28/r
   ;; in /lisp
   :straight nil
   :commands doc-font-mode)
-
 #+end_src
+
 *** Toggle font size
-Sometimes I feel the need for a generally bigger font.
+Sometimes I feel the need for a generally bigger font. Especially when switching between my 13 inch 1920*1080-screen and my 24 inch 1920*1080-screen (systemwide screenwise fractional scaling is still not an option on linux).
 #+begin_src emacs-lisp
 (defvar aj/orig-font-size nil)
 
@@ -3975,9 +4046,11 @@ Sometimes I feel the need for a generally bigger font.
 
 (defun aj/toggle-font-size ()
   (interactive)
-  (if (= aj/orig-font-size (face-attribute 'default :height))
+  (if (> 7 (abs (- aj/orig-font-size (face-attribute 'default :height))))
       (set-face-attribute 'default nil :height 135)
     (set-face-attribute 'default nil :height aj/orig-font-size)))
+
+(bind-key "C-s-T" #'aj/toggle-font-size)
 #+end_src
 
 
@@ -4091,7 +4164,7 @@ mouse-1: Previous buffer\nmouse-3: Next buffer"
                                    cp
                                    (pdf-cache-number-of-pages)))
                  (currlabel (pdf-view-current-pagelabel)))
-            
+
             (propertize
              (if (equal currlabel (number-to-string cp))
                  (concat " P: " physical " ")
@@ -4376,7 +4449,8 @@ Load my own face customizations after enabling a theme.
   "Do face definition stuff after loading theme.
 Also runs hook aj/face-definitions-hook."
   (unless (eq theme 'user) ;enable theme calls itself with user theme.
-    (set-face-attribute 'scroll-bar nil :foreground (face-attribute 'widget-field :background))
+
+    ;; (set-face-attribute 'scroll-bar nil :foreground (face-attribute 'widget-field :background))
 
     (with-eval-after-load 'org-faces
 
@@ -4385,9 +4459,9 @@ Also runs hook aj/face-definitions-hook."
 
       (set-face-attribute 'org-block-begin-line nil :height 0.9)
       (set-face-attribute 'org-block-end-line nil :height 0.9)
-      (set-face-attribute 'org-block nil :height 0.95)
+      (set-face-attribute 'org-block nil :height 0.95 :extend t)
 
-      (set-face-attribute 'org-quote nil :weight 'normal :height 0.95 :inherit 'default)
+      (set-face-attribute 'org-quote nil :weight 'light :height 0.95 :inherit 'default)
       (set-face-attribute 'org-verse nil :inherit 'org-table)
       ;; (set-face-attribute 'org-tag nil :weight 'normal :inherit
       ;; 'show-paren-match)
@@ -4616,6 +4690,11 @@ I actually liked this more, especially the unified-branch which I used here. But
                 writeroom-global-effects '(writeroom-set-fullscreen)))
 #+END_SRC
 
+*** Hide mode-line
+#+begin_src emacs-lisp
+(use-package hide-mode-line
+  :defer t)
+#+end_src
 *** Readable-frame :ARCHIVE:
 With some inspiration from here: https://lepisma.github.io/2017/10/28/ricing-org-mode/
 Launches a frame with a serif font and writeroom, to read texts in org-mode.
@@ -4645,9 +4724,8 @@ From: http://stackoverflow.com/questions/4726220/how-to-have-colors-in-the-outpu
 *** ajf
 Some special functions for managing my data files.
 #+begin_src emacs-lisp
-(use-package aj-forskning
+(use-package aj-forskning ;; private package
   :straight nil
-  :load-path "~/kodat/elisp/orgqda"
   :defer t)
 
 ;;; font-lock () och {}
@@ -4665,13 +4743,13 @@ Some special functions for managing my data files.
 
 *** mplayer-mode
 I use my fork, available here: https://github.com/andersjohansson/mplayer-mode/tree/org-sessions
+(it’s messy and mixes up too many things in my current opinion...)
 #+BEGIN_SRC emacs-lisp
-  (use-package mplayer-mode
-    :straight nil
-	:load-path "~/kodat/elisp/mplayer-mode/"
-	:defer t
-	:config (setq mplayer-display-time-in-modeline nil
-				  mplayer-default-seek-step 2))
+(use-package mplayer-mode
+  :straight (:host github :repo "andersjohansson/mplayer-mode" :depth full :branch "org-sessions")
+  :defer t
+  :config (setq mplayer-display-time-in-modeline nil
+				mplayer-default-seek-step 3))
 #+END_SRC
 
 *** orgqda-helm-tags
@@ -4689,7 +4767,6 @@ Also at: https://github.com/andersjohansson/orgqda
 #+BEGIN_SRC emacs-lisp
 (use-package orgqda-transcript
   :straight nil
-  :load-path "~/kodat/elisp/orgqda"
   :defer t
   :config (setq orgqda-transcript-bind-fn-keys t
                 orgqda-transcript-set-up-speaker-keys t
@@ -4792,10 +4869,11 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
 #+begin_src emacs-lisp
 (when (display-graphic-p)
   (add-to-list 'default-frame-alist '(top . 0))
-  (add-to-list 'default-frame-alist '(left . 0))
+  (add-to-list 'default-frame-alist '(left . (+ -9)))
   (add-to-list 'default-frame-alist '(fullscreen . fullheight))
-  (add-to-list 'default-frame-alist '(scroll-bar-width . 7))
-  
+  ;; this is a bitt narrower for arc-gtk-theme:
+  (add-to-list 'default-frame-alist '(scroll-bar-width . 12))
+
   (defun aj/frame-to-left ()
     (interactive)
     (if (> (x-display-pixel-width) aj/large-screen-min-width)
@@ -4806,14 +4884,16 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
       (add-to-list 'default-frame-alist (cons 'width 90)) ;small
       )
     (set-frame-parameter nil 'fullscreen 'fullheight)
-    (set-frame-parameter nil 'left 0)
+    (set-frame-parameter nil 'left '(+ -0))
     (set-frame-parameter nil 'top 0))
 
   (add-hook 'after-init-hook #'aj/frame-to-left))
 #+end_src
 
 ** Auto-saving and reverting
-*** Auto-saving of all buffers in visited files
+*** Auto-saving of all buffers in visited files :ARCHIVE:
+I don’t currently use this. It has caused more problems for me than it has solved. Over-eager auto-save interferes with some packages (most notably helm). And I’m kind of used to using unsaved buffers for some parts of my workflow.
+
 Inspired by https://github.com/grettke/lolsmacs, it’s better to not keep inconsistent state in non-saved buffers. Especially since Emacs or my computer crashes from time to time.
 
 #+begin_src emacs-lisp

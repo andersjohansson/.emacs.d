@@ -25,10 +25,12 @@ I use ~msmtp~ together with the queueing script ~msmtpq~ (included with ~msmtp~)
 (add-to-list 'global-mode-string '(t aj/mail-queue-modeline))
 
 (defun aj/update-mail-queue-modeline (_event)
-  (setq aj/mail-queue-modeline
-        (format "%d%s"
-                (length (directory-files "~/.msmtp.queue" nil "\\.mail$"))
-                (all-the-icons-alltheicon "arrow-right" :v-adjust 0.02))))
+  (let ((l (length (directory-files "~/.msmtp.queue" nil "\\.mail$"))))
+    (setq aj/mail-queue-modeline
+          (if (< 0 l)
+              (format " %d%s " l
+                      (all-the-icons-alltheicon "arrow-right" :v-adjust 0.02))
+            ""))))
 
 ;; first run
 (aj/update-mail-queue-modeline t)
@@ -164,7 +166,7 @@ EMAILREGEXP"
 #+BEGIN_SRC emacs-lisp
 (use-package mu4e-maildirs-extension
   :after mu4e
-  :config (setq mu4e-maildirs-extension-use-bookmarks t
+  :config (setq mu4e-maildirs-extension-use-bookmarks nil
                 mu4e-maildirs-extension-toggle-maildir-key (kbd "TAB"))
   (mu4e-maildirs-extension-load))
 #+END_SRC
@@ -270,8 +272,70 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
   (set-face-attribute 'mu4e-conversation-sender-6 nil :inherit 'org-level-6)
   (set-face-attribute 'mu4e-conversation-sender-7 nil :inherit 'org-level-7)
   (set-face-attribute 'mu4e-conversation-sender-8 nil :inherit 'org-level-8))
-
 #+END_SRC
+
+** Contact handling
+*** LDAP (EUDC)
+#+begin_src emacs-lisp
+(with-eval-after-load 'mu4e-compose
+  (bind-key "C-c C-ä" #'eudc-expand-inline mu4e-compose-mode-map))
+
+(setq eudc-server-hotlist
+      '(("ldap://localhost:1389" . ldap)))
+(eudc-set-server "ldap://localhost:1389" 'ldap)
+
+(setq eudc-expansion-overwrites-query t)
+
+(defun aj/display-eudc-info-at-point ()
+  (interactive)
+  (if-let ((email (get-text-property (point) 'email)))
+      (aj/display-eudc-info-other-buffer email)
+    (user-error "No address found at point")))
+
+;;TODO, try to parse address around point also ^
+
+(defvar aj/interesting-ldap-fields '(cn title department mail telephonenumber mobile uid manager))
+
+(dolist (i '((title . "Title")
+             (department . "Institution")
+             (mail . "Mail")
+             (mobile . "Mobil")
+             (uid . "ID")
+             (manager . "Chef")))
+  (add-to-list 'eudc-user-attribute-names-alist i))
+
+(defun aj/display-eudc-info-other-buffer (email)
+  (interactive "sEmail: ")
+  (if-let ((results (eudc-query `((mail . ,email)))))
+      (let ((buf (get-buffer-create "*aj-eudc*")))
+        (unless (eq buf (current-buffer))
+          (view-buffer-other-window buf)
+          (with-current-buffer buf
+            (let* ((inhibit-read-only t)
+                   (fields (cl-loop for f in aj/interesting-ldap-fields
+                                    collect
+                                    (cons f (eudc-format-attribute-name-for-display f))))
+                   (fieldlength (cl-loop for f in fields maximize (length (cdr f)))))
+              (erase-buffer)
+              (cl-loop for result in results
+                       do
+                       (cl-loop for f in fields
+                                do
+                                (when-let (ff (alist-get (car f) result))
+                                  (eudc-print-record-field
+                                   (cons (cdr f)
+                                         (decode-coding-string ff 'utf-8))
+                                   fieldlength))
+                                )
+                       (insert "\n"))))))
+    (user-error "No results found for address %s" email)))
+
+
+;; TODO. Gör "Chef", klickbar. Kanske går att göra med en lämplig
+;; funktion för den (och för id, men det är nog mer meningslöst) i:
+;; eudc-attribute-display-method-alist
+#+end_src
+
 ** View mode settings
 #+BEGIN_SRC emacs-lisp
 (add-hook 'mu4e-view-mode-hook #'visual-line-mode)
@@ -359,28 +423,51 @@ message from the wrong account"
 #+END_SRC
 
 *** Signature cycling
-I have long and "official" signatures defined for my accounts, but often I want to just include my name, or nothing at all. This function allows me to cycle through the signature set in the context (variable ~message-context~), and a list of shorter ones.
+I have long and "official" signatures defined for my accounts, but often I want to just include my name, or nothing at all. This function allows me to cycle through the signature set in the context (variable ~message-context~), a list of shorter ones, and localized signatures when writing in different languages (English and Swedish really). 
+
+Also commented below a function for switching signature language automatically with guess-language. I found it too unpredictable however (for example when replying in a different language) and just switching manually gives more control.
 #+BEGIN_SRC emacs-lisp
 (defvar aj/message-simple-signatures '("Anders Johansson\n" ""))
+(defvar aj/mu4e-compose-localized-signatures nil
+  "Alist of language and signature")
+
 (defvar-local aj/message-sig-cycle 0)
 
 (defun aj/message-signature-cycle ()
   (interactive)
+  (let ((sigs (cl-remove nil
+                         (cl-remove-duplicates
+                          (append (list message-signature)
+                                  (mapcar #'cdr aj/mu4e-compose-localized-signatures)
+                                  aj/message-simple-signatures)
+                          :test #'equal))))
+    (setq aj/message-sig-cycle
+          (mod (1+ aj/message-sig-cycle)
+               (length sigs)))
+    (aj/message-change-signature (nth aj/message-sig-cycle sigs) t)))
+
+(bind-key "C-c C-p" #'aj/message-signature-cycle mu4e-compose-mode-map)
+
+(defun aj/message-change-signature (sig &optional show)
   (save-excursion
-    (let ((sigs (cl-remove-duplicates
-                 (cons message-signature aj/message-simple-signatures)
-                 :test #'equal)))
-      (setq aj/message-sig-cycle
-            (mod (1+ aj/message-sig-cycle)
-                 (length sigs)))
-      (aj/message-remove-signature)
-      (let ((message-signature (nth aj/message-sig-cycle sigs)))
-        (unless (string= message-signature "")
-          (message-insert-signature)))
+    (aj/message-remove-signature)
+    (let ((message-signature sig))
+      (unless (or  (not sig) (string= message-signature ""))
+        (message-insert-signature)))
+    (when show
       ;; to be able to see what happens in a long message:
       (sit-for 0.4))))
 
-(bind-key "C-c C-p" #'aj/message-signature-cycle mu4e-compose-mode-map)
+;; Switch signature with guess-language?
+
+;; (with-eval-after-load 'guess-language
+;;   (add-to-list 'guess-language-after-detection-functions
+;;                #'aj/message-switch-signature-language))
+
+;; (defun aj/message-switch-signature-language (lang _beg _end)
+;;   (when (eq major-mode 'mu4e-compose-mode)
+;;     (aj/message-change-signature
+;;      (alist-get lang aj/mu4e-compose-localized-signatures))))
 #+END_SRC
 
 *** Context cycling
@@ -689,6 +776,51 @@ Non-interactive use returns link"
         (insert (format "recipient-filename=\"%s\" " filename))))))
 #+end_src
 
+**** Warning when forgetting to include attachments
+Adapted from https://www.topbug.net/blog/2016/12/09/attachment-reminder-in-emacs-message-mode/, 
+http://disq.us/p/158wrxo, and http://mbork.pl/2016-02-06_An_attachment_reminder_in_mu4e
+
+#+begin_src emacs-lisp
+(defcustom aj/message-attachment-intent-re
+  (regexp-opt '("attached"
+		        "attachment"
+                "pdf"
+                "bifogad"
+                "bilaga"))
+  "A regex which - if found in the message, and if there is no
+attachment - should launch the no-attachment warning.")
+
+(defun aj/message-says-attachment-p ()
+  "Return t if the message suggests there can be an attachment."
+  (save-excursion
+    (mail-text)
+    (save-match-data
+      (let (search-result)
+        (while
+            (and (setq search-result
+                       (re-search-forward
+                        aj/message-attachment-intent-re nil t))
+                 (org-match-line mu4e-cited-regexp)))
+        search-result))))
+
+(defun aj/message-has-attachment-p ()
+  "Return t if the message has an attachment."
+  (save-excursion
+    (mail-text)
+    (save-match-data
+      (search-forward "<#part" nil t))))
+
+(defun aj/message-pre-send-check-attachment ()
+  (when (and (aj/message-says-attachment-p)
+             (not (aj/message-has-attachment-p)))
+    (unless
+        (y-or-n-p "Glömde du bilagan?!")
+      (keyboard-quit))))
+
+(add-hook 'message-send-hook 'aj/message-pre-send-check-attachment)
+
+#+end_src
+
 **** Detach attachments :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 ;;TODO, fixa! (kolla på mm- funktionerna (mime-biblioteket))
@@ -789,7 +921,7 @@ Non-interactive use returns link"
          ;; (:othermaildir . 10)
          ;; (:mailing-list . 7)
          (:thread-subject))
-        :uu
+        :chalmers
         ((:aj-human-date . 12)
          (:flags . 6)
          (:from-or-to . 22)
@@ -822,8 +954,8 @@ Non-interactive use returns link"
                            query))
                          (maildirs (mapcar #'cadr mdm)))
                (cond
-                ((--all? (string-match-p "^/uu" it) maildirs)
-                 :uu)
+                ((--all? (string-match-p "^/chalmers" it) maildirs)
+                 :chalmers)
                 ((--all? (string-match-p "^/\\(mejla\\|ajf\\)" it) maildirs)
                  :gmail))))
             header-line-format (mu4e~header-line-format)))))
@@ -900,6 +1032,7 @@ Returns the empty string if this is the \"current\" maildir."
               ""
             (s-chop-prefix (s-shared-start mmd smd) mmd)))
       (s-replace-all '(("/uu/" . "🅄 ")
+                       ("/chalmers/" . "🄲")
                        ("/mejla/" . "🄶 ")
                        ("/ajf/" . "🄰 ")) mmd))))
 
@@ -990,18 +1123,18 @@ The most complex part is for choosing refile folders, depending on account and ~
 ;; In its current form kind of repetitive. But I could want special
 ;; conditions, so I will not abstract it more now.
 
-(cl-defmacro aj/mu4e-msg-account (msg &key uu mejla ajf default gmail)
+(cl-defmacro aj/mu4e-msg-account (msg &key chalmers mejla ajf default gmail)
   (declare (indent 1))
   `(cond
-    ((and ,msg (string-match-p "^/uu/" (mu4e-message-field ,msg :maildir)))
-     ,uu)
+    ((and ,msg (string-match-p "^/chalmers/" (mu4e-message-field ,msg :maildir)))
+     ,chalmers)
     ((and ,msg ,mejla (string-match-p "^/mejla/" (mu4e-message-field ,msg :maildir)))
      ,mejla)
     ((and ,msg ,ajf (string-match-p "^/ajf/" (mu4e-message-field ,msg :maildir)))
      ,ajf)
     (t ,default)))
 
-(setq mu4e-sent-folder "/uu/Sent" ; gmail is set to delete sent mails
+(setq mu4e-sent-folder "/chalmers/Skickat" ; gmail is set to delete sent mails
                                         ; (because it recreates them on the
                                         ; server from the mails sent via its
                                         ; smtp server.)
@@ -1009,7 +1142,7 @@ The most complex part is for choosing refile folders, depending on account and ~
                                         ; to the server
       mu4e-trash-folder (lambda (msg)
                           (aj/mu4e-msg-account msg
-                            :uu "/uu/Trash"
+                            :chalmers "/chalmers/Borttagna objekt"
                             :mejla "/mejla/Papperskorgen"
                             :ajf "/ajf/Papperskorgen"))
       mu4e-refile-folder #'aj/mu4e-refile-folder)
@@ -1021,18 +1154,18 @@ No automatic guess if FORCE-CHOICE is non-nil."
   (let* ((user-has-chosen nil)
          (found
           (aj/mu4e-msg-account msg
-            :uu (if-let ((tags (mu4e-message-field msg :tags)))
-                    (catch 'found
-                      ;; default if no throw is /uu/Archive
-                      (dolist (tag tags "/uu/Archive")
-                        (when-let ((ajtag (assoc tag aj/mail-tags)))
-                          (when-let ((ajrf (nth 3 ajtag)))
-                            (cond
-                             ((stringp ajrf) (throw 'found ajrf))
-                             ((listp ajrf) (throw 'found (prog1 (aj/mu4e-choose-refile (car ajrf) msg)
-                                                           (setq user-has-chosen t))))
-                             (t (user-error "Bad config for tag %s in aj/mail-tags" tag)))))))
-                  "/uu/Archive")
+            :chalmers (if-let ((tags (mu4e-message-field msg :tags)))
+                          (catch 'found
+                            ;; default if no throw is /chalmers/Arkiv
+                            (dolist (tag tags "/chalmers/Arkiv")
+                              (when-let ((ajtag (assoc tag aj/mail-tags)))
+                                (when-let ((ajrf (nth 3 ajtag)))
+                                  (cond
+                                   ((stringp ajrf) (throw 'found ajrf))
+                                   ((listp ajrf) (throw 'found (prog1 (aj/mu4e-choose-refile (car ajrf) msg)
+                                                                 (setq user-has-chosen t))))
+                                   (t (user-error "Bad config for tag %s in aj/mail-tags" tag)))))))
+                        "/chalmers/Arkiv")
             ;; Only for show, they get changed labels via custom action
             :mejla "/mejla/Alla mail"
             :ajf "/ajf/Alla mail")))
@@ -1107,6 +1240,9 @@ messages “refiled” in gmail accounts from the inbox listing."
   (aj/mu4e-msg-account msg
     :mejla (aj/mu4e-retag-as-move msg "-\\Inbox")
     :ajf (aj/mu4e-retag-as-move msg "-\\Inbox")
+    :chalmers (mu4e~proc-move docid
+                              (mu4e~mark-check-target target)
+                              "-N")
     :default (mu4e~proc-move docid
                              (mu4e~mark-check-target target)
                              "-N")))
@@ -1187,12 +1323,12 @@ At times, I can safely refile messages without reading them and at the same time
 (defun aj/mu-message-is-duplicate (msg &optional _param)
   (plist-get (mu4e-message-field msg :thread) :duplicate))
 
-(defun aj/mu-find-stupid-duplicates ()
-  (interactive)
-  (let ((mu4e-headers-results-limit -1)
-        (mu4e-headers-skip-duplicates nil)
-        (mu4e-headers-found-hook '(aj/mu-mark-duplicates-for-deletion)))
-    (mu4e-headers-search "maildir:/uu/* date:20171001..now ")))
+;; (defun aj/mu-find-stupid-duplicates ()
+;;   (interactive)
+;;   (let ((mu4e-headers-results-limit -1)
+;;         (mu4e-headers-skip-duplicates nil)
+;;         (mu4e-headers-found-hook '(aj/mu-mark-duplicates-for-deletion)))
+;;     (mu4e-headers-search "maildir:/uu/* date:20171001..now ")))
 #+END_SRC
 
 *** COMMENT Directly applied marks :ARCHIVE:
