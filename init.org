@@ -47,7 +47,10 @@ org mode async exports, using only trees tagged with “org_async”."
              ;; avoid garbage-collection for this
              (gc-cons-threshold most-positive-fixnum))
         (aj/org-tangle-matching "-no_default_tangle-ARCHIVE" file file-el)
-        (aj/org-tangle-matching "org_async-org_async_exclude-ARCHIVE" file file-async))
+        ;; FIXME, I almost never use org-async export, so commenting
+        ;; this out for now:
+        ;; (aj/org-tangle-matching "org_async-org_async_exclude-ARCHIVE" file file-async)
+        )
       ;; (load file-noext)
       )))
 
