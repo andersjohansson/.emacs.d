@@ -553,6 +553,17 @@ Example of alist entry:
           (alist-get 'filtered-candidate-transformer (symbol-value source))
         '(aj/helm-recentf-filtered-candidates-shorten))))
 
+  ;;; helm-recentf, delete and add to ignore-list
+  (with-eval-after-load 'helm-for-files
+    (cl-callf append
+        (alist-get 'action helm-source-recentf)
+      '(("Delete from recentf and ignore" . aj/helm-remove-from-recentf-and-ignore))))
+
+  (defun aj/helm-remove-from-recentf-and-ignore (candidate)
+    (setq recentf-list (delete candidate recentf-list))
+    (when-let ((pattern (read-string "Pattern for recentf-exclude: " candidate nil nil)))
+      (customize-set-variable 'recentf-exclude (cons pattern recentf-exclude))))
+
   ;;; grep --> ripgrep
 
   (setq helm-grep-ag-command "rg -u --color=never --smart-case --no-heading --line-number %s %s %s"
