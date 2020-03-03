@@ -322,24 +322,33 @@ Otherwise hydra for template insertion.
 **** Todo tree
 I often find it useful to copy in a tree from somewhere (for instance reviewer comments on a scientific paper) and make every heading a TODO. This makes it easy!
 #+BEGIN_SRC emacs-lisp
-(defun aj/org-todo-tree ()
-  "Make TODO states of all nodes in current tree and add [/]"
-  (interactive)
-  (org-map-tree #'aj/org-add-todo-and-cookie))
+(defvar aj/org-todo-tree-maxlevel 100)
+
+(defun aj/org-todo-tree (&optional maxlevel)
+  "Make TODO states of all nodes in current tree and add [/]
+A numeric prefix determines the depth where TODO states are created."
+  (interactive "P")
+  (let ((aj/org-todo-tree-maxlevel
+         (if maxlevel (+ (org-current-level) (prefix-numeric-value maxlevel))
+           100)))
+    (org-map-tree #'aj/org-add-todo-and-cookie)))
 
 (defun aj/org-add-todo-and-cookie ()
   "Add TODO if not in a TODO state and a [/]-cookie if there are children"
-  (unless (org-get-todo-state)
-    (org-todo "TODO"))
-  (when (and
-         (not (re-search-forward
-		       "\\(\\[[0-9]*%\\]\\|\\[[0-9]*/[0-9]*\\]\\)"
-		       (point-at-eol) t))
-         (save-excursion (org-goto-first-child)))
-    (let ((org-special-ctrl-a/e t)
-          (visual-line-mode nil))
-      (org-end-of-line)
-      (insert " [/]"))))
+  (let ((level (org-current-level)))
+    (unless (or (> level aj/org-todo-tree-maxlevel)
+                (org-get-todo-state))
+      (org-todo "TODO"))
+    (when (and
+           (not (>= level aj/org-todo-tree-maxlevel))
+           (not (re-search-forward
+		         "\\(\\[[0-9]*%\\]\\|\\[[0-9]*/[0-9]*\\]\\)"
+		         (point-at-eol) t))
+           (save-excursion (org-goto-first-child)))
+      (let ((org-special-ctrl-a/e t)
+            (visual-line-mode nil))
+        (org-end-of-line)
+        (insert " [/]")))))
 #+END_SRC
 **** Hierarchical TODO automatization
 If you would like a TODO entry to automatically change to DONE when
