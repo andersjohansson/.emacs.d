@@ -407,7 +407,7 @@ all children are done, you can use the following setup:
 
 ;; change agenda prefix format, add effort, wider categories
 (with-eval-after-load 'org-agenda
-  (setf (alist-get 'agenda org-agenda-prefix-format) " %i %-10c%?-12t% s%-4e"))
+  (setf (alist-get 'agenda org-agenda-prefix-format) " %i %-7c%?-12t% s%-4e"))
 #+END_SRC
 
 **** Agenda custom commands
