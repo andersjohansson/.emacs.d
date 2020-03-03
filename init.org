@@ -4780,13 +4780,17 @@ Available at: https://github.com/andersjohansson/orgqda
 Also at: https://github.com/andersjohansson/orgqda
 #+BEGIN_SRC emacs-lisp
 (use-package orgqda-transcript
-  :straight nil
+  :straight nil ;; in orgqda
   :defer t
-  :config (setq orgqda-transcript-bind-fn-keys t
-                orgqda-transcript-set-up-speaker-keys t
-                orgqda-transcript-rebind-c-s-ret t
-                orgqda-transcript-rebind-s-ret t)
+  :custom
+  (orgqda-transcript-bind-fn-keys t)
+  (orgqda-transcript-bind-1-4-keys t)
+  (orgqda-transcript-set-up-speaker-keys t)
+  (orgqda-transcript-set-up-speaker-keys-5-9 t)
+  (orgqda-transcript-rebind-c-s-ret t)
+  (orgqda-transcript-rebind-s-ret t)
 
+  :config
   (defun aj/q-hydra-pre ()
     (undo-boundary)
     (insert "q"))
@@ -4837,43 +4841,43 @@ Also at: https://github.com/andersjohansson/orgqda
 
   (define-key orgqda-transcript-mode-map (kbd "C-c m") #'aj/hydra-mplayer/body)
 
-  (defvar aj/mplayer-last-seek-f (current-time))
-  (defvar aj/mplayer-number-of-seeks-f 0)
-  (defvar aj/mplayer-last-seek-b (current-time))
-  (defvar aj/mplayer-number-of-seeks-b 0)
-  (defvar aj/mplayer-seek-sequence '(0 .9 1.5 2 4))
-  (put 'aj/mplayer-seek-sequence 'safe-local-variable
-       (lambda (x) (cl-every #'numberp x)))
+  ;; (defvar aj/mplayer-last-seek-f (current-time))
+  ;; (defvar aj/mplayer-number-of-seeks-f 0)
+  ;; (defvar aj/mplayer-last-seek-b (current-time))
+  ;; (defvar aj/mplayer-number-of-seeks-b 0)
+  ;; (defvar aj/mplayer-seek-sequence '(0 .9 1.5 2 4))
+  ;; (put 'aj/mplayer-seek-sequence 'safe-local-variable
+  ;;      (lambda (x) (cl-every #'numberp x)))
 
-  (defun aj/mplayer-seek-backward ()
-    (interactive)
-    (if (and (eq last-command 'aj/mplayer-seek-backward)
-             (> 1.0 (float-time (time-subtract (current-time) aj/mplayer-last-seek-b))))
-        (cl-incf aj/mplayer-number-of-seeks-b)
-      (setq aj/mplayer-number-of-seeks-b 1))
-    (mplayer-seek-backward
-     (or (nth aj/mplayer-number-of-seeks-b aj/mplayer-seek-sequence) 5))
-    (setq aj/mplayer-last-seek-b (current-time)))
+  ;; (defun aj/mplayer-seek-backward ()
+  ;;   (interactive)
+  ;;   (if (and (eq last-command 'aj/mplayer-seek-backward)
+  ;;            (> 1.0 (float-time (time-subtract (current-time) aj/mplayer-last-seek-b))))
+  ;;       (cl-incf aj/mplayer-number-of-seeks-b)
+  ;;     (setq aj/mplayer-number-of-seeks-b 1))
+  ;;   (mplayer-seek-backward
+  ;;    (or (nth aj/mplayer-number-of-seeks-b aj/mplayer-seek-sequence) 5))
+  ;;   (setq aj/mplayer-last-seek-b (current-time)))
 
-  (defun aj/mplayer-seek-forward ()
-    (interactive)
-    (if (and (eq last-command 'aj/mplayer-seek-forward)
-             (> 1.0 (float-time (time-subtract (current-time) aj/mplayer-last-seek-f))))
-        (cl-incf aj/mplayer-number-of-seeks-f)
-      (setq aj/mplayer-number-of-seeks-f 1))
-    (mplayer-seek-forward
-     (or (nth aj/mplayer-number-of-seeks-f aj/mplayer-seek-sequence) 5))
-    (setq aj/mplayer-last-seek-f (current-time)))
+  ;; (defun aj/mplayer-seek-forward ()
+  ;;   (interactive)
+  ;;   (if (and (eq last-command 'aj/mplayer-seek-forward)
+  ;;            (> 1.0 (float-time (time-subtract (current-time) aj/mplayer-last-seek-f))))
+  ;;       (cl-incf aj/mplayer-number-of-seeks-f)
+  ;;     (setq aj/mplayer-number-of-seeks-f 1))
+  ;;   (mplayer-seek-forward
+  ;;    (or (nth aj/mplayer-number-of-seeks-f aj/mplayer-seek-sequence) 5))
+  ;;   (setq aj/mplayer-last-seek-f (current-time)))
 
-  (bind-key "<f1>" #'aj/mplayer-seek-backward orgqda-transcript-mode-map)
-  (bind-key "<f2>" #'aj/mplayer-seek-forward orgqda-transcript-mode-map)
+  ;; (bind-key "<f1>" #'aj/mplayer-seek-backward orgqda-transcript-mode-map)
+  ;; (bind-key "<f2>" #'aj/mplayer-seek-forward orgqda-transcript-mode-map)
 
   (bind-key "C-S-a" #'orgqda-transcript-beginning-or-indentation orgqda-transcript-mode-map)
   (bind-key "C-S-e" #'end-of-line orgqda-transcript-mode-map)
-  (dolist (key `(("1" . mplayer-toggle-pause-with-rewind)
-                 ("2" . mplayer-seek-backward)
-                 ("3" . mplayer-seek-forward)))
-    (define-key orgqda-transcript-mode-map (car key) (cdr key)))
+  ;; (dolist (key `(("1" . mplayer-toggle-pause-with-rewind)
+  ;;                ("2" . mplayer-seek-backward)
+  ;;                ("3" . mplayer-seek-forward)))
+  ;;   (define-key orgqda-transcript-mode-map (car key) (cdr key)))
 
   (bind-key "C-+" #'aj/repeat-last-words orgqda-transcript-mode-map))
 #+END_SRC
