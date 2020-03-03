@@ -547,7 +547,7 @@ Example of alist entry:
   (defun aj/helm-recentf-filtered-candidates-shorten (candidates source)
     (mapcar #'aj/shorten-helm-path candidates))
 
-  (with-eval-after-load "helm-for-files"
+  (with-eval-after-load 'helm-for-files
     (dolist (source '(helm-source-recentf helm-source-files-in-current-dir))
       (cl-callf append
           (alist-get 'filtered-candidate-transformer (symbol-value source))
