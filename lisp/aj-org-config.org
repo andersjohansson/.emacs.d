@@ -597,14 +597,6 @@ In addition, eligible trees should not include TODO entries without subtasks.
   :commands (aj/org-agenda-weekplan-to-utv
              aj/org-agenda-morningplan aj/org-agenda-days-to-utv))
 #+end_src
-*** TODO Check out org-gcal (two-way sync) instead of this custom solution.
-
-https://github.com/kidd/org-gcal.el
-
-There’s also: https://github.com/dengste/org-caldav
-
-But I couldn’t get that to work so well.
-
 *** Times and clocking
 **** Enable Swedish for parsing of names of weekdays and months
 The date input prompt uses functionality from ~parse-time~. I want it to be able to guess from Swedish names for months and weekdays as well as English. This just means adding a few elements to the relevant lists (some of the names or abbreviations are identical in English and Swedish, e.g. "April").
