@@ -336,69 +336,6 @@ Some variables are not suitable to keep in the init-file, I add these via custom
   :demand t)
 #+END_SRC
 
-*** Org init
-**** org init
-#+begin_src emacs-lisp
-(use-package org
-  :bind (("C-c a" . org-agenda) ("C-c c" . org-capture))
-  :commands org-mode
-  :defer t
-  :init
-  ;; (require 'org-protocol) ;; move to modules? autoload the entry commands (don’t seem to be)
-  (setq org-directory "~/org"
-        org-ellipsis " ⤵"
-        org-export-backends '(beamer odt ascii html icalendar latex)
-        org-modules '(org-habit org-inlinetask org-mu4e org-id org-bullets org-pdfview)
-        org-list-allow-alphabetical t
-        org-id-method 'ts
-        org-id-prefix "aj"
-        org-id-link-to-org-use-id 'use-existing
-        org-agenda-files (expand-file-name "agenda-files" org-directory))
-  (defcustom aj/org-work-agenda-files nil
-    "Agenda files connected to work"
-    :group 'aj
-    :type '(repeat file))
-  :config
-  ;; (message "Laddade org")
-  ;; (load-library "helm-mode)"
-  (load-library "aj-org-config")
-  ;; (require 'helm-mode)
-  ;; (require 'aj-org-config)
-  )
-#+end_src
-**** org init async                             :org_async:no_default_tangle:
-#+begin_src emacs-lisp
-(use-package org
-  :demand t
-  :commands org-mode
-  :init (progn
-          (setq org-directory "~/org"
-                org-export-backends '(beamer odt ascii html icalendar latex)
-                org-modules '(org-inlinetask org-zotxt org-id)
-                org-list-allow-alphabetical t))
-  :config (require 'ox) (require 'aj-org-config-org-async))
-#+end_src
-*** Swallow
-#+begin_src emacs-lisp
-
-#+end_src
-
-*** No littering! :org_async:
-#+begin_src emacs-lisp
-(use-package no-littering
-  :demand t
-  :init
-  (setq no-littering-etc-directory
-        (expand-file-name "config/" user-emacs-directory)
-        no-littering-var-directory "~/.emacs.data/")
-  :config
-  (with-eval-after-load 'recentf
-    (add-to-list 'recentf-exclude no-littering-var-directory)
-    (add-to-list 'recentf-exclude no-littering-etc-directory))
-  (setq auto-save-file-name-transforms
-        `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))))
-#+end_src
-
 *** Save-hist (don't use session, but save many useful history variables)
 #+BEGIN_SRC emacs-lisp
 (setq savehist-additional-variables
@@ -422,12 +359,6 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 (savehist-mode)
 #+END_SRC
 
-*** Tooltip-mode
-I want to use the echo area (hence ~(tooltip-mode -1)~), but don’t want help echo messages to be truncated, but resized!
-#+begin_src emacs-lisp
-(tooltip-mode -1)
-(setq tooltip-resize-echo-area t)
-#+end_src
 
 *** Center frame (used for helm)
 Code adapted from ime-frame
@@ -455,9 +386,8 @@ Code adapted from ime-frame
 Returns a list of `(TOP LEFT)' representing the centered position
 of the box `(w h)' inside the box `(cw ch)'."
   (list (/ (- cw w) 2) (/ (- ch h) 2)))
-
-
 #+end_src
+
 *** Helm
 **** Loading helm
 (Really too much in config section here. Should probably move it to another file)
@@ -475,7 +405,7 @@ Example of alist entry:
 (use-package helm
   :bind (("<f2>" . helm-imenu))
   :delight helm-mode
-  :defer 2
+  :demand t
   :config
   (setq-default helm-command-prefix-key "C-c h")
   (require 'helm-config)
@@ -982,10 +912,9 @@ overriding it, but you should know before you do.
 #+end_src
 
 
-*** org-mode extra
 
-**** Things to load with org
-***** Stuff
+*** Things to load with org
+**** Stuff
 #+begin_src emacs-lisp
 ;; TODO, why here?
 (use-package orgqda
@@ -1014,12 +943,13 @@ overriding it, but you should know before you do.
 (use-package org-download
   :after org)
 #+end_src
-***** org-pdfview
+**** org-pdfview
 #+BEGIN_SRC emacs-lisp
 (use-package org-pdfview
-  :after org)
+  :after org
+  :defer t)
 #+END_SRC
-***** org clock hydra
+**** org clock hydra
 #+BEGIN_SRC emacs-lisp
 (bind-key "C-c w" #'hydra-org-clock/body)
 ;; make byte-compiler happy?
@@ -1079,6 +1009,76 @@ overriding it, but you should know before you do.
       (org-todo 'done))))
 #+END_SRC
 
+
+*** Org init
+**** org init
+#+begin_src emacs-lisp
+(use-package org
+  :bind (("C-c a" . org-agenda) ("C-c c" . org-capture))
+  :commands org-mode
+  :demand t
+  :init
+  ;; (require 'org-protocol) ;; move to modules? autoload the entry commands (don’t seem to be)
+  (setq org-directory "~/org"
+        org-ellipsis " ⤵"
+        org-export-backends '(beamer odt ascii html icalendar latex)
+        org-modules '(org-habit org-inlinetask org-mu4e org-id org-bullets org-pdfview)
+        org-list-allow-alphabetical t
+        org-id-method 'ts
+        org-id-prefix "aj"
+        org-id-link-to-org-use-id 'use-existing
+        org-agenda-files (expand-file-name "agenda-files" org-directory))
+  (defcustom aj/org-work-agenda-files nil
+    "Agenda files connected to work"
+    :group 'aj
+    :type '(repeat file))
+  :config
+  ;; (message "Laddade org")
+  ;; (load-library "helm-mode)"
+  (load-library "aj-org-config")
+  ;; (require 'helm-mode)
+  ;; (require 'aj-org-config)
+  )
+#+end_src
+**** org init async                             :org_async:no_default_tangle:
+#+begin_src emacs-lisp
+(use-package org
+  :demand t
+  :commands org-mode
+  :init (progn
+          (setq org-directory "~/org"
+                org-export-backends '(beamer odt ascii html icalendar latex)
+                org-modules '(org-inlinetask org-zotxt org-id)
+                org-list-allow-alphabetical t))
+  :config (require 'ox) (require 'aj-org-config-org-async))
+#+end_src
+*** Swallow
+#+begin_src emacs-lisp
+
+#+end_src
+
+*** No littering! :org_async:
+#+begin_src emacs-lisp
+(use-package no-littering
+  :demand t
+  :init
+  (setq no-littering-etc-directory
+        (expand-file-name "config/" user-emacs-directory)
+        no-littering-var-directory "~/.emacs.data/")
+  :config
+  (with-eval-after-load 'recentf
+    (add-to-list 'recentf-exclude no-littering-var-directory)
+    (add-to-list 'recentf-exclude no-littering-etc-directory))
+  (setq auto-save-file-name-transforms
+        `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))))
+#+end_src
+
+*** Tooltip-mode
+I want to use the echo area (hence ~(tooltip-mode -1)~), but don’t want help echo messages to be truncated, but resized!
+#+begin_src emacs-lisp
+(tooltip-mode -1)
+(setq tooltip-resize-echo-area t)
+#+end_src
 
 *** Flycheck
 #+begin_src emacs-lisp
