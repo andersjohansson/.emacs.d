@@ -4889,7 +4889,7 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
   (add-to-list 'default-frame-alist '(top . 0))
   (add-to-list 'default-frame-alist '(left . (+ -9)))
   (add-to-list 'default-frame-alist '(fullscreen . fullheight))
-  ;; this is a bitt narrower for arc-gtk-theme:
+  ;; this is a bit narrower for arc-gtk-theme:
   (add-to-list 'default-frame-alist '(scroll-bar-width . 12))
 
   (defun aj/frame-to-left ()
