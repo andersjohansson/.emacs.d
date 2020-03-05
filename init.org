@@ -4735,7 +4735,7 @@ From: http://stackoverflow.com/questions/4726220/how-to-have-colors-in-the-outpu
 
 
 ** Special libraries for research :org_async:
-*** ajf
+*** aj-forskning
 Some special functions for managing my data files.
 #+begin_src emacs-lisp
 (use-package aj-forskning ;; private package

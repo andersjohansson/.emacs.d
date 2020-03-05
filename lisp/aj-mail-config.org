@@ -283,8 +283,12 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 (setq eudc-server-hotlist
       '(("ldap://localhost:1389" . ldap)))
 (eudc-set-server "ldap://localhost:1389" 'ldap)
-
 (setq eudc-expansion-overwrites-query t)
+
+;; Don’t do any stupid options saving, my options are above!
+(setq eudc-options-file "nonononononononono.el") ;; see eudc.el::1157
+(with-eval-after-load 'eudc
+  (advice-add 'eudc-save-options :override #'ignore))
 
 (defun aj/display-eudc-info-at-point ()
   (interactive)
