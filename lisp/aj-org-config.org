@@ -1080,21 +1080,8 @@ A local variables comment block that is placed at the end of the file may be los
                                   (find-file (car x))
                                   (goto-char (cadr x))
                                   (org-show-entry))))))))
-
-)
-
-
-
-
-;; (emacsql org-db [:select [tags:rowid tags:tag] :from tags
-;;                          :inner :join headline-tags :on (= headlines:rowid headline-tags:headline-id)])
-
-;; (emacsql org-db [:select [headline-tags:tag-id (funcall count headline-tags:tag-id)]
-;;                          :from headline-tags])
-
-;; (emacsql org-db [:select *
-;;                          :from headline-tags])
 #+end_src
+
 ** Navigation etc. (helm-org)
 *** helm-org
 #+BEGIN_SRC emacs-lisp
@@ -1156,57 +1143,66 @@ Should check if it’s less efficient doing this than the homegrown mapping in h
 (advice-add 'helm-org--get-candidates-in-file :around
             #'aj/helm-org--get-candidates-in-file)
 
-(defun aj/helm-org--get-candidates-in-file (fun filename &optional fontify nofname parents matcher)
+(defun aj/helm-org--get-candidates-in-file (fun filename &optional fontify nofname parents matcher force-refresh)
   (if parents ;; won’t handle that special case
       (funcall fun filename fontify nofname parents)
-    (org-agenda-prepare-buffers (list filename))
     (with-current-buffer (pcase filename
                            ((pred bufferp) filename)
                            ((pred stringp) (find-file-noselect filename t)))
-      (let ((match-fn (if fontify
-                          #'match-string
-                        #'match-string-no-properties))
-            (matcher (or matcher aj/helm-org-candidates-matcher))
-            (file (unless nofname
-                    (concat (helm-basename filename) ":"))))
-        (save-excursion
-          (save-restriction
-            (unless (and (bufferp filename)
-                         (buffer-base-buffer filename))
-              ;; Only widen direct buffers, not indirect ones.
-              (widen))
-            ;; (unless parents (goto-char (point-min)))
-            ;; clear cache for new version of org-get-outline-path
-            (and (boundp 'org-outline-path-cache)
-                 (setq org-outline-path-cache nil))
-            (cl-remove-if
-             #'null
-             (org-scan-tags
-              (lambda ()
-                (goto-char (point-at-bol))
-                (when (looking-at org-complex-heading-regexp)
-                  (let ((beg (point-at-bol))
-                        (end (point-at-eol))
-                        (level (length (match-string-no-properties 1)))
-                        (width (window-width (helm-window)))
-                        (heading (funcall match-fn 4)))
-                    (when (and fontify
-                               (null (text-property-any
-                                      beg end 'fontified t)))
-                      (jit-lock-fontify-now beg end))
-                    (when (and (>= level helm-org-headings-min-depth)
-                               (<= level helm-org-headings-max-depth))
-                      (cons
-                       (propertize
-                        (if helm-org-format-outline-path
-                            (org-format-outline-path
-                             (org-get-outline-path t t) width file)
-                          (if file
-                              (concat file (funcall match-fn 0))
-                            (funcall match-fn 0)))
-                        'helm-real-display heading)
-                       (set-marker (make-marker) (point-at-eol)))))))
-              matcher aj/helm-org-candidates-todo-only))))))))
+      (let ((tick (buffer-chars-modified-tick)))
+        (if (and helm-org--buffer-tick
+                 (= tick helm-org--buffer-tick)
+                 (null force-refresh))
+            helm-org--headers-cache
+          (set (make-local-variable 'helm-org--buffer-tick) tick)
+          (org-agenda-prepare-buffers (list filename))
+          (prog1
+              (setq-local
+               helm-org--headers-cache
+               (let ((match-fn (if fontify
+                                   #'match-string
+                                 #'match-string-no-properties))
+                     (matcher (or matcher aj/helm-org-candidates-matcher))
+                     (file (unless nofname
+                             (concat (helm-basename filename) ":")))
+                     (width (window-width (helm-window))))
+                 (save-excursion
+                   (save-restriction
+                     (unless (and (bufferp filename)
+                                  (buffer-base-buffer filename))
+                       ;; Only widen direct buffers, not indirect ones.
+                       (widen))
+                     ;; (unless parents (goto-char (point-min)))
+                     ;; clear cache for new version of org-get-outline-path
+                     (and (boundp 'org-outline-path-cache)
+                          (setq org-outline-path-cache nil))
+                     (cl-remove-if
+                      #'null
+                      (org-scan-tags
+                       (lambda ()
+                         (goto-char (point-at-bol))
+                         (when (looking-at org-complex-heading-regexp)
+                           (let ((beg (point-at-bol))
+                                 (end (point-at-eol))
+                                 (level (length (match-string-no-properties 1)))
+                                 (heading (funcall match-fn 4)))
+                             (when (and fontify
+                                        (null (text-property-any
+                                               beg end 'fontified t)))
+                               (jit-lock-fontify-now beg end))
+                             (when (and (>= level helm-org-headings-min-depth)
+                                        (<= level helm-org-headings-max-depth))
+                               (propertize
+                                (if helm-org-format-outline-path
+                                    (org-format-outline-path
+                                     (org-get-outline-path t t) width file)
+                                  (if file
+                                      (concat file (funcall match-fn 0))
+                                    (funcall match-fn 0)))
+                                'helm-real-display heading
+                                'helm-realvalue
+                                (set-marker (make-marker) (point-at-eol)))))))
+                       matcher aj/helm-org-candidates-todo-only))))))))))))
 #+END_SRC
 
 **** Some tests for this  :ARCHIVE:
@@ -1215,7 +1211,8 @@ Should check if it’s less efficient doing this than the homegrown mapping in h
   "Measure the time it takes to evaluate BODY."
   (let ((time (current-time)))
     (dotimes (i times)
-      (helm-org-get-candidates (list (buffer-file-name))))
+      (setq helm-org--headers-cache nil)
+      (helm-org--get-candidates-in-file (buffer-file-name)))
     (format "%s: %.06f" name (float-time (time-since time)))))
 
 (defun aj/helm-org-test (times)
@@ -1338,9 +1335,8 @@ Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entrie
 ;;     (org-get-outline-path t t)
 ;;     (window-width)
 ;;     nil "/")))
-
-
 #+END_SRC
+
 ** Redefine ~org-paste-special~ to choose from kill-ring (with helm)
 If we have inadvertantly killed something between the special kill and yank we intended, we are then given an opportunity to easily choose the right thing to yank.
 #+BEGIN_SRC emacs-lisp

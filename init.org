@@ -294,6 +294,7 @@ Some variables are not suitable to keep in the init-file, I add these via custom
   (load bootstrap-file nil 'nomessage))
 #+end_src
 
+
 *** Bootstrap ~use-package~ :org_async:
 #+begin_src emacs-lisp
 ;; (unless (package-installed-p 'use-package)
@@ -535,11 +536,11 @@ Example of alist entry:
   (defun aj/shorten-helm-path (path)
     (cl-loop
      with disp = (or (car-safe path) path) with real = (or (cdr-safe path) path)
-     for s in aj/shortened-helm-paths
-     when (string-match (car s) disp)
+     for (match . replace) in aj/shortened-helm-paths
+     when (string-match match disp)
      return (cons
              (concat (substring disp 0 (match-beginning 0))
-                     (propertize (cdr s) 'face '(bold helm-ff-symlink))
+                     (propertize replace 'face '(bold helm-ff-symlink))
                      (substring disp (match-end 0)))
              real)
      finally return path))
@@ -641,17 +642,29 @@ Example of alist entry:
   (advice-add 'helm-run-or-raise :override #'aj/helm-run-or-raise)
 
   )
-
-
 #+end_src
-**** helm-flx
+
+**** Helm-fuz
+For modern fuzzy matching with a binary module built on Rust libraries.
+We need to add "target" to the fuz recipe so that it isn’t removed by straight (we don’t want to rebuild the fuz module every time we start Emacs).
+#+begin_src emacs-lisp
+(use-package fuz
+  :straight (fuz :repo "rustify-emacs/fuz.el" :host github
+                 :files ("fuz*.el" "Cargo.toml" "Cargo.lock" "src" "target")))
+
+(use-package helm-fuz
+  :after helm
+  :config (helm-fuz-mode t))
+#+end_src
+
+**** helm-flx :ARCHIVE:
 Different fuzzy search algorithm, is this needed?
 #+BEGIN_SRC emacs-lisp
 (use-package helm-flx
   :after helm
   :init (helm-flx-mode t))
-
 #+END_SRC
+
 **** Open zotero library files
 #+BEGIN_SRC emacs-lisp
 (with-eval-after-load 'helm-files
