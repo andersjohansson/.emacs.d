@@ -505,10 +505,11 @@ I want to use a single binding to switch (cycle through) contexts when composing
 
 *** Ask for confirmation before sending mail
 #+BEGIN_SRC emacs-lisp
-(add-hook 'message-send-hook
-          (lambda ()
-            (unless (yes-or-no-p "Sure you want to send this?")
-              (signal 'quit nil))))
+(add-hook 'message-send-hook #'aj/confirm-send 90)
+
+(defun aj/confirm-send ()
+  (unless (yes-or-no-p "Sure you want to send this?")
+    (signal 'quit nil)))
 #+END_SRC
 
 *** Let flyspell only check relevant regions
@@ -799,6 +800,7 @@ http://disq.us/p/158wrxo, and http://mbork.pl/2016-02-06_An_attachment_reminder_
 		        "attachment"
                 "pdf"
                 "bifogad"
+                "bifogar"
                 "bilaga"))
   "A regex which - if found in the message, and if there is no
 attachment - should launch the no-attachment warning.")
@@ -827,10 +829,10 @@ attachment - should launch the no-attachment warning.")
   (when (and (aj/message-says-attachment-p)
              (not (aj/message-has-attachment-p)))
     (unless
-        (y-or-n-p "Glömde du bilagan?!")
+        (y-or-n-p "Är du säker på att du inte glömde en bilaga?!")
       (keyboard-quit))))
 
-(add-hook 'message-send-hook 'aj/message-pre-send-check-attachment)
+(add-hook 'message-send-hook 'aj/message-pre-send-check-attachment -50)
 
 #+end_src
 
