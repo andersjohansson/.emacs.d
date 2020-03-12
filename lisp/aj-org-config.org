@@ -1995,6 +1995,7 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
   :straight nil
   :load-path "~/kodat/elisp/zotxt-extra"
   :after zotxt
+  :demand t
   :commands zotxt-extra-maybe-edit-description
   zotxt-extra-link-parse-desc zotxt-extra--replace-consecutive
   :config (zotxt-extra-complete-citation-help-echo-activate))
@@ -2005,6 +2006,7 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 (use-package zotxt-helm
   :straight nil
   :after zotxt
+  :demand t
   :init (setq zotxt-helm-method 'async)
   :commands zotxt-helm-link-to-disp-real
   :config
