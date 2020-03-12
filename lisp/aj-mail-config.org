@@ -9,6 +9,14 @@
 #+END_SRC
 
 * mail-config
+
+** Mu4e should be available
+I install it with emacs, and this should prevent other packages below to install it via straight.
+#+begin_src emacs-lisp
+(use-package mu4e
+  :straight (mu4e :type built-in))
+#+end_src
+
 ** Basic settings for mailing and auth
 I use ~msmtp~ together with the queueing script ~msmtpq~ (included with ~msmtp~).
 #+BEGIN_SRC emacs-lisp
