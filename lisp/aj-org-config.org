@@ -1629,6 +1629,11 @@ Useful for launching a small capture frame from window manager with a call like:
 #+end_src
 
 
+** org-protocol-capture-html: Capture web pages from browser
+#+begin_src emacs-lisp
+(use-package org-protocol-capture-html
+  :straight (org-protocol-capture-html :repo "alphapapa/org-protocol-capture-html" :host github :files ("org-protocol-capture-html.el")))
+#+end_src
 ** org-protocol for linking into org files
 I keep some notes for papers in org-mode, but sort my papers in Zotero. With this I can easily add a link to the specific note from Zotero, which is launched and resolved through org-protocol.
 #+BEGIN_SRC emacs-lisp
