@@ -300,8 +300,9 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 
 (defun aj/display-eudc-info-at-point ()
   (interactive)
-  (if-let ((email (get-text-property (point) 'email)))
-      (aj/display-eudc-info-other-buffer email)
+  (if-let ((email (or (get-text-property (point) 'email)
+                      (thing-at-point 'email t))))
+      (aj/display-eudc-info-other-buffer (s-chop-prefix "<" (s-chop-suffix ">" email)))
     (user-error "No address found at point")))
 
 ;;TODO, try to parse address around point also ^
