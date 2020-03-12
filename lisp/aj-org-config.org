@@ -2477,6 +2477,11 @@ Mostly for html and reveal
 (add-to-list 'org-export-filter-link-functions #'aj/org-reveal-lazy-load-links)
 #+END_SRC
 
+**** Fix blockquotes
+Actually, the tree filtering in ~org-re-reveal~ takes care of frag attributes. No need for a custom (weaker) ~org-re-reveal-quote-block~
+#+begin_src emacs-lisp
+(advice-add 'org-re-reveal-quote-block :override #'org-html-quote-block)
+#+end_src
 *** Ignored drawers
 #+begin_src emacs-lisp
 (with-eval-after-load 'ox
