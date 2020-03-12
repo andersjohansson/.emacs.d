@@ -4556,7 +4556,7 @@ Also runs hook aj/face-definitions-hook."
 (use-package gruvbox
   :straight (gruvbox-theme
              :depth nil
-             :fork (:host github :repo "andersjohansson/emacs-theme-gruvbox" :branch "ajfixes")))
+             :fork (:host github :repo "andersjohansson/emacs-theme-gruvbox" :branch "ajfixes2")))
 #+END_SRC
 
 **** Define themes to use for dark and light and load light theme
