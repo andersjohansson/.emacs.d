@@ -4017,8 +4017,15 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
     (interactive "p")
     (aj/other-window-pdf-next-page (- (or n 1))))
   (bind-keys ("M-n" . aj/other-window-pdf-next-page)
-             ("M-p" . aj/other-window-pdf-previous-page)))
+             ("M-p" . aj/other-window-pdf-previous-page))
+
+
+  ;; No scrollbar!
+  (add-hook 'pdf-view-mode-hook #'aj/no-scrollbars)
+  (defun aj/no-scrollbars ()
+    (setq vertical-scroll-bar nil)))
 #+END_SRC
+
 **** Multipage view
 Package adopted from some code with "issues" from politza. But it initially seems to work ok for getting the pdf "book" experience.
 
