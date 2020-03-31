@@ -705,8 +705,7 @@ From: http://mbork.pl/2015-11-28_Fixing_mml-attach-file_using_advice
     (save-restriction
       (widen)
       (goto-char (point-max))
-      ;; (message-goto-signature)
-      ;; (forward-line -1)
+      (search-backward-regexp message-signature-separator 500 t) ;; 500 chars reasonable limit for signature
       (apply orig-fun args))))
 
 (advice-add 'mml-attach-file :around #'aj/mml-attach-file--go-to-eob)
