@@ -4137,60 +4137,114 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 
 #+END_SRC
 *** Modeline
-**** Doom-modeline
+**** mini-modeline
 #+BEGIN_SRC emacs-lisp
 (use-package eldoc-eval)
-(use-package doom-modeline
-  :defer t
-  :hook (after-init . doom-modeline-mode)
-  :custom
-  (doom-modeline-buffer-file-name-style 'truncate-all)
-  (doom-modeline-bar-width (frame-parameter nil 'left-fringe))
+(use-package mini-modeline
+  ;; :after doom-modeline
   :config
-  ;; shorten filenames when the window is narrow
-  (defun aj/doom-modeline-shorten-file-name (name)
-    (let ((limit (/ (window-text-width) 3)))
-      (if (< limit (length name))
-          (concat (substring name 0 (1- limit)) " ⋯")
-        name)))
+  ;; (doom-modeline-def-modeline 'minibuffer-line
+  ;;   '(modals workspace-name window-number matches buffer-info remote-host buffer-position word-count selection-info misc-info major-mode process vcs lsp checker)
+  ;;   )
 
-  (advice-add 'doom-modeline-update-buffer-file-name :override #'aj/doom-modeline-update-buffer-file-name)
-  (add-hook 'window-configuration-change-hook #'doom-modeline-update-buffer-file-name)
 
-  (defun aj/doom-modeline-update-buffer-file-name (&rest _)
-    "Update buffer file name in mode-line."
-    (setq doom-modeline--buffer-file-name
-          (ignore-errors
-            (save-match-data
-              (if buffer-file-name
-                  (aj/doom-modeline-shorten-file-name (doom-modeline-buffer-file-name))
-                (propertize (aj/doom-modeline-shorten-file-name (buffer-name))
-                            'face (if (doom-modeline--active)
-                                      'doom-modeline-buffer-file
-                                    'mode-line-inactive)
-                            'help-echo "Buffer name
-mouse-1: Previous buffer\nmouse-3: Next buffer"
-                            'local-map mode-line-buffer-identification-keymap))))))
-  ;; pdf pages with pagelabels
-  (advice-add 'doom-modeline-update-pdf-pages :override #'aj/doom-modeline-update-pdf-pages)
+  ;; (setq mini-modeline-r-format '(:eval (doom-modeline-format--minibuffer-line)))
 
-  (defun aj/doom-modeline-update-pdf-pages ()
-    "Update PDF pages. Use pagelabels if available."
-    (setq doom-modeline--pdf-pages
-          (let* ((cp (eval `(pdf-view-current-page)))
-                 (physical (format "%d/%d"
-                                   cp
-                                   (pdf-cache-number-of-pages)))
-                 (currlabel (pdf-view-current-pagelabel)))
+  (setq mini-modeline-r-format '("%e" mode-line-front-space
+                                 ;; mode-line-mule-info
+                                 ;; anzu--mode-line-format
+                                 mode-line-client
+                                 mode-line-modified
+                                 mode-line-remote
+                                 mode-line-frame-identification
+                                 mode-line-buffer-identification
+                                 " " mode-line-position " "
+                                 ;; evil-mode-line-tag
+                                 mode-line-misc-info))
 
-            (propertize
-             (if (equal currlabel (number-to-string cp))
-                 (concat " P: " physical " ")
-               (concat " P:" currlabel " (" physical ") "))
-             'face (if (doom-modeline--active)
-                       'mode-line
-                     'mode-line-inactive)))))
+  (setq mini-modeline-right-padding 1
+        mini-modeline-enhance-visual nil)
+
+
+  (set-face-attribute 'mode-line nil :box nil)
+  (set-face-attribute 'mini-modeline-mode-line nil :background (face-background 'modus-theme-intense-blue) :height 0.2)
+  (set-face-attribute 'mini-modeline-mode-line-inactive nil :background (face-background 'fringe) :height 0.2)
+
+  :hook (after-init . mini-modeline-mode)
   )
+
+;; (use-package doom-modeline
+;;   :custom
+;;   (doom-modeline-buffer-file-name-style 'truncate-all)
+;;   (doom-modeline-bar-width (frame-parameter nil 'left-fringe))
+;;   (doom-modeline-height 10)
+;;   (doom-modeline-icon nil)
+;;   )
+
+;; (defun aj/visible-helm-modeline ()
+;;   (with-current-buffer helm-buffer
+;;     ;; this should be buffer-local, but it doesn’t seem to work!
+;;     (face-remap-add-relative 'mode-line 'mode-line)
+;;     (face-remap-add-relative 'mode-line :height 80)
+;;     ))
+
+;; (remove-hook 'helm-minibuffer-set-up-hook #'aj/visible-helm-modeline)
+
+
+;; (use-package doom-modeline
+;;   :defer t
+;;   ;; :hook (after-init . doom-modeline-mode)
+;;   :custom
+;;   (doom-modeline-buffer-file-name-style 'truncate-all)
+;;   (doom-modeline-bar-width (frame-parameter nil 'left-fringe))
+;;   (doom-modeline-height 32)
+;;   :config
+;;   ;; shorten filenames when the window is narrow
+;;   ;; (defun aj/doom-modeline-shorten-file-name (name)
+;;   ;;   (let ((limit (/ (window-text-width) 3)))
+;;   ;;     (if (< limit (length name))
+;;   ;;         (concat (substring name 0 (1- limit)) " ⋯")
+;;   ;;       name)))
+
+;;   ;; (advice-add 'doom-modeline-update-buffer-file-name :override #'aj/doom-modeline-update-buffer-file-name)
+;;   ;; (add-hook 'window-configuration-change-hook #'doom-modeline-update-buffer-file-name)
+
+;;   ;; (defun aj/doom-modeline-update-buffer-file-name (&rest _)
+;;   ;;     "Update buffer file name in mode-line."
+;;   ;;     (setq doom-modeline--buffer-file-name
+;;   ;;           (ignore-errors
+;;   ;;             (save-match-data
+;;   ;;               (if buffer-file-name
+;;   ;;                   (aj/doom-modeline-shorten-file-name (doom-modeline-buffer-file-name))
+;;   ;;                 (propertize (aj/doom-modeline-shorten-file-name (buffer-name))
+;;   ;;                             'face (if (doom-modeline--active)
+;;   ;;                                       'doom-modeline-buffer-file
+;;   ;;                                     'mode-line-inactive)
+;;   ;;                             'help-echo "Buffer name
+;;   ;; mouse-1: Previous buffer\nmouse-3: Next buffer"
+;;   ;;                             'local-map mode-line-buffer-identification-keymap))))))
+
+
+;;   ;; pdf pages with pagelabels
+;;   (advice-add 'doom-modeline-update-pdf-pages :override #'aj/doom-modeline-update-pdf-pages)
+
+;;   (defun aj/doom-modeline-update-pdf-pages ()
+;;     "Update PDF pages. Use pagelabels if available."
+;;     (setq doom-modeline--pdf-pages
+;;           (let* ((cp (eval `(pdf-view-current-page)))
+;;                  (physical (format "%d/%d"
+;;                                    cp
+;;                                    (pdf-cache-number-of-pages)))
+;;                  (currlabel (pdf-view-current-pagelabel)))
+
+;;             (propertize
+;;              (if (equal currlabel (number-to-string cp))
+;;                  (concat " P: " physical " ")
+;;                (concat " P:" currlabel " (" physical ") "))
+;;              'face (if (doom-modeline--active)
+;;                        'mode-line
+;;                      'mode-line-inactive)))))
+;;   )
 #+END_SRC
 
 **** Moody :ARCHIVE:
