@@ -683,10 +683,10 @@ I often invoke a compose buffer in a window where I’m doing something else, an
   ;; choose to use the formatted string, with some language guessing
   (setq message-citation-line-function #'aj/message-insert-formatted-citation-line)
 
-  (autoload #'guess-language "guess-language")
+  (autoload #'guess-language-buffer "guess-language")
   (defun aj/message-insert-formatted-citation-line (&rest args)
     "Guess language and maybe force date formats to Swedish, else English"
-    (let* ((sv (eq 'sv (guess-language)))
+    (let* ((sv (eq 'sv (guess-language-buffer)))
            (system-time-locale (if sv "sv_SE" "C"))
            (message-citation-line-format
             (if sv
