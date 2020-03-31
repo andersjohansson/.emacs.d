@@ -347,23 +347,31 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 #+BEGIN_SRC emacs-lisp
 (setq savehist-additional-variables
       '(kill-ring search-ring regexp-search-ring extended-command-history
-                 helm-M-x-input-history
-                  ;; mindre viktiga kanske
-                  helm-adaptive-history helm-build-regexp-history
-                  helm-eshell-command-on-file-input-history
-                  helm-external-command-history helm-ff-history
-                  helm-file-name-history helm-grep-history
-                  helm-surfraw-engines-history
-                  helm-surfraw-input-history Info-history
-                  Info-search-history compile-history
-                  dired-regexp-history dired-shell-command-history
-                  face-name-history grep-files-history
-                  grep-find-history grep-history grep-regexp-history
-                  org-agenda-search-history org-insert-link-history
-                  org-refile-history org-tags-history
-                  pdf-occur-history query-replace-history
-                  shell-command-history))
+
+                  ;; all these should be added automatically when minibuffer is used in savehist-minibuffer-history-variables
+                  ;; helm-M-x-input-history
+                  ;; helm-adaptive-history helm-build-regexp-history
+                  ;; helm-eshell-command-on-file-input-history
+                  ;; helm-external-command-history helm-ff-history
+                  ;; helm-file-name-history helm-grep-history
+                  ;; helm-surfraw-engines-history
+                  ;; helm-surfraw-input-history Info-history
+                  ;; Info-search-history compile-history
+                  ;; dired-regexp-history dired-shell-command-history
+                  ;; face-name-history grep-files-history
+                  ;; grep-find-history grep-history grep-regexp-history
+                  ;; org-agenda-search-history org-insert-link-history
+                  ;; org-refile-history org-tags-history
+                  ;; pdf-occur-history query-replace-history
+                  ;; shell-command-history
+                  ))
 (savehist-mode)
+
+;; No properties in kill-ring saved by savehist, makes it much smaller
+(defun aj/unpropertize-kill-ring ()
+  (setq kill-ring (mapcar 'substring-no-properties kill-ring)))
+
+(add-hook 'kill-emacs-hook 'aj/unpropertize-kill-ring -90)
 #+END_SRC
 
 
