@@ -5046,6 +5046,38 @@ A function for reverting all opened files, even remote files (because auto-rever
   (message "Refreshed open files."))
 #+end_src
 
+** Helm for recent org files at startup
+#+begin_src emacs-lisp
+(require 'helm-for-files)
+(defclass aj/helm-recentf-org-source (helm-source-sync helm-type-file)
+  ((init :initform (lambda ()
+                     (require 'recentf)
+                     (recentf-mode 1)))
+   (candidates :initform (seq-filter
+                          (lambda (it) (and (string-match "\\.org$" it)
+                                       (not (org-agenda-file-p it))
+                                       (not (string-match "\\.emacs\\.d" it))))
+                          recentf-list))
+   (match-part :initform (lambda (candidate)
+                           (if (or helm-ff-transformer-show-only-basename
+                                   helm-recentf--basename-flag)
+                               (helm-basename candidate) candidate)))
+   (pattern-transformer :initform 'helm-recentf-pattern-transformer)
+   (filtered-candidate-transformer :initform '(aj/helm-recentf-filtered-candidates-shorten))
+   (persistent-action :initform 'helm-ff-kill-or-find-buffer-fname)
+   (fuzzy-match :initform t)))
+
+(defvar aj/helm-source-recentf-org
+  (helm-make-source "Recentf org" 'aj/helm-recentf-org-source))
+
+(defun aj/helm-recentf-org ()
+  (interactive)
+  (helm :sources aj/helm-source-recentf-org
+        :buffer "*helm-recentf-org*"
+        :ff-transformer-show-only-basename nil))
+
+(add-hook 'window-setup-hook #'aj/helm-recentf-org 95)
+#+end_src
 * Final
 ** Load custom loaddefs :org_async:ARCHIVE:
 #+BEGIN_SRC emacs-lisp
