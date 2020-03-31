@@ -3876,22 +3876,6 @@ DIR."
   )
 #+end_src
 
-*** Spotify
-#+begin_src emacs-lisp
-(use-package spotify
-  :straight (spotify :host github :repo "danielfm/spotify.el" :files ("*.el" "*.py"))
-  :defer t
-  :custom
-  (spotify-transport 'connect)
-  (spotify-api-locale "sv_SE")
-  (spotify-api-country "SE")
-  (spotify-player-status-format " %p %a: %t ")
-  (spotify-api-search-limit 100)
-  :config
-  (setq spotify-player-status-playing-text (all-the-icons-faicon "play-circle" :v-adjust 0.01)
-        spotify-player-status-paused-text (all-the-icons-faicon "pause-circle" :v-adjust 0.01)
-        spotify-player-status-stopped-text (all-the-icons-faicon "stop-circle" :v-adjust 0.01)))
-#+end_src
 *** Extra definitions for ~auto-mode-alist~
 #+begin_src emacs-lisp
 (add-to-list 'auto-mode-alist
