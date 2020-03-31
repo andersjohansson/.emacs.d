@@ -378,7 +378,7 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 #+BEGIN_SRC emacs-lisp
 (setq mu4e-compose-format-flowed t
       mail-user-agent 'mu4e-user-agent
-      mu4e-compose-hidden-headers '("^Face:" "^X-Face:" "^X-Draft-From:" "^User-agent:"))
+      mu4e-compose-hidden-headers '("^Face:" "^X-Face:" "^X-Draft-From:" "^User-agent:" "References:"))
 
 ;; in case write is invoked before mu4e is loaded 
 (add-hook 'mu4e-compose-pre-hook #'mu4e~start)
