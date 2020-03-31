@@ -39,13 +39,13 @@
  org-edit-src-turn-on-auto-save t
  org-M-RET-may-split-line '((headline . t) (default . t))
  org-agenda-window-setup 'current-window
- org-fontify-whole-heading-line t
- org-level-color-stars-only t
+ ;; org-fontify-whole-heading-line t
+ ;; org-level-color-stars-only t
  org-hide-emphasis-markers t
  org-highlight-latex-fragments-and-specials t
  org-startup-folded nil
  org-startup-indented t
-org-indent-indentation-per-level 2
+ org-indent-indentation-per-level 2
  org-url-hexify-p nil)
 #+END_SRC
 ** MobileOrg
@@ -407,8 +407,12 @@ all children are done, you can use the following setup:
 
 ;; change agenda prefix format, add effort, wider categories
 (with-eval-after-load 'org-agenda
-  (setf (alist-get 'agenda org-agenda-prefix-format) " %i %-7c%?-12t% s%-4e"))
+  (setf (alist-get 'agenda org-agenda-prefix-format) " %i %-10c%?-12t% s%-4e"))
 #+END_SRC
+**** Hl-line-mode in agenda
+#+begin_src emacs-lisp
+(add-hook 'org-agenda-mode-hook #'hl-line-mode)
+#+end_src
 
 **** Agenda custom commands
 #+BEGIN_SRC emacs-lisp
@@ -512,9 +516,9 @@ syncing."
          ,syncform))))
 
 (aj/org-calendar-sync-external-defun "gcal"
-  "~/org/imp/gcal.org" 8 (call-process "aj-gcal-to-org"))
+  "~/org/imp/G.org" 8 (call-process "aj-gcal-to-org"))
 (aj/org-calendar-sync-external-defun "exchange"
-  "~/org/imp/chalmers-kalender.org" 3 (org-caldav-sync))
+  "~/org/imp/chalmerskalender.org" 3 (org-caldav-sync))
 
 (defun aj/org-calendar-sync-all (&optional force)
   (interactive "P")
@@ -641,40 +645,6 @@ The date input prompt uses functionality from ~parse-time~. I want it to be able
 ;;       (propertize "Wk" ; or e.g. "KW" in Germany
 ;;                   'font-lock-face 'calendar-iso-week-header-face))
 #+END_SRC
-**** Effort
-I don’t like the standard set-effort function. My own function allows me to set the effort to whatever I want, but using the predefined values and those existing in the current buffer as completion alternatives.
-#+BEGIN_SRC emacs-lisp
-(add-to-list 'org-global-properties '("Effort_ALL" . "0:15 0:30 1h 2h 3h 4h 6h 1d 2d 3d 4d 1w 2w 3w"))
-
-(advice-add 'org-set-effort :around #'aj/org-set-effort)
-
-(defun aj/org-set-effort (oldfun &optional val incr)
-  "Set the effort property of the current entry.
-Offer completion from `org-global-properties' and values used in
-current buffer but don’t limit accepted values."
-  (interactive)
-  (if (or val incr)
-      (apply oldfun val incr)
-    (let* ((completion-ignore-case t)
-           (prop org-effort-property)
-           (cur (org-entry-get nil prop))
-           (allowed (org-property-get-allowed-values nil prop 'table))
-           (existing (mapcar 'list (org-property-values prop)))
-           (alternatives (append allowed existing))
-           (heading (nth 4 (org-heading-components)))
-           (val (org-completing-read
-                 "Effort: " alternatives nil nil "" nil cur)))
-      (unless (equal (org-entry-get nil prop) val)
-        (org-entry-put nil prop val))
-      (org-refresh-property
-       '((effort . identity)
-         (effort-minutes . org-duration-string-to-minutes))
-       val)
-      (when (equal heading (bound-and-true-p org-clock-current-task))
-        (setq org-clock-effort (get-text-property (point-at-bol) 'effort))
-        (org-clock-update-mode-line))
-      (message "%s is now %s" prop val))))
-#+END_SRC
 **** Auto deadline
 #+BEGIN_SRC emacs-lisp
 (defun aj/org-add-auto-deadline (force)
@@ -739,33 +709,35 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
            org-pomodoro-format "P~%s"
            org-pomodoro-keep-killed-pomodoro-time t
            org-pomodoro-manual-break t))
-  :config (alert-add-rule
-           :category "org-pomodoro"
-           :style 'libnotify
-           :continue nil)
-  (set-face-attribute 'org-pomodoro-mode-line nil :inverse-video nil :foreground 'unspecified :inherit 'mode-line-emphasis)
-  (set-face-attribute 'org-pomodoro-mode-line-break nil :inverse-video nil :foreground 'unspecified :inherit 'mode-line-emphasis))
+  :config
+  (alert-add-rule
+   :category "org-pomodoro"
+   :style 'libnotify
+   :continue nil))
 #+end_src
 
-**** Clocksum variables
+**** Clocksum variables, duration units, effort global properties
 #+BEGIN_SRC emacs-lisp
-(setq org-duration-units
-      `(("min" . 1)
-        ("h" . 60)
-        ("d" . ,(* 60 8)) ; 8 hour work day
-        ("w" . ,(* 60 8 5)) ; 5 days a week
-        ("m" . ,(* 60 8 21)) ; 21 working days per month
-        ("y" . ,(round (* 60 8 21 10.5)))) ;; 10.5 such working months
-      org-duration-format
-      '(("m") ("w") ("d") ("h") (special . h:mm)))
-(org-duration-set-regexps)
+(with-eval-after-load 'org-duration
+  (setq org-duration-units
+        `(("min" . 1)
+          ("p" . 25) ; time of a pomodoro!
+          ("h" . 60)
+          ("d" . ,(* 60 8)) ; 8 hour work day
+          ("w" . ,(* 60 8 5)) ; 5 days a week
+          ("m" . ,(* 60 8 21)) ; 21 working days per month
+          ("y" . ,(round (* 60 8 21 10.5))))
+        ;; 10.5 such working months (because I have 31 days of
+        ;; vacation. 🙌 Swedish working agreements)
+        org-duration-format
+        '(("m") ("w") ("d") ("h") (special . h:mm)))
 
-;; pre 9.1-values:
-;; org-time-clocksum-use-effort-durations t
-;; org-time-clocksum-format
-;; '(:weeks "%dw " :days "%dd " :hours "%d" :require-hours t
-;;          :minutes ":%02d" :require-minutes t)
+  (org-duration-set-regexps))
 
+;; :ETC makes these the values offered for completion, but won’t require a match
+(add-to-list
+ 'org-global-properties
+ '("Effort_ALL" . "0:15 1p 2p 3p 4p 1h 2h 3h 4h 6h 1d 2d 3d 4d 1w 2w 3w :ETC"))
 #+END_SRC
 
 **** Org clock with helm
@@ -775,11 +747,17 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
 (defun aj/helm-org-clock-select-task (&optional _prompt)
   "Select a task that was recently associated with clocking."
   (interactive)
-  (or
-   (helm :sources (list (aj/helm-org-clock-history) (aj/helm-org-clock-agenda-headings))
-         :candidate-number-limit 99999
-         :buffer "*Helm org clock*")
-   (user-error "No clock in task chosen")))
+  (let ((aj/helm-org-candidates-todo-only t)
+        (helm-org-headings-actions '(("Clock in" . identity))))
+    (or
+     (helm :sources
+           (append
+            (list (aj/helm-org-clock-history))
+            (helm-org-build-sources (org-agenda-files)))
+           :candidate-number-limit 99999
+           :buffer "*Helm org clock*")
+     (user-error "No clock in task chosen"))))
+
 
 ;; TODO add sources for
 ;; org-clock-default task, interrupted-task, current clocking task
@@ -815,43 +793,6 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
       (goto-char (point-min))
       (cons (buffer-substring 4 (point-at-eol)) (cdr cm)))))
 
-(autoload 'helm-org-get-candidates "helm-org")
-(defun aj/helm-org-clock-agenda-headings ()
-  (let ((aj/helm-org-candidates-todo-only t))
-    (helm-build-sync-source "Org agenda headings"
-      :candidates (helm-org-get-candidates (org-agenda-files)))))
-#+END_SRC
-**** Agenda navigation and clocking :ARCHIVE:
-From:
-https://lists.gnu.org/archive/html/emacs-orgmode/2015-04/msg00052.html
-#+BEGIN_SRC emacs-lisp
-(defun my/helm-org-clock-in (marker)
-  (save-window-excursion
-    (helm-org-goto-marker marker)
-    (if (derived-mode-p 'org-agenda-mode) (org-agenda-clock-in) (org-clock-in))
-    t))
-
-(defun my/helm-org-clock-in-and-goto (marker)
-  (helm-org-goto-marker marker)
-  (if (derived-mode-p 'org-agenda-mode) (org-agenda-clock-in) (org-clock-in)))
-
-(cl-defun mlm/helm-source-org-headings-for-files (filenames
-                                                  &optional (min-depth 1) (max-depth 8))
-  (helm-build-sync-source "Org Headings"
-    :candidates (helm-org-get-candidates filenames min-depth max-depth)
-    :persistent-help "Go to line (keeping session); <f1> Go to line; <f2> Refile to this heading; <f3> Clock In; <f4> Clock in and Goto; <f5> Insert link to this heading"
-    :action '(("Go to line" . helm-org-goto-marker)
-              ("Refile to this heading" . helm-org-heading-refile)
-              ("Clock in" . my/helm-org-clock-in)
-              ("Clock in and Go to" . my/helm-org-clock-in-and-goto)
-              ("Insert link to this heading" . helm-org-insert-link-to-heading-at-marker))))
-
-
-(defun mlm/helm-org-agenda-files-headings ()
-  (interactive)
-  (helm :sources (mlm/helm-source-org-headings-for-files (org-agenda-files))
-        :candidate-number-limit 99999
-        :buffer "*helm org headings*"))
 #+END_SRC
 
 ** org-id, add id's in this file! And for all org files in a directory.
@@ -866,6 +807,7 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2015-04/msg00052.html
   (org-id-update-id-locations
    (directory-files-recursively dir ".*\\.org$" nil t t)))
 #+end_src
+
 ** Visibility, folding, display etc.
 *** Make visibility property "folded" behave as if subtree was archived, i.e. always hidden after visibility cycling
 This is based on ~org-cycle-hide-archived-trees~.
@@ -1143,66 +1085,117 @@ Should check if it’s less efficient doing this than the homegrown mapping in h
 (advice-add 'helm-org--get-candidates-in-file :around
             #'aj/helm-org--get-candidates-in-file)
 
-(defun aj/helm-org--get-candidates-in-file (fun filename &optional fontify nofname parents matcher force-refresh)
+(defun aj/helm-org--get-candidates-in-file (fun filename &optional fontify nofname parents matcher _force-refresh)
   (if parents ;; won’t handle that special case
       (funcall fun filename fontify nofname parents)
     (with-current-buffer (pcase filename
                            ((pred bufferp) filename)
                            ((pred stringp) (find-file-noselect filename t)))
-      (let ((tick (buffer-chars-modified-tick)))
-        (if (and helm-org--buffer-tick
-                 (= tick helm-org--buffer-tick)
-                 (null force-refresh))
-            helm-org--headers-cache
-          (set (make-local-variable 'helm-org--buffer-tick) tick)
-          (org-agenda-prepare-buffers (list filename))
-          (prog1
-              (setq-local
-               helm-org--headers-cache
-               (let ((match-fn (if fontify
-                                   #'match-string
-                                 #'match-string-no-properties))
-                     (matcher (or matcher aj/helm-org-candidates-matcher))
-                     (file (unless nofname
-                             (concat (helm-basename filename) ":")))
-                     (width (window-width (helm-window))))
-                 (save-excursion
-                   (save-restriction
-                     (unless (and (bufferp filename)
-                                  (buffer-base-buffer filename))
-                       ;; Only widen direct buffers, not indirect ones.
-                       (widen))
-                     ;; (unless parents (goto-char (point-min)))
-                     ;; clear cache for new version of org-get-outline-path
-                     (and (boundp 'org-outline-path-cache)
-                          (setq org-outline-path-cache nil))
-                     (cl-remove-if
-                      #'null
-                      (org-scan-tags
-                       (lambda ()
-                         (goto-char (point-at-bol))
-                         (when (looking-at org-complex-heading-regexp)
-                           (let ((beg (point-at-bol))
-                                 (end (point-at-eol))
-                                 (level (length (match-string-no-properties 1)))
-                                 (heading (funcall match-fn 4)))
-                             (when (and fontify
-                                        (null (text-property-any
-                                               beg end 'fontified t)))
-                               (jit-lock-fontify-now beg end))
-                             (when (and (>= level helm-org-headings-min-depth)
-                                        (<= level helm-org-headings-max-depth))
-                               (propertize
-                                (if helm-org-format-outline-path
-                                    (org-format-outline-path
-                                     (org-get-outline-path t t) width file)
-                                  (if file
-                                      (concat file (funcall match-fn 0))
-                                    (funcall match-fn 0)))
-                                'helm-real-display heading
-                                'helm-realvalue
-                                (set-marker (make-marker) (point-at-eol)))))))
-                       matcher aj/helm-org-candidates-todo-only))))))))))))
+      (org-agenda-prepare-buffers (list filename))
+      (let ((match-fn (if fontify
+                          #'match-string
+                        #'match-string-no-properties))
+            (matcher (or matcher aj/helm-org-candidates-matcher))
+            (file (unless nofname
+                    (concat (helm-basename filename) ":")))
+            (width (window-width (helm-window))))
+        (save-excursion
+          (save-restriction
+            (unless (and (bufferp filename)
+                         (buffer-base-buffer filename))
+              ;; Only widen direct buffers, not indirect ones.
+              (widen))
+            ;; clear cache for new version of org-get-outline-path
+            (and (boundp 'org-outline-path-cache)
+                 (setq org-outline-path-cache nil))
+            (cl-remove-if
+             #'null
+             (org-scan-tags
+              (lambda ()
+                (goto-char (point-at-bol))
+                (when (looking-at org-complex-heading-regexp)
+                  (let ((beg (point-at-bol))
+                        (end (point-at-eol))
+                        (level (length (match-string-no-properties 1)))
+                        (heading (funcall match-fn 4)))
+                    (when (and fontify
+                               (null (text-property-any
+                                      beg end 'fontified t)))
+                      (jit-lock-fontify-now beg end))
+                    (when (and (>= level helm-org-headings-min-depth)
+                               (<= level helm-org-headings-max-depth))
+                      (propertize
+                       (if helm-org-format-outline-path
+                           (org-format-outline-path
+                            (org-get-outline-path t t) width file)
+                         (if file
+                             (concat file (funcall match-fn 0))
+                           (funcall match-fn 0)))
+                       'helm-real-display heading
+                       'helm-realvalue
+                       (set-marker (make-marker) (point-at-eol)))))))
+              matcher aj/helm-org-candidates-todo-only))))))))
+
+;; (defun aj/helm-org--get-candidates-in-file (fun filename &optional fontify nofname parents matcher force-refresh)
+;;   (if parents ;; won’t handle that special case
+;;       (funcall fun filename fontify nofname parents)
+;;     (with-current-buffer (pcase filename
+;;                            ((pred bufferp) filename)
+;;                            ((pred stringp) (find-file-noselect filename t)))
+;;       (let ((tick (buffer-chars-modified-tick)))
+;;         (if (and helm-org--buffer-tick
+;;                  (= tick helm-org--buffer-tick)
+;;                  (null force-refresh))
+;;             helm-org--headers-cache
+;;           (set (make-local-variable 'helm-org--buffer-tick) tick)
+;;           (org-agenda-prepare-buffers (list filename))
+;;           (prog1
+;;               (setq-local
+;;                helm-org--headers-cache
+;;                (let ((match-fn (if fontify
+;;                                    #'match-string
+;;                                  #'match-string-no-properties))
+;;                      (matcher (or matcher aj/helm-org-candidates-matcher))
+;;                      (file (unless nofname
+;;                              (concat (helm-basename filename) ":")))
+;;                      (width (window-width (helm-window))))
+;;                  (save-excursion
+;;                    (save-restriction
+;;                      (unless (and (bufferp filename)
+;;                                   (buffer-base-buffer filename))
+;;                        ;; Only widen direct buffers, not indirect ones.
+;;                        (widen))
+;;                      ;; (unless parents (goto-char (point-min)))
+;;                      ;; clear cache for new version of org-get-outline-path
+;;                      (and (boundp 'org-outline-path-cache)
+;;                           (setq org-outline-path-cache nil))
+;;                      (cl-remove-if
+;;                       #'null
+;;                       (org-scan-tags
+;;                        (lambda ()
+;;                          (goto-char (point-at-bol))
+;;                          (when (looking-at org-complex-heading-regexp)
+;;                            (let ((beg (point-at-bol))
+;;                                  (end (point-at-eol))
+;;                                  (level (length (match-string-no-properties 1)))
+;;                                  (heading (funcall match-fn 4)))
+;;                              (when (and fontify
+;;                                         (null (text-property-any
+;;                                                beg end 'fontified t)))
+;;                                (jit-lock-fontify-now beg end))
+;;                              (when (and (>= level helm-org-headings-min-depth)
+;;                                         (<= level helm-org-headings-max-depth))
+;;                                (propertize
+;;                                 (if helm-org-format-outline-path
+;;                                     (org-format-outline-path
+;;                                      (org-get-outline-path t t) width file)
+;;                                   (if file
+;;                                       (concat file (funcall match-fn 0))
+;;                                     (funcall match-fn 0)))
+;;                                 'helm-real-display heading
+;;                                 'helm-realvalue
+;;                                 (set-marker (make-marker) (point-at-eol)))))))
+;;                        matcher aj/helm-org-candidates-todo-only))))))))))))
 #+END_SRC
 
 **** Some tests for this  :ARCHIVE:
@@ -1251,6 +1244,7 @@ Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entrie
   (setq helm-org-rifle-show-path t
         helm-org-rifle-show-tags t))
 #+END_SRC
+
 *** helm-org + helm-org-rifle: Make display of headings focus on first and last
 #+BEGIN_SRC emacs-lisp
 (defun aj/override-org-format-outline-path (fn &rest rest)
@@ -2059,7 +2053,7 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
   ;; and then it’s useful to display the outer brackets, for easy
   ;; killing and yanking.
   (org-link-set-parameters "zotero"
-						   :face 'org-scheduled
+						   :face 'org-scheduled-today
 						   :activate-func #'aj/org-zotxt-activate)
 
   (defun aj/org-zotxt-activate (start end _path bracketp)
@@ -2220,9 +2214,10 @@ Mostly for html and reveal
 **** Loading
 #+begin_src emacs-lisp
 (use-package org-re-reveal
-  :straight nil
-  :demand t
-  :load-path "~/kodat/elisp/org-re-reveal")
+  :straight (org-re-reveal
+             :depth nil
+             :fork (:host gitlab :repo "andersjohansson/org-re-reveal" :branch "ajfixes"))
+  :demand t)
 #+end_src
 **** Settings
 #+BEGIN_SRC emacs-lisp
@@ -3746,20 +3741,23 @@ parent."
                            :test #'string=)
         (let ((level-top (org-element-property :level object))
               level-diff)
-          (mapc (lambda (el)
-                  ;; recursively promote all nested headlines
-                  (org-element-map el 'headline
-                    (lambda (el)
-                      (when (equal 'headline (org-element-type el))
-                        (unless level-diff
-                          (setq level-diff (- (org-element-property :level el)
-                                              level-top)))
-                        (org-element-put-property el :level
-                                                  (- (org-element-property :level el)
-                                                     level-diff)))))
-                  ;; insert back into parse tree
-                  (org-element-insert-before el object))
-                (org-element-contents object)))
+
+          (dolist (el (org-element-contents object))
+            ;; recursively promote all nested headlines
+            (org-element-map el 'headline
+              (lambda (el)
+                (unless level-diff
+                  (setq level-diff (- (org-element-property :level el)
+                                      level-top)))
+                (org-element-put-property el :level
+                                          (- (org-element-property :level el)
+                                             level-diff))))
+            ;; insert everything back into parse tree, except for segments
+            ;; (non-headlines) on level 1 (believe that’s the
+            ;; pathological case)
+            (unless (and (= 1 level-top)
+                         (not (equal 'headline (org-element-type el))))
+              (org-element-insert-before el object))))
         (org-element-extract-element object)))
     info nil)
   (org-extra--merge-sections data backend info)
