@@ -209,16 +209,6 @@ https://bling.github.io/blog/2016/01/18/why-are-you-changing-gc-cons-threshold/
     (aj/deactivate-gui (car mm) (cadr mm))))
 #+END_SRC
 
-*** Enable scroll-bars
-#+begin_src emacs-lisp
-(when window-system
-  (scroll-bar-mode t)
-  (set-scroll-bar-mode 'right)
-  (set-window-scroll-bars (minibuffer-window) nil nil)
-  (set-window-fringes (minibuffer-window) nil 0) ; no right fringe in minibuffer
-  )
-
-#+end_src
 *** Fontset stuff, color emojis (emacs 27, yay!)
 #+BEGIN_SRC emacs-lisp
 ;; Not needed.
@@ -4908,6 +4898,19 @@ Also at: https://github.com/andersjohansson/orgqda
 I want my windows to launch at half screen width, to the left. But on my narrow laptop screen probably a little wider (90 chars).
 #+begin_src emacs-lisp
 (when (display-graphic-p)
+
+  (scroll-bar-mode t)
+  (set-scroll-bar-mode 'right)
+
+
+  (defun aj/no-minibuffer-scrollbar-or-fringe (&optional frame)
+    (set-window-scroll-bars (minibuffer-window frame) nil nil)
+    ;; no right fringe in minibuffer:
+    (set-window-fringes (minibuffer-window frame) nil 0))
+
+  (add-hook 'after-make-frame-functions #'aj/no-minibuffer-scrollbar-or-fringe)
+  (aj/no-minibuffer-scrollbar-or-fringe)
+
   (add-to-list 'default-frame-alist '(top . 0))
   (add-to-list 'default-frame-alist '(left . (+ -9)))
   (add-to-list 'default-frame-alist '(fullscreen . fullheight))
