@@ -3155,17 +3155,17 @@ _d_: subtree     _<tab>_: toggle
 (setq auto-mode-alist
       (cons '("\\.m$" . octave-mode) auto-mode-alist))
 #+end_src
+
 *** Tabs or spaces
 #+begin_src emacs-lisp
-(setq-default tab-width 4) ; or any other preferred value
-(defvaralias 'c-basic-offset 'tab-width)
+(setq-default tab-width 4)
 (defvaralias 'cperl-indent-level 'tab-width)
 (defvaralias 'js-indent-level 'tab-width)
 
-(use-package smart-tabs-mode
-  :commands smart-tabs-insinuate
-  :init (smart-tabs-insinuate 'c 'c++ 'java 'javascript 'cperl 'python 'ruby 'nxml)
-  )
+;; (use-package smart-tabs-mode
+;;   :commands smart-tabs-insinuate
+;;   :init (smart-tabs-insinuate 'c 'c++ 'java 'javascript 'cperl 'python 'ruby 'nxml)
+;;   )
 
 (add-hook 'emacs-lisp-mode-hook
 		  (lambda ()
@@ -4474,7 +4474,7 @@ Also runs hook aj/face-definitions-hook."
       ;; Use fixed-pitch for checkbox, compressed font for table
       (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
       (set-face-attribute 'org-table nil :family "Input Mono Compressed")
-      
+
       (when (eq theme 'modus-operandi)
         (set-face-attribute 'org-block nil :background "#f8f8f8")
         (dolist (n '("1" "2" "3" "4" "5" "6" "7" "8"))
@@ -4650,11 +4650,6 @@ I actually liked this more, especially the unified-branch which I used here. But
 *** Hl-line
 #+begin_src emacs-lisp
 (add-hook 'prog-mode-hook 'hl-line-mode)
-;; (use-package hl-line+
-;;   :ensure t
-;;   :defer 5
-;;   :config
-;;   (hl-line-toggle-when-idle))
 #+end_src
 
 *** Cursor
@@ -4663,15 +4658,6 @@ I actually liked this more, especially the unified-branch which I used here. But
 (setq-default cursor-in-non-selected-windows 'hollow)
 (blink-cursor-mode -1)
 (setq blink-cursor-alist '((bar . (bar . 1))))
-
-;; (use-package cursor-chg
-;;   :defer 5
-;;   :init (setq curchg-default-cursor-color (face-attribute 'font-lock-type-face :foreground))
-;;   :config
-;;   ;; (setq curchg-idle-cursor-type 'box)
-;;   ;; (toggle-cursor-type-when-idle -1)
-;;   (setq curchg-overwrite/read-only-cursor-type 'box)
-;;   (change-cursor-mode 1))
 #+end_src
 
 *** Fullscreen toggling
@@ -4686,10 +4672,7 @@ I actually liked this more, especially the unified-branch which I used here. But
                              aj/last-fullscreen-param
 
                            (setq aj/last-fullscreen-param current-value)
-                           ;; (fancy-battery-mode +1)
                            'fullboth))))
-
-;; (autoload 'fancy-battery-mode "fancy-battery")
 
 (bind-key "<f11>" #'aj/toggle-fullscreen)
 #+end_src
