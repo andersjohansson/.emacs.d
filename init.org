@@ -1096,22 +1096,6 @@ overriding it, but you should know before you do.
 
 #+end_src
 
-*** No littering! :org_async:
-#+begin_src emacs-lisp
-(use-package no-littering
-  :demand t
-  :init
-  (setq no-littering-etc-directory
-        (expand-file-name "config/" user-emacs-directory)
-        no-littering-var-directory "~/.emacs.data/")
-  :config
-  (with-eval-after-load 'recentf
-    (add-to-list 'recentf-exclude no-littering-var-directory)
-    (add-to-list 'recentf-exclude no-littering-etc-directory))
-  (setq auto-save-file-name-transforms
-        `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))))
-#+end_src
-
 *** Tooltip-mode
 I want to use the echo area (hence ~(tooltip-mode -1)~), but don’t want help echo messages to be truncated, but resized!
 #+begin_src emacs-lisp
