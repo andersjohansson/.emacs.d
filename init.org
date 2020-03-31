@@ -999,9 +999,9 @@ overriding it, but you should know before you do.
  In/out^        ^Edit^         ^Summary     (_?_)
 ---------------------------------------------
  _i_n, select    _e_dit effort  _g_oto entry
- _I_n here       _C_ancel       _d_isplay
- _c_ontinue ^ ^ _r_eport
- _o_ut
+ _I_n here       _E_ffort here  _d_isplay
+ _c_ontinue      _C_ancel       _d_isplay
+ _o_ut           _r_eport
  _D_one
  _p_omodoro (select)
  _l_ast task pomodoro (continue)
@@ -1015,6 +1015,7 @@ overriding it, but you should know before you do.
   ("l" (org-pomodoro '(16)))
   ("P" org-pomodoro)
   ("e" org-clock-modify-effort-estimate)
+  ("E" org-set-effort)
   ("C" org-clock-cancel)
   ("g" org-clock-goto)
   ("d" org-clock-display)
