@@ -4450,35 +4450,6 @@ Add ADDITIONAL-SEGMENTS to the end of the theme."
 **** My own face definitions
 Load my own face customizations after enabling a theme.
 #+BEGIN_SRC emacs-lisp
-
-;; Would it be possible to do it as a custom theme that is enabled
-;; after other themes? It would be cleaner (disableable).
-;; But it is tricky, to get the evaluation logic (is solarized
-;; loaded?) working as well as the hook. It could be modifications of
-;; the var aj/face-defs but we would still need to do dynamic checks
-;; of what theme is loaded for some of the faces before calling
-;; custom-theme-set-faces with this variable. Much hassle.
-
-;; (deftheme aj/face-definitions
-;;   "Extra face definitions to be loaded after other themes")
-
-;; (defvar aj/face-defs
-;;   (list
-;;    '(org-table ((t :inherit 'fixed-pitch)))
-;;    '(org-date ((t :inherit 'fixed-pitch)))))
-
-
-;; (defun aj/enable-face-definitions (en-theme theme)
-;;   (funcall en-theme theme)
-;;   (apply #'custom-theme-set-faces
-;;          'aj/face-definitions
-;;          aj/face-defs)
-
-;;   (funcall en-theme 'aj/face-definitions)
-
-;;   )
-
-
 (defun aj/apply-face-definitions (&optional theme)
   "Do face definition stuff after loading theme.
 Also runs hook aj/face-definitions-hook."
@@ -4489,26 +4460,29 @@ Also runs hook aj/face-definitions-hook."
     (with-eval-after-load 'org-faces
 
       (set-face-attribute 'org-document-title nil :height 1.5 :weight 'bold)
-      (set-face-attribute 'org-meta-line nil :inherit 'org-drawer)
+      ;; (set-face-attribute 'org-meta-line nil :inherit 'org-drawer)
 
-      (set-face-attribute 'org-block-begin-line nil :height 0.9)
-      (set-face-attribute 'org-block-end-line nil :height 0.9)
-      (set-face-attribute 'org-block nil :height 0.95 :extend t)
+      (set-face-attribute 'org-block-begin-line nil :height 0.9 :extend t)
+      ;; (set-face-attribute 'org-block-end-line nil :height 0.9 :extend t)
+      (set-face-attribute 'org-block nil :extend t)
 
       (set-face-attribute 'org-quote nil :weight 'light :height 0.95 :inherit 'default)
       (set-face-attribute 'org-verse nil :inherit 'org-table)
-      ;; (set-face-attribute 'org-tag nil :weight 'normal :inherit
-      ;; 'show-paren-match)
 
-      (set-face-attribute 'org-special-keyword nil :weight 'normal :inherit 'shadow)
+      ;; (set-face-attribute 'org-special-keyword nil :weight 'normal :inherit 'shadow)
 
       ;; Use fixed-pitch for checkbox, compressed font for table
       (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
       (set-face-attribute 'org-table nil :family "Input Mono Compressed")
+      
+      (when (eq theme 'modus-operandi)
+        (set-face-attribute 'org-block nil :background "#f8f8f8")
+        (dolist (n '("1" "2" "3" "4" "5" "6" "7" "8"))
+          (set-face-attribute (intern (concat "org-level-" n)) nil :weight 'light))
 
-      ;; avoid tags inheriting headline color, make them bold but subdued.
-      (set-face-attribute 'org-tag nil :inherit 'shadow)
-
+        ;; avoid tags inheriting headline color, make them bold but subdued.
+        (set-face-attribute 'org-tag nil :foreground 'unspecified :inherit 'shadow :weight 'normal)
+        )
       ;; level colors in gruvbox are bad... (I don’t like the red...)
       ;; (when (eq theme 'gruvbox-light-hard)
       ;;   (gruvbox-light-hard-with-palette
@@ -4535,12 +4509,12 @@ Also runs hook aj/face-definitions-hook."
       ;;                                   (set-face-attribute 'org-level-8 nil :foreground magenta)))
       )
 
-    (cond
-     ((eq theme 'solarized-light)
-      (setq org-n-level-faces 8))
-     ((eq theme 'solarized-dark)
-      ;; the yellow-red ones are garish contrast-colors to the background
-      (setq org-n-level-faces 4)))
+    ;; (cond
+    ;;  ((eq theme 'solarized-light)
+    ;;   (setq org-n-level-faces 8))
+    ;;  ((eq theme 'solarized-dark)
+    ;;   ;; the yellow-red ones are garish contrast-colors to the background
+    ;;   (setq org-n-level-faces 4)))
 
     ;; the thing solarized does with mode-line underline is bad.
     ;; (when (member theme '(solarized-dark solarized-light))
@@ -4551,8 +4525,8 @@ Also runs hook aj/face-definitions-hook."
     (with-eval-after-load 'idle-highlight-mode
       (set-face-attribute 'idle-highlight nil :inherit nil :underline t))
 
-    (with-eval-after-load 'org-inlinetask
-      (set-face-attribute 'org-inlinetask nil :inherit 'org-level-5))
+    ;; (with-eval-after-load 'org-inlinetask
+    ;;   (set-face-attribute 'org-inlinetask nil :inherit 'org-level-5))
 
     (run-hook-with-args 'aj/face-definitions-hook theme)))
 
@@ -4565,13 +4539,20 @@ Also runs hook aj/face-definitions-hook."
              :depth nil
              :fork (:host github :repo "andersjohansson/emacs-theme-gruvbox" :branch "ajfixes2")))
 #+END_SRC
-
+**** Modus-operandi theme
+#+begin_src emacs-lisp
+(use-package modus-operandi-theme
+  :custom (modus-operandi-theme-visible-fringes t))
+#+end_src
 **** Define themes to use for dark and light and load light theme
 #+BEGIN_SRC emacs-lisp
-(defvar aj/light-theme 'gruvbox-light-hard)
+(defvar aj/light-theme 'modus-operandi
+  ;; 'gruvbox-light-hard
+  )
 (defvar aj/dark-theme 'gruvbox-dark-medium)
 
 (load-theme aj/light-theme)
+;; I’m not loading dark theme here, since I seldom use it.
 #+END_SRC
 **** Dark-light-switching
 #+BEGIN_SRC emacs-lisp
