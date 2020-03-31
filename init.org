@@ -657,7 +657,6 @@ Example of alist entry:
 
   )
 #+end_src
-
 **** Helm-fuz
 For modern fuzzy matching with a binary module built on Rust libraries.
 We need to add "target" to the fuz recipe so that it isn’t removed by straight (we don’t want to rebuild the fuz module every time we start Emacs).
@@ -2509,7 +2508,6 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
 #+end_src
 
 ** New (custom) utility commands
-
 #+begin_src emacs-lisp
 (use-package aj-custom-commands
   :straight (aj-custom-commands :host gitlab :repo "andersjohansson/aj-custom-emacs-commands")
@@ -2619,7 +2617,7 @@ I often have more use for killing emacs (including all GUI-windows).
 #+BEGIN_SRC emacs-lisp
 (setq shift-select-mode nil)
 #+END_SRC
-*** Rectangle mark-mode hydra
+*** Rectangle mark-mode hydra :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (global-set-key (kbd "C-x SPC") 'hydra-rectangle/body)
 
@@ -4040,6 +4038,7 @@ I want to use variable pitch for most things. But changing the default face to a
 (add-hook 'prog-mode-hook #'variable-pitch-mode)
 (add-hook 'text-mode-hook #'variable-pitch-mode)
 (set-face-attribute 'mode-line nil :family "Input Sans Condensed")
+(set-face-attribute 'mode-line-inactive nil :family "Input Sans Condensed")
 #+end_src
 *** Document font
 When editing longer text documents in org mode (or perhaps LaTeX) it’s good to use a nice sans serif like ET Book (https://github.com/edwardtufte/et-book).
