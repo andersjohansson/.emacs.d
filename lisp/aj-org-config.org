@@ -972,6 +972,7 @@ A local variables comment block that is placed at the end of the file may be los
 (defun aj/org-insert-local-variable-heading (&rest _args)
   "Insert a heading under which local variables can be stored, if not already present"
   (when (eq major-mode 'org-mode)
+    (push-mark)
     (save-excursion
       (save-restriction
         (widen)
