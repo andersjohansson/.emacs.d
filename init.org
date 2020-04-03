@@ -1095,7 +1095,7 @@ overriding it, but you should know before you do.
 
 #+end_src
 
-*** Tooltip-mode
+*** Tooltip-mode :ARCHIVE:
 I want to use the echo area (hence ~(tooltip-mode -1)~), but don’t want help echo messages to be truncated, but resized!
 #+begin_src emacs-lisp
 (tooltip-mode -1)
@@ -4147,50 +4147,123 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
         (all-the-icons-dired--display)))))
 
 #+END_SRC
+
 *** Modeline
-**** mini-modeline
+**** mini-modeline + doom-modeline
 #+BEGIN_SRC emacs-lisp
 (use-package eldoc-eval)
-(use-package mini-modeline
-  ;; :after doom-modeline
+(use-package doom-modeline
+  :demand t
+  :straight (doom-modeline :fork (:host github :repo "andersjohansson/doom-modeline" :branch "mini-modeline"))
+  :custom
+  (doom-modeline-buffer-file-name-style 'truncate-all)
+  (doom-modeline-bar-width (frame-parameter nil 'left-fringe))
+  (doom-modeline-height 10)
+  (doom-modeline-icon t)
+  (doom-modeline-icons-scale-factor 0.8)
+  (doom-modeline-icons-v-adjust-factor 0.8)
   :config
-  ;; (doom-modeline-def-modeline 'minibuffer-line
-  ;;   '(modals workspace-name window-number matches buffer-info remote-host buffer-position word-count selection-info misc-info major-mode process vcs lsp checker)
-  ;;   )
+
+  ;; adjust v-adjust factors for major-mode-icons
+  ;; these are read in through ‘all-the-icons-icon-for-buffer’ and not
+  ;; scaled according to the udpated scaling in my doom-modeline fork
+  (cl-loop for x in-ref all-the-icons-mode-icon-alist
+           do
+           (when-let ((adj (plist-get (cdr x) :v-adjust)))
+             (setf (cl-getf (cdr x) :v-adjust) (* adj doom-modeline-icons-v-adjust-factor))))
 
 
-  ;; (setq mini-modeline-r-format '(:eval (doom-modeline-format--minibuffer-line)))
+  (set-face-attribute 'doom-modeline nil :inherit 'default)
+  (set-face-attribute 'doom-modeline-inactive nil :inherit 'default)
 
-  (setq mini-modeline-r-format '("%e" mode-line-front-space
-                                 ;; mode-line-mule-info
-                                 ;; anzu--mode-line-format
-                                 mode-line-client
-                                 mode-line-modified
-                                 mode-line-remote
-                                 mode-line-frame-identification
-                                 mode-line-buffer-identification
-                                 " " mode-line-position " "
-                                 ;; evil-mode-line-tag
-                                 mode-line-misc-info))
+  ;;   ;; pdf pages with pagelabels
+  (advice-add 'doom-modeline-update-pdf-pages :override #'aj/doom-modeline-update-pdf-pages)
+
+  (defun aj/doom-modeline-update-pdf-pages ()
+    "Update PDF pages. Use pagelabels if available."
+    (setq doom-modeline--pdf-pages
+          (let* ((cp (eval `(pdf-view-current-page)))
+                 (physical (format "%d/%d"
+                                   cp
+                                   (pdf-cache-number-of-pages)))
+                 (currlabel (pdf-view-current-pagelabel)))
+
+            (propertize
+             (if (equal currlabel (number-to-string cp))
+                 (concat " P: " physical " ")
+               (concat " P:" currlabel " (" physical ") "))
+             'face (if (doom-modeline--active)
+                       'mode-line
+                     'mode-line-inactive)))))
+  )
+
+(use-package mini-modeline
+  :straight (mini-modeline :fork (:host github :repo "andersjohansson/mini-modeline" :branch "buffer-local-formats"))
+  :after doom-modeline
+  :hook (after-init . mini-modeline-mode)
+  :config
+  (doom-modeline-def-modeline 'minibuffer-line
+    '(modals workspace-name window-number matches buffer-info remote-host buffer-position word-count selection-info misc-info major-mode process vcs lsp checker))
+
+  (setq mini-modeline-r-format (doom-modeline-format--minibuffer-line))
+
+  ;; (setq mini-modeline-r-format '("%e" mode-line-front-space
+  ;;                                ;; mode-line-mule-info
+  ;;                                ;; anzu--mode-line-format
+  ;;                                mode-line-client
+  ;;                                mode-line-modified
+  ;;                                mode-line-remote
+  ;;                                mode-line-frame-identification
+  ;;                                mode-line-buffer-identification
+  ;;                                " " mode-line-position " "
+  ;;                                ;; evil-mode-line-tag
+  ;;                                mode-line-misc-info))
 
   (setq mini-modeline-right-padding 1
         mini-modeline-enhance-visual nil)
-
 
   (set-face-attribute 'mode-line nil :box nil)
   (set-face-attribute 'mini-modeline-mode-line nil :background (face-background 'modus-theme-intense-blue) :height 0.2)
   (set-face-attribute 'mini-modeline-mode-line-inactive nil :background (face-background 'fringe) :height 0.2)
 
-  :hook (after-init . mini-modeline-mode)
+  (defun doom-modeline-segment--bar ()
+    "Don’t show the bar when using mini-modeline"
+    "")
+
+  (defun aj/mini-modeline-set-doom-special (key)
+    (when-let ((modeline (doom-modeline key)))
+      (set (make-local-variable 'mini-modeline-r-format)
+           modeline)))
+
+  (add-hook 'Info-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'info)))
+  (add-hook 'pdf-view-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'pdf)))
+  (add-hook 'dired-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'project)))
+  (add-hook 'dashboard-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'project)))
+  (add-hook 'image-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'media)))
+  (add-hook 'message-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'message)))
+  (add-hook 'git-commit-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'message)))
+  (add-hook 'magit-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'vcs)))
+  (add-hook 'circe-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'special)))
+  (add-hook 'erc-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'special)))
+  (add-hook 'rcirc-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'special)))
+  (add-hook 'org-src-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'org-src)))
+  (add-hook 'git-timemachine-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'timemachine)))
+  (add-hook 'paradox-menu-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'package)))
+  (add-hook 'xwidget-webkit-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'minimal)))
   )
 
-;; (use-package doom-modeline
-;;   :custom
-;;   (doom-modeline-buffer-file-name-style 'truncate-all)
-;;   (doom-modeline-bar-width (frame-parameter nil 'left-fringe))
-;;   (doom-modeline-height 10)
-;;   (doom-modeline-icon nil)
-;;   )
+
+;; (add-hook 'window-buffer-change-functions #'aj/no-face-remapping-in-minibuffer)
+;; (defun aj/no-face-remapping-in-minibuffer (_frame)
+;;   (when-let ((win (minibuffer-window))
+;;              (buf (window-buffer win)))
+;;     (with-current-buffer buf
+;;       (set (make-local-variable 'face-remapping-alist)
+;;            '((mode-line default)
+;;              (mode-line-inactive default))))))
+
+
+
 
 ;; (defun aj/visible-helm-modeline ()
 ;;   (with-current-buffer helm-buffer
@@ -4236,25 +4309,7 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 ;;   ;;                             'local-map mode-line-buffer-identification-keymap))))))
 
 
-;;   ;; pdf pages with pagelabels
-;;   (advice-add 'doom-modeline-update-pdf-pages :override #'aj/doom-modeline-update-pdf-pages)
 
-;;   (defun aj/doom-modeline-update-pdf-pages ()
-;;     "Update PDF pages. Use pagelabels if available."
-;;     (setq doom-modeline--pdf-pages
-;;           (let* ((cp (eval `(pdf-view-current-page)))
-;;                  (physical (format "%d/%d"
-;;                                    cp
-;;                                    (pdf-cache-number-of-pages)))
-;;                  (currlabel (pdf-view-current-pagelabel)))
-
-;;             (propertize
-;;              (if (equal currlabel (number-to-string cp))
-;;                  (concat " P: " physical " ")
-;;                (concat " P:" currlabel " (" physical ") "))
-;;              'face (if (doom-modeline--active)
-;;                        'mode-line
-;;                      'mode-line-inactive)))))
 ;;   )
 #+END_SRC
 
