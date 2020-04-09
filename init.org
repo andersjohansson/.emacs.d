@@ -1992,51 +1992,45 @@ https://github.com/andersjohansson/tex-fold-linebreaks
   ("b" #'previous-buffer "Previous buffer")
   ("q" nil "Quit"))
 #+END_SRC
-*** Eyebrowse
+*** Eyebrowse :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (use-package eyebrowse
   :init (setq eyebrowse-keymap-prefix (kbd "C-c C-å"))
   (eyebrowse-mode t))
 #+END_SRC
+
 *** Window management variables
 #+BEGIN_SRC emacs-lisp
 (setq split-width-threshold 140)
 #+END_SRC
+
 *** Window management hydra
 #+BEGIN_SRC emacs-lisp
 (bind-key "C-§" #'hydra-window/body)
 
-(defhydra hydra-window ()
+(defhydra hydra-window (:hint nil)
   "
-Movement^^     ^Split^           ^Switch^      ^Resize^
-_h_ ←         _v_ertical         _r_otate      _2_ X←
-_j_ ↓         _x_ horizontal     _t_ranspose   _3_ X↓
-_k_ ↑         _z_ undo           _d_ delete      _4_ X↑
-_l_ →        _Z_ reset           _0_ delete   _5_ X→
-_F_ollow      _1_ only this
-_q_ cancel
+Split^^            ^Switch^       ^Resize^
+_2_ vertical       _r_otate CW    _<left>_ ←
+_3_ horizontal     _R_otate CCW   _<down>_ ↓
+_1_ only this      _t_ranspose    _<up>_ ↑
+_0_ delete                      _<right>_ →
+_z_ undo                        _=_ balance
+_Z_ redo
+_F_ollow _q_ cancel
 "
-  ("h" windmove-left)
-  ("j" windmove-down)
-  ("k" windmove-up)
-  ("l" windmove-right)
-  ("2" hydra-move-splitter-left)
-  ("3" hydra-move-splitter-down)
-  ("4" hydra-move-splitter-up)
-  ("5" hydra-move-splitter-right)
-  ("F" follow-mode)
-  ("v" (lambda ()
-         (interactive)
-         (split-window-right)
-         (windmove-right)))
-  ("x" (lambda ()
-         (interactive)
-         (split-window-below)
-         (windmove-down)))
-  ("r" aj/rotate-windows :color blue)
+  ("<left>" aj/hydra-move-splitter-left)
+  ("<down>" aj/hydra-move-splitter-down)
+  ("<up>" aj/hydra-move-splitter-up)
+  ("<right>" aj/hydra-move-splitter-right)
+  ("=" balance-windows)
+  ("2" split-window-below)
+  ("3" split-window-right)
+  ("r" rotate-frame-clockwise)
+  ("R" rotate-frame-anti-clockwise)
   ("t" transpose-frame)
-  ("0" delete-window :color blue)
-  ("d" delete-window :color blue)
+  ("F" follow-mode)
+  ("0" delete-window)
   ("1" delete-other-windows)
   ("z" (progn
          (winner-undo)
