@@ -452,7 +452,7 @@ Example of alist entry:
 
   ;; display
   (setq helm-split-window-inside-p t)
-  
+
   (setq helm-display-function
         ;;#'aj/helm-display-child-frame
         #'helm-default-display-buffer
@@ -460,7 +460,7 @@ Example of alist entry:
         helm-display-buffer-width 120
         helm-display-buffer-height 35
         helm-echo-input-in-header-line t)
-  
+
   (add-hook 'helm-minibuffer-set-up-hook #'helm-hide-minibuffer-maybe)
 
   ;; (defun aj/helm-display-child-frame (buffer &optional resume)
@@ -588,7 +588,7 @@ Example of alist entry:
       (advice-remove 'helm-grep--filter-candidate-1
                      #'aj/shorten-helm-path)))
 
-  
+
   ;;; more candidates for helm-ucs
   (defun aj/helm-500-candidates (fn &rest args)
     (let ((helm-candidate-number-limit 500))
@@ -4747,6 +4747,7 @@ I actually liked this more, especially the unified-branch which I used here. But
 (use-package hide-mode-line
   :defer t)
 #+end_src
+
 *** Readable-frame :ARCHIVE:
 With some inspiration from here: https://lepisma.github.io/2017/10/28/ricing-org-mode/
 Launches a frame with a serif font and writeroom, to read texts in org-mode.
