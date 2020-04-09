@@ -4119,15 +4119,6 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   (doom-modeline-icons-v-adjust-factor 0.8)
   :config
 
-  ;; adjust v-adjust factors for major-mode-icons
-  ;; these are read in through ‘all-the-icons-icon-for-buffer’ and not
-  ;; scaled according to the udpated scaling in my doom-modeline fork
-  (cl-loop for x in-ref all-the-icons-mode-icon-alist
-           do
-           (when-let ((adj (plist-get (cdr x) :v-adjust)))
-             (setf (cl-getf (cdr x) :v-adjust) (* adj doom-modeline-icons-v-adjust-factor))))
-
-
   (set-face-attribute 'doom-modeline nil :inherit 'default)
   (set-face-attribute 'doom-modeline-inactive nil :inherit 'default)
 
@@ -4158,33 +4149,24 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   :hook (after-init . mini-modeline-mode)
   :config
   (doom-modeline-def-modeline 'minibuffer-line
-    '(modals workspace-name window-number matches buffer-info remote-host buffer-position word-count selection-info misc-info major-mode process vcs lsp checker))
+    '(workspace-name window-number matches buffer-info remote-host buffer-position word-count parrot selection-info objed-state misc-info persp-name battery grip irc mu4e gnus github debug lsp minor-modes input-method indent-info buffer-encoding major-mode process vcs checker))
 
   (setq mini-modeline-r-format (doom-modeline-format--minibuffer-line))
-
-  ;; (setq mini-modeline-r-format '("%e" mode-line-front-space
-  ;;                                ;; mode-line-mule-info
-  ;;                                ;; anzu--mode-line-format
-  ;;                                mode-line-client
-  ;;                                mode-line-modified
-  ;;                                mode-line-remote
-  ;;                                mode-line-frame-identification
-  ;;                                mode-line-buffer-identification
-  ;;                                " " mode-line-position " "
-  ;;                                ;; evil-mode-line-tag
-  ;;                                mode-line-misc-info))
 
   (setq mini-modeline-right-padding 1
         mini-modeline-enhance-visual nil)
 
-  (set-face-attribute 'mode-line nil :box nil)
-  (set-face-attribute 'mini-modeline-mode-line nil :background (face-background 'modus-theme-intense-blue) :height 0.2)
-  (set-face-attribute 'mini-modeline-mode-line-inactive nil :background (face-background 'fringe) :height 0.2)
+  (set-face-attribute 'mode-line nil :box t)
+  (set-face-attribute 'mini-modeline-mode-line nil
+                      :background (face-background 'modus-theme-intense-blue) :height 0.2)
+  (set-face-attribute 'mini-modeline-mode-line-inactive nil
+                      :background (face-background 'fringe) :height 0.2)
 
   (defun doom-modeline-segment--bar ()
     "Don’t show the bar when using mini-modeline"
     "")
 
+  ;; use some special doom-modelines
   (defun aj/mini-modeline-set-doom-special (key)
     (when-let ((modeline (doom-modeline key)))
       (set (make-local-variable 'mini-modeline-r-format)
@@ -4195,16 +4177,25 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   (add-hook 'dired-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'project)))
   (add-hook 'dashboard-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'project)))
   (add-hook 'image-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'media)))
-  (add-hook 'message-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'message)))
+  (add-hook 'mu4e-compose-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'message)))
   (add-hook 'git-commit-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'message)))
   (add-hook 'magit-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'vcs)))
-  (add-hook 'circe-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'special)))
-  (add-hook 'erc-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'special)))
-  (add-hook 'rcirc-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'special)))
   (add-hook 'org-src-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'org-src)))
   (add-hook 'git-timemachine-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'timemachine)))
-  (add-hook 'paradox-menu-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'package)))
   (add-hook 'xwidget-webkit-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'minimal)))
+
+
+  ;; show modeline for helm, it displays some needed info, like when
+  ;; grep is finished running etc. Use doom-modeline for this.
+
+  (advice-add #'helm-display-mode-line :after #'aj/visible-helm-modeline)
+  (defun aj/visible-helm-modeline (&rest _)
+    (with-helm-buffer
+      (set (make-local-variable 'face-remapping-alist)
+           '((mode-line . mode-line)
+             (doom-modeline . mode-line))))
+    (doom-modeline-set-helm-modeline))
+
   )
 
 
@@ -4216,18 +4207,6 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 ;;       (set (make-local-variable 'face-remapping-alist)
 ;;            '((mode-line default)
 ;;              (mode-line-inactive default))))))
-
-
-
-
-;; (defun aj/visible-helm-modeline ()
-;;   (with-current-buffer helm-buffer
-;;     ;; this should be buffer-local, but it doesn’t seem to work!
-;;     (face-remap-add-relative 'mode-line 'mode-line)
-;;     (face-remap-add-relative 'mode-line :height 80)
-;;     ))
-
-;; (remove-hook 'helm-minibuffer-set-up-hook #'aj/visible-helm-modeline)
 
 
 ;; (use-package doom-modeline
