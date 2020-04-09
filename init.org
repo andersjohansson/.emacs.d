@@ -2557,6 +2557,13 @@ Deleting a whitespace character deletes all whitespace up till non ws
 
 ** Various key binding customizations
 
+*** Use ~C-x s~ for ~save-buffer~ and ~C-S-x C-S-s~ for ~save-some-buffers~
+Becuase I often mistype and let go of my ctrl button before pressing s.
+#+begin_src emacs-lisp
+(bind-key "C-x s" #'save-buffer)
+(bind-key "C-S-x C-S-s" #'save-some-buffers)
+#+end_src
+
 *** Goto-adress
 #+begin_src emacs-lisp
 (use-package goto-addr
