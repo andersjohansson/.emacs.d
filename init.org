@@ -4913,14 +4913,18 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
   (scroll-bar-mode t)
   (set-scroll-bar-mode 'right)
 
-
   (defun aj/no-minibuffer-scrollbar-or-fringe (&optional frame)
     (set-window-scroll-bars (minibuffer-window frame) nil nil)
     ;; no right fringe in minibuffer:
     (set-window-fringes (minibuffer-window frame) nil 0))
 
-  (add-hook 'after-make-frame-functions #'aj/no-minibuffer-scrollbar-or-fringe)
   (aj/no-minibuffer-scrollbar-or-fringe)
+  ;; not enough?
+  ;; (add-hook 'after-make-frame-functions #'aj/no-minibuffer-scrollbar-or-fringe)
+
+  ;; brute-force:
+  (add-hook 'window-configuration-change-hook #'aj/no-minibuffer-scrollbar-or-fringe)
+
 
   (add-to-list 'default-frame-alist '(top . 0))
   (add-to-list 'default-frame-alist '(left . (+ -9)))
