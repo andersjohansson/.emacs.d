@@ -305,14 +305,6 @@ Some variables are not suitable to keep in the init-file, I add these via custom
   :demand t)
 (use-package bind-key
   :demand t)
-
-;; delight depends on nadvice, but will bring in and load the
-;; backwards-compatible version from GNU ELPA. This should solve that.
-(use-package nadvice
-  :straight (nadvice :type built-in)
-  :demand t)
-(use-package delight
-  :demand t)
 #+end_src
 
 
@@ -419,7 +411,6 @@ Example of alist entry:
 
 (use-package helm
   :bind (("<f2>" . helm-imenu))
-  :delight helm-mode
   :demand t
   :config
   (setq-default helm-command-prefix-key "C-c h")
@@ -1090,7 +1081,6 @@ I want to use the echo area (hence ~(tooltip-mode -1)~), but don’t want help e
   :commands (global-flycheck-mode)
   :init (add-hook 'after-init-hook #'global-flycheck-mode)
   :defer 5
-  :delight ""
   :config (progn
             (setq-default flycheck-emacs-lisp-load-path 'inherit)
             (setq-default flycheck-disabled-checkers '(emacs-lisp-checkdoc))
@@ -1905,10 +1895,7 @@ https://github.com/andersjohansson/tex-fold-linebreaks
 *** beginend (redefine beginning and end of buffer in a smart way for special buffers)
 #+BEGIN_SRC emacs-lisp
 (use-package beginend
-  :init (beginend-setup-all)
-  :delight beginend-global-mode
-  :config (cl-loop for x in beginend-modes do
-                   (delight (cdr x) "" 'beginend)))
+  :init (beginend-setup-all))
 #+END_SRC
 *** Buffer flip :ARCHIVE:
 #+begin_src emacs-lisp
@@ -2170,7 +2157,6 @@ already narrowed."
 *** Anzu: Shows number of search matches in modeline, replacements inline etc.
 #+BEGIN_SRC emacs-lisp
 (use-package anzu
-  :delight
   :defer 12
   :bind (("M-%" . anzu-query-replace)
          ("C-M-%" . anzu-query-replace-regexp))
@@ -2191,7 +2177,6 @@ already narrowed."
 #+BEGIN_SRC emacs-lisp
 (use-package company
   :defer 3
-  :delight ""
   :custom (company-idle-delay 1)
   :config (global-company-mode))
 
@@ -2212,7 +2197,6 @@ already narrowed."
 #+begin_src emacs-lisp
 (use-package yasnippet
   :defer 6
-  :delight yas-minor-mode ""
   :config
   (yas-global-mode 1) ;välja specifika?
   (define-key yas-minor-mode-map (kbd "<tab>") nil)
@@ -2482,14 +2466,12 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
 #+BEGIN_SRC emacs-lisp
 (use-package whole-line-or-region
   :demand t
-  :config (whole-line-or-region-global-mode)
-  :delight whole-line-or-region-local-mode)
+  :config (whole-line-or-region-global-mode))
 #+END_SRC
 *** Volatile-highlight :ARCHIVE:
 Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
 #+BEGIN_SRC emacs-lisp
 (use-package volatile-highlights
-  :delight
   :commands volatile-highlights-mode
   :init (volatile-highlights-mode t)
   :config
@@ -2513,7 +2495,6 @@ Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
 *** [[https://github.com/rejeep/drag-stuff.el][Drag stuff]] :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (use-package drag-stuff
-  :delight drag-stuff-mode
   :config
   (defhydra aj/hydra-drag-stuff (:color pink)
     "Drag stuff"
@@ -2662,7 +2643,6 @@ When called in the minibuffer, get out of the minibuffer using
 *** Emacs-which-key
 #+BEGIN_SRC emacs-lisp
 (use-package which-key
-  :delight
   :defer 4
   :config (which-key-setup-side-window-right-bottom)
   (which-key-mode)
@@ -3039,7 +3019,7 @@ Argument SYM-NAME is the thing to find."
   :commands aggressive-indent-mode
   :init (add-hook 'prog-mode-hook #'aggressive-indent-mode)
   :config (add-hook 'reb-mode-hook (lambda () (aggressive-indent-mode -1))) ;; meaningless and shadows the important keybinding C-c C-q
-  (delight 'aggressive-indent-mode (all-the-icons-faicon "indent" :v-adjust 0.02) t))
+  )
 #+end_src
 
 
@@ -3110,8 +3090,7 @@ _d_: subtree     _<tab>_: toggle
   :commands origami-mode
   :config (bind-keys :map origami-mode-map
                      ("<tab>" . origami-recursively-toggle-node)
-                     ("<backtab>" . origami-toggle-all-nodes))
-  (delight 'origami-mode (all-the-icons-octicon "fold") t))
+                     ("<backtab>" . origami-toggle-all-nodes)))
 #+END_SRC
 
 *** octave-mode
@@ -3366,7 +3345,6 @@ Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t
 #+BEGIN_SRC emacs-lisp
 (use-package abbrev
   :straight nil
-  :delight
   :init
   (add-hook 'text-mode-hook #'abbrev-mode)
   (setq abbrev-file-name "~/.emacs.d/config/abbrev_defs")
@@ -3583,9 +3561,7 @@ personal dictionaries into a combined personal dictionary."
   (defun aj/set-langtool-language (lang _beg _end)
     (cl-case lang
       (sv (setq-local langtool-default-language "sv-SE"))
-      (en (setq-local langtool-default-language "en-GB"))))
-
-  :delight guess-language-mode)
+      (en (setq-local langtool-default-language "en-GB")))))
 
 
 (defvar aj/flyspell-modes '(org-mode))
@@ -3861,7 +3837,6 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
   (setq-default pdf-view-display-size 'fit-page)
   (add-hook 'pdf-view-mode-hook (lambda () (auto-revert-mode -1) (whole-line-or-region-local-mode -1)))
 
-  (delight 'pdf-view-midnight-minor-mode " ☾" "pdf-misc")
   (defvar aj/pdf-view-midnight-list
     '(("#282828" . "#f9f5d7")
       ("#fdf4c1" . "#282828")))
@@ -3993,9 +3968,7 @@ https://gitlab.com/andersjohansson/pdf-zotxt-quote
   :straight nil
   :load-path ("~/kodat/elisp/pdf-zotxt-quote/" "~/kodat/elisp/zotxt-emacs/")
   :commands pdf-zotxt-quote-mode
-  :config
-  (setq pdf-zotxt-quote-fill-column 99999)
-  (delight 'pdf-zotxt-quote-mode (all-the-icons-material "format_quote" :v-adjust 0) t))
+  :custom (pdf-zotxt-quote-fill-column 999999))
 #+END_SRC
 
 ** Display customizations: theme, modeline, etc.
@@ -4059,7 +4032,6 @@ A way of higlighting where you are, don’t use it now.
 #+BEGIN_SRC emacs-lisp
 (use-package beacon
   :defer 3
-  :delight
   :config (setq beacon-blink-duration 0.2
                 beacon-blink-delay 0.1
                 beacon-size 40
@@ -4088,7 +4060,6 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 #+BEGIN_SRC emacs-lisp
 (use-package all-the-icons-dired
   :init (add-hook 'dired-mode-hook #'all-the-icons-dired-mode)
-  :delight
   :config
   (add-hook 'dired-subtree-after-insert-hook #'aj/dired-subtree-all-the-icons)
 
@@ -4463,27 +4434,6 @@ Add ADDITIONAL-SEGMENTS to the end of the theme."
   :config (yahoo-weather-mode))
 #+END_SRC
 
-**** Remove or shorten more minor-mode lighters
-#+begin_src emacs-lisp
-(delight `((undo-tree-mode "" undo-tree)
-           (eldoc-mode "" eldoc)
-           (auto-revert-mode ,(all-the-icons-material "restore_page" :v-adjust -0.15) autorevert)
-           (smartparens-mode "" smartparens)
-           (elisp-slime-nav-mode "" elisp-slime-nav)
-           (auto-dim-other-buffers-mode "" auto-dim-other-buffers)
-           (flyspell-mode ,(all-the-icons-material "spellcheck") flyspell)
-           (org-cdlatex-mode " 𝛀" org)
-           (visual-line-mode "" simple)
-           (auto-fill-function ,(all-the-icons-material "wrap_text" :v-adjust -0.15) simple)
-           (buffer-face-mode "" face-remap)
-           (org-indent-mode "" org-indent)
-           (hi-lock-mode ,(all-the-icons-material "format_color_text" :v-adjust -0.1) hi-lock)
-           (org-src-mode "" org-src)
-           (magit-auto-revert-mode "" magit)
-           (outline-minor-mode ,(all-the-icons-octicon "list-unordered" :v-adjust 0.1) outline)))
-
-;; (delight 'emacs-lisp-mode " Elisp" :major)
-#+end_src
 *** Themes
 **** My own face definitions
 Load my own face customizations after enabling a theme.

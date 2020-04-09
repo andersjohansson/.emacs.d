@@ -2041,7 +2041,6 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
   :straight nil ;; already installed with zotxt-emacs above
   :commands org-zotxt-mode
   :demand t
-  :delight "𝐙 "
   :init (setq org-zotxt-link-description-style :betterbibtexkey)
   :commands org-zotxt-extract-link-id-at-point org-zotxt-choose-path
   :custom (org-zotxt-default-search-method :title-creator-year)
