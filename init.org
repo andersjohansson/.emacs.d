@@ -3163,8 +3163,8 @@ cperl instead of perl-mode
            (cperl-get-help))))
   (add-hook 'cperl-mode-hook (eldoc-mode))
   (add-hook 'cperl-mode-hook
-            (lambda () (set (make-local-variable 'eldoc-documentation-function)
-                       'aj/cperl-eldoc-documentation-function))))
+            (lambda () (setq-local eldoc-documentation-function
+                              'aj/cperl-eldoc-documentation-function))))
 
 ;; ;; helm-perldoc:setup takes long time on low power platform
 ;; (helm-perldoc:setup)
@@ -4130,8 +4130,7 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   ;; use some special doom-modelines
   (defun aj/mini-modeline-set-doom-special (key)
     (when-let ((modeline (doom-modeline key)))
-      (set (make-local-variable 'mini-modeline-r-format)
-           modeline)))
+      (setq-local mini-modeline-r-format modeline)))
 
   (add-hook 'Info-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'info)))
   (add-hook 'pdf-view-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'pdf)))
@@ -4152,9 +4151,9 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   (advice-add #'helm-display-mode-line :after #'aj/visible-helm-modeline)
   (defun aj/visible-helm-modeline (&rest _)
     (with-helm-buffer
-      (set (make-local-variable 'face-remapping-alist)
-           '((mode-line . mode-line)
-             (doom-modeline . mode-line))))
+      (setq-local face-remapping-alist
+                  '((mode-line . mode-line)
+                    (doom-modeline . mode-line))))
     (doom-modeline-set-helm-modeline))
 
   )
