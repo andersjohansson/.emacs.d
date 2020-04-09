@@ -431,8 +431,9 @@ Example of alist entry:
 
   (when (executable-find "curl")
     (setq helm-net-prefer-curl-p t))
+
   (setq
-   helm-M-x-always-save-history t ; ska spara även kraschade kommandon
+   helm-M-x-always-save-history t ; save also crashed commands
    helm-ff-search-library-in-sexp t ; search for library in `require' and `declare-function' sexp.
    helm-scroll-amount 8 ; scroll 8 lines other window using M-<next>/M-<prior>
    helm-ff-file-name-history-use-recentf t)
@@ -451,18 +452,7 @@ Example of alist entry:
 
   ;; display
   (setq helm-split-window-inside-p t)
-  ;; from: https://www.reddit.com/r/emacs/comments/3asbyn/new_and_very_useful_helm_feature_enter_search/
-  (defun helm-hide-minibuffer-maybe ()
-    (when (with-helm-buffer helm-echo-input-in-header-line)
-      (let ((ov (make-overlay (point-min) (point-max) nil nil t)))
-        (overlay-put ov 'window (selected-window))
-        (overlay-put ov 'face (let ((bg-color (face-background 'default nil)))
-                                `(:background ,bg-color :foreground ,bg-color)))
-        (setq-local cursor-type nil))))
-
-  (add-hook 'helm-minibuffer-set-up-hook
-            'helm-hide-minibuffer-maybe)
-
+  
   (setq helm-display-function
         ;;#'aj/helm-display-child-frame
         #'helm-default-display-buffer
@@ -470,6 +460,8 @@ Example of alist entry:
         helm-display-buffer-width 120
         helm-display-buffer-height 35
         helm-echo-input-in-header-line t)
+  
+  (add-hook 'helm-minibuffer-set-up-hook #'helm-hide-minibuffer-maybe)
 
   ;; (defun aj/helm-display-child-frame (buffer &optional resume)
   ;;     "Display `helm-buffer' in a separate frame.
@@ -596,17 +588,7 @@ Example of alist entry:
       (advice-remove 'helm-grep--filter-candidate-1
                      #'aj/shorten-helm-path)))
 
-  ;;; google-suggest
-  (with-eval-after-load 'helm-net
-    (add-to-list 'helm-google-suggest-actions
-                 '("Thesaurus" . (lambda (candidate)
-                                   (helm-search-suggest-perform-additional-action
-                                    "http://www.thesaurus.com/browse/%s" candidate))) t)
-    (add-to-list 'helm-google-suggest-actions
-                 '("Tyda" . (lambda (candidate)
-                              (helm-search-suggest-perform-additional-action
-                               "http://tyda.se/search/%s" candidate))) t))
-
+  
   ;;; more candidates for helm-ucs
   (defun aj/helm-500-candidates (fn &rest args)
     (let ((helm-candidate-number-limit 500))
