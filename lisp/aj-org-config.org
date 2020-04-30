@@ -1700,13 +1700,16 @@ I keep some notes for papers in org-mode, but sort my papers in Zotero. With thi
                     (when (search-forward "[[" (point-at-eol) t)
                       (org-zotxt-extract-link-id-at-point))))))
         (request
-         (format "%s/inserturl" zotxt-url-base)
-         :params
-         `(("key" . ,id)
-           ("url" . ,link)
-           ("title" . "org")))
-      (user-error "Couldn’t create link"))))
+          (format "%s/inserturl" zotxt-url-base)
+          :params
+          `(("key" . ,id)
+            ("url" . ,link)
+            ("title" . "org")))
+      (user-error "Couldn’t create link")))
+  (with-eval-after-load 'org-zotxt
+    (bind-key "C-c \" l" #'aj/add-zotero-link-to-headline org-zotxt-mode-map)))
 #+END_SRC
+
 ** Special commands for org-babel-tangle
 #+begin_src emacs-lisp
 (defun aj/org-babel-tangle-tagged (tag)
