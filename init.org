@@ -190,7 +190,11 @@ https://bling.github.io/blog/2016/01/18/why-are-you-changing-gc-cons-threshold/
 (aj/set-no-gc)
 (add-hook 'after-init-hook #'aj/set-normal-gc)
 #+END_SRC
-
+*** Native compilation
+When using the experimental ~feature/native-comp~ branch of emacs, lazily compile all libraries that are loaded.
+#+begin_src emacs-lisp
+(setq comp-deferred-compilation t)
+#+end_src
 *** Remove unnecessary GUI-elements
 #+begin_src emacs-lisp
 (setq inhibit-startup-message t)
