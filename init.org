@@ -432,17 +432,31 @@ Example of alist entry:
   (helm-adaptive-mode 1)
 
   ;; display
-  (setq helm-split-window-inside-p t)
-
-  (setq helm-display-function
-        ;;#'aj/helm-display-child-frame
-        #'helm-default-display-buffer
-        helm-display-buffer-reuse-frame t
-        helm-display-buffer-width 120
-        helm-display-buffer-height 35
-        helm-echo-input-in-header-line t)
-
+  ;; Input in header line
+  (setq helm-echo-input-in-header-line t)
   (add-hook 'helm-minibuffer-set-up-hook #'helm-hide-minibuffer-maybe)
+
+  ;; split like I want it
+  (setq helm-split-window-preferred-function #'aj/helm-split-window-fn)
+  (defun aj/helm-split-window-fn (window)
+    "Reuse a window below or split window below"
+    (let* (split-width-threshold
+           (win (if (and (fboundp 'window-in-direction)
+                         (not (minibufferp helm-current-buffer)))
+                    (or (helm-window-in-direction 'below)
+                        (split-window (selected-window) nil 'below))
+                  (split-window-sensibly window))))
+      (setq helm-persistent-action-window-buffer (window-buffer win))
+      win))
+
+  ;; (setq ;;helm-display-function
+  ;;  ;;#'aj/helm-display-child-frame
+  ;;  ;; #'helm-default-display-buffer
+  ;;  ;; helm-display-buffer-reuse-frame nil
+  ;;  ;; helm-display-buffer-width 120
+  ;;  ;; helm-display-buffer-height 35
+  ;;  )
+
 
   ;; (defun aj/helm-display-child-frame (buffer &optional resume)
   ;;     "Display `helm-buffer' in a separate frame.
@@ -576,6 +590,7 @@ Example of alist entry:
       (apply fn args)))
 
   (advice-add 'helm-ucs :around #'aj/helm-500-candidates)
+  (advice-add 'helm-imenu :around #'aj/helm-500-candidates)
 
   ;;; mark-ring extra
   (defun aj/pop-to-mark-invoke-helm (fun)
