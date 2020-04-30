@@ -1306,7 +1306,7 @@ Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entrie
             (let* ((lastrem (max (floor (/ (- lwidth) 2)) (floor (* 0.3 diff))))
                    (firstrem (- diff lastrem)))
               (setq last (substring last 0 lastrem))
-              (unless (eq 0 firstrem) ; 0 means don’t remove!
+              (unless (> 0 firstrem) ; 0 means don’t remove! <0 is a problem
                 (setq first (substring first 0 firstrem))))))
           (setq fpath (concat
                        prefix (and prefix separator)
