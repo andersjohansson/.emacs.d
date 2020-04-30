@@ -4076,11 +4076,11 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   :straight (doom-modeline :fork (:host github :repo "andersjohansson/doom-modeline" :branch "mini-modeline"))
   :custom
   (doom-modeline-buffer-file-name-style 'truncate-all)
-  (doom-modeline-bar-width (frame-parameter nil 'left-fringe))
+  ;; (doom-modeline-bar-width (frame-parameter nil 'left-fringe))
   (doom-modeline-height 10)
   (doom-modeline-icon t)
-  (doom-modeline-icons-scale-factor 0.8)
-  (doom-modeline-icons-v-adjust-factor 0.8)
+  (doom-modeline-icons-scale-factor 0.75)
+  (doom-modeline-icons-v-adjust-factor 0.75)
   :config
 
   (set-face-attribute 'doom-modeline nil :inherit 'default)
