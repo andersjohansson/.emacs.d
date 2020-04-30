@@ -4063,17 +4063,8 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 (use-package all-the-icons-dired
   :init (add-hook 'dired-mode-hook #'all-the-icons-dired-mode)
   :config
-  (add-hook 'dired-subtree-after-insert-hook #'aj/dired-subtree-all-the-icons)
-
-  (defun aj/dired-subtree-all-the-icons ()
-    (save-restriction
-      (let ((all-the-icons-dired-displayed nil))
-        (widen)
-        (beginning-of-line)
-        (narrow-to-region (point) end) ; works just because
-                                        ; dired-subtree uses dynamic binding
-        (all-the-icons-dired--display)))))
-
+  (add-hook 'dired-subtree-after-insert-hook #'all-the-icons-dired--refresh)
+  (add-hook 'dired-subtree-after-remove-hook #'all-the-icons-dired--refresh))
 #+END_SRC
 
 *** Modeline
