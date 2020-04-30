@@ -3256,18 +3256,21 @@ The minor mode defined below takes care of this. I advice ~fill-region-as-paragr
 #+BEGIN_SRC emacs-lisp
 (add-hook 'text-mode-hook (lambda () (setq fill-column 99999)))
 
-
 (define-minor-mode aj/one-sentence-per-line-mode
   "Minor mode that overrides `fill-region-as-paragraph' to
   arrange every sentence on its own line"
-  ;; (message "hej")
-  ;; (if aj/one-sentence-per-line-mode
-  ;;     (font-lock-add-keywords nil aj/missing-eol-period-fl-keywords)
-  ;;   (font-lock-remove-keywords nil aj/missing-eol-period-fl-keywords))
-  )
+  nil nil nil
+  (if aj/one-sentence-per-line-mode
+      (font-lock-add-keywords nil aj/missing-eol-period-fl-keywords)
+    (font-lock-remove-keywords nil aj/missing-eol-period-fl-keywords)))
 
-;; (defvar aj/missing-eol-period-fl-keywords
-;;   '(("^[^#:\\*].+\\(\\b[[:word:]]+[^].?:]\\)$" 1 'font-lock-warning-face prepend)))
+(defface aj/missing-eol-period '((t :inherit trailing-whitespace :extend t)) "Face for marking missing periods")
+
+(defvar aj/missing-eol-period-fl-keywords
+  ;; anchored match: First matches lines starting with alnum (not
+  ;; org-headlines for example), and then highlights words at eol
+  ;; without periods etc.
+  '(("^[[:alnum:]]" "\\b[[:word:]]+[^].?!:]$" nil nil (0 'aj/missing-eol-period prepend))))
 
 (defun aj/one-sentence-fill-override (fun from to &rest args)
   (if aj/one-sentence-per-line-mode
