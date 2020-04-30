@@ -1333,6 +1333,41 @@ Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entrie
 ;;     nil "/")))
 #+END_SRC
 
+
+*** Refile with helm
+Present a nicer-looking helm buffer for ~org-refile~
+#+begin_src emacs-lisp
+(setq org-refile-use-outline-path t
+      org-outline-path-complete-in-steps nil)
+
+(add-to-list 'helm-completing-read-handlers-alist
+             '(org-refile . helm-aj/org-refile-handler))
+
+(defun helm-aj/org-refile-handler (prompt collection test
+                                          _require-match init hist
+                                          default _iim name buffer)
+
+  (let ((helm-truncate-lines nil))
+    (helm-comp-read prompt (mapcar #'car collection)
+                    :test test :initial-input init :default default
+                    :history hist :multiline nil :nomark t
+                    :fc-transformer #'aj/helm-org-hl-transformer
+                    :name name :buffer buffer)))
+
+(defun aj/helm-org-hl-transformer (tbl _s)
+  (mapcar #'aj/org-outline-propertize tbl))
+
+;; perhaps not the most efficient way of doing this:
+(defun aj/org-outline-propertize (outline-path)
+  (cl-loop with n = (length org-level-faces)
+           with i = -1
+           for p in (split-string outline-path "/")
+           do (cl-incf i)
+           collect (propertize p 'face (nth (mod i n) org-level-faces)) into l
+           finally return (mapconcat #'identity l "/")))
+
+
+#+end_src
 ** Redefine ~org-paste-special~ to choose from kill-ring (with helm)
 If we have inadvertantly killed something between the special kill and yank we intended, we are then given an opportunity to easily choose the right thing to yank.
 #+BEGIN_SRC emacs-lisp
