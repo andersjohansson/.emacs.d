@@ -386,6 +386,53 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 ;; (with-eval-after-load "helm-mode"
 ;;   (add-to-list 'helm-mode-no-completion-in-region-in-modes 'mu4e-compose-mode))
 #+END_SRC
+*** Make header separator a thin line
+The line ~--text follows this line--~ that separaters headers from the message doesn’t look that nice. We can improve on it! 
+We set the face for it to a thin line with the same background and foreground.
+Then, we also want it to extend to the end of line, so we’ll have to patch ~mu4e~draft-insert-mail-header-separator~ to insert an extra line break.
+
+#+begin_src emacs-lisp
+(set-face-attribute 'mu4e-compose-separator-face nil
+                    :background "#e0e0e0" :foreground "#e0e0e0"
+                    :height 0.2 :box nil :extend t)
+(el-patch-feature mu4e-draft)
+(with-eval-after-load 'mu4e-draft
+  (el-patch-defun mu4e~draft-insert-mail-header-separator ()
+    "Insert `mail-header-separator' in the first empty line of the message.
+`message-mode' needs this line to know where the headers end and
+the body starts. Note, in `mu4e-compose-mode', we use
+`before-save-hook' and `after-save-hook' to ensure that this
+separator is never written to the message file. Also see
+`mu4e-remove-mail-header-separator'."
+    ;; we set this here explicitly, since (as it has happened) a wrong
+    ;; value for this (such as "") breaks address completion and other things
+    (set (make-local-variable 'mail-header-separator) "--text follows this line--")
+    (put 'mail-header-separator 'permanent-local t)
+    (save-excursion
+      ;; make sure there's not one already
+      (mu4e~draft-remove-mail-header-separator)
+      (let ((sepa (propertize (el-patch-wrap 1 1 (concat mail-header-separator "\n"))
+                              'intangible t
+                              ;; don't make this read-only, message-mode
+                              ;; seems to require it being writable in some cases
+                              ;;'read-only "Can't touch this"
+                              'rear-nonsticky t
+                              'font-lock-face 'mu4e-compose-separator-face)))
+        (widen)
+        ;; search for the first empty line
+        (goto-char (point-min))
+        (if (search-forward-regexp "^$" nil t)
+            (progn
+              (replace-match sepa)
+              ;; `message-narrow-to-headers` searches for a
+              ;; `mail-header-separator` followed by a new line. Therefore, we
+              ;; must insert a newline if on the last line of the buffer.
+              (when (= (point) (point-max))
+                (insert "\n")))
+          (progn ;; no empty line? then prepend one
+            (goto-char (point-max))
+            (insert "\n" sepa)))))))
+#+end_src
 
 *** Allow and handle context change while composing
 I often open a compose buffer without checking the context. The functions below make sure that switching context in a compose buffer works as expected. A function to switch address and signature when switching context is defined. However, several compose buffers may be open at once, and this will only switch for the current buffer (which I believe is the most reasonable behaviour). To ensure that we don’t attempt to send a message with the wrong context active, a function to check if the context matches with the from address is added to ~message-send-hook~.
