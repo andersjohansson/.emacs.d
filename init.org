@@ -3204,6 +3204,15 @@ cperl instead of perl-mode
 **** Text-mode uses visual-line-mode and visual-fill-column-mode
 #+begin_src emacs-lisp
 (add-hook 'text-mode-hook 'turn-on-visual-line-mode)
+(add-hook 'visual-line-mode-hook #'aj/hl-line-visual-line)
+
+(defun aj/hl-line-visual-line ()
+  (setq-local hl-line-range-function #'aj/hl-line-visual-line-range-function))
+
+(defun aj/hl-line-visual-line-range-function ()
+  (cons
+   (save-excursion (beginning-of-visual-line))
+   (save-excursion (beginning-of-visual-line 2))))
 
 (use-package visual-fill-column
   :init (add-hook 'visual-line-mode-hook #'visual-fill-column-mode)
