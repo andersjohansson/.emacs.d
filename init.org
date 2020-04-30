@@ -4705,7 +4705,7 @@ Some special functions for managing my data files.
 #+begin_src emacs-lisp
 (use-package aj-forskning ;; private package
   :straight nil
-  :defer t)
+  :commands (ajf/mount-forskningsdata ajf/swap-quotes-cycle aj/repeat-last-words))
 
 ;;; font-lock () och {}
 (with-eval-after-load 'org
