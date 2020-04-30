@@ -2074,11 +2074,32 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 			  (widen)
 			  (org-element-parse-buffer))
 		  (org-element-parse-buffer))
-		'link #'zotxt-helm-link-to-disp-real)))
+		'link #'zotxt-helm-link-to-disp-real))
+
+  (setf (alist-get 'persistent-action zotxt-helm-current-refs-source)
+        #'aj/zotxt-helm-current-show-full-ref)
+
+  ;; Display full ref for "current" refs
+  (defun aj/zotxt-helm-current-show-full-ref (cand)
+    "Display complete citation of selected ref in helm"
+    (interactive)
+    (when-let
+        ((key (with-temp-buffer (insert cand) (org-zotxt-extract-link-id-at-point))))
+      (deferred:$
+        (zotxt-get-item-bibliography-deferred (list :key key))
+        (deferred:nextc it
+          (lambda (item)
+            (save-window-excursion
+              (select-window (active-minibuffer-window))
+              (when-let ((ov (car-safe (overlays-at 1))))
+                (overlay-put ov 'display (plist-get item :citation))
+                (overlay-put ov 'face 'default))
+              ))))))
+  )
 
 (use-package org-zotxt
   :straight nil ;; already installed with zotxt-emacs above
-  :commands org-zotxt-mode
+  :hook (org-mode . org-zotxt-mode)
   :demand t
   :init (setq org-zotxt-link-description-style :betterbibtexkey)
   :commands org-zotxt-extract-link-id-at-point org-zotxt-choose-path
