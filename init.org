@@ -918,7 +918,7 @@ overriding it, but you should know before you do.
 #+begin_src emacs-lisp
 ;; TODO, why here?
 (use-package orgqda
-  :straight (:host gitlab :repo "andersjohansson/orgqda")
+  :straight (:depth full :host gitlab :repo "andersjohansson/orgqda")
   :defer t
   :after org
   :init (put 'orgqda-csv-dir 'safe-local-variable #'file-directory-p)
