@@ -16,6 +16,7 @@
  org-refile-allow-creating-parent-nodes 'confirm
  org-special-ctrl-k t
  org-fontify-quote-and-verse-blocks t
+ org-fontify-done-headline nil
  org-adapt-indentation nil
  org-yank-adjusted-subtrees t
  org-catch-invisible-edits 'show
