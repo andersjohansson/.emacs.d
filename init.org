@@ -1053,6 +1053,8 @@ overriding it, but you should know before you do.
     :group 'aj
     :type '(repeat file))
   :config
+  (setq org-version "9.4")
+  (defun org-version () "9.4")
   ;; (message "Laddade org")
   ;; (load-library "helm-mode)"
   (load-library "aj-org-config")
