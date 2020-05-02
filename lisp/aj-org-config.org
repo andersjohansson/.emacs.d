@@ -541,8 +541,7 @@ syncing."
 Settings for calendars kept in custom.el
 #+begin_src emacs-lisp
 (use-package org-caldav
-  :straight (:host github :repo "dengste/org-caldav"
-                   :fork (:host github :repo "andersjohansson/org-caldav" :branch "customize"))
+  :straight (:host github :repo "dengste/org-caldav")
   :config
   (setq org-icalendar-timezone "Europe/Stockholm"))
 #+end_src
