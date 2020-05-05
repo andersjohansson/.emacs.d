@@ -1490,7 +1490,8 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
 
 (use-package password-store
   :defer t
-  :config (setq password-store-password-length 47)
+  :custom (password-store-password-length 47)
+  :config
 
   (defun aj/password-store-generate (oldfun entry &optional password-length no-symbols)
     (interactive (list (aj/password-store-get-new-entry-with-completion)
@@ -1512,6 +1513,30 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
     (let ((entry (aj/password-store-get-new-entry-with-completion)))
       (password-store--run-generate entry 19 t t)
       (password-store-copy entry)))
+
+  (defun aj/password-store-generate-and-copy-words (&optional number-of-words)
+    (interactive "p")
+    (let ((entry (aj/password-store-get-new-entry-with-completion)))
+      (password-store-insert entry
+                             (aj/password-store-get-random-sv-pass
+                              (cl-case number-of-words
+                                (1 4)
+                                (t number-of-words))))
+      (password-store-copy entry)))
+
+  (defun aj/password-store-get-random-sv-pass (&optional num)
+    (with-temp-buffer
+      (insert-file-contents "/usr/share/hunspell/sv_SE.dic")
+      (cl-loop with max = (point-max)
+               repeat (or num 4)
+               collect (progn
+                         (goto-char (random max))
+                         (forward-line 0)
+                         (when (search-forward-regexp "[^/]+" (point-at-eol))
+                           (match-string 0)))
+               into words
+               finally return
+               (mapconcat #'identity words "-"))))
 
   (defun aj/password-store-get-new-entry-with-completion ()
     (helm
@@ -1550,7 +1575,8 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
              ("F" . aj/pass-git-pull)
              ("m" . aj/pass-magit)
              ("W" . aj/password-store-generate-and-copy)
-             ("V" . aj/password-store-generate-and-copy-simpler))
+             ("v" . aj/password-store-generate-and-copy-simpler)
+             ("V" . aj/password-store-generate-and-copy-words))
 
   (defun aj/pass-git-push ()
     (interactive)
@@ -1563,8 +1589,10 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
     (magit-status "~/.password-store"))
 
   (defun aj/pass-display-header-extra ()
-    (pass--display-keybindings '((aj/password-store-generate-and-copy . "Generate and copy")
-                                 (aj/password-store-generate-and-copy-simpler . "Generate and copy simpler")))
+    (pass--display-keybindings
+     '((aj/password-store-generate-and-copy . "Gen + copy")
+       (aj/password-store-generate-and-copy-simpler . "Gen + copy simpler")
+       (aj/password-store-generate-and-copy-words . "Gen + copy words")))
     (insert "\n")
     (pass--display-keybindings '((aj/pass-git-push . "Git push")
                                  (aj/pass-git-pull . "Git pull")
