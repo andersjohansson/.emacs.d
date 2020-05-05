@@ -954,7 +954,7 @@ That is, always create a new buffer. (Is there anything more changed?)
 (add-to-list 'org-file-apps '("\\.pdf\\'" . emacs)) ; open pdfs in emacs
 ;;use xdg-open instead of mailcap
 ;; this won’t work in a real console, but I won’t open files from org in a real console
-(setq org-file-apps-defaults-gnu '((remote . emacs) (system . "aj-open %s") (t . "aj-open %s")))
+(setq org-file-apps-gnu '((remote . emacs) (system . "aj-open %s") (t . "aj-open %s")))
 
 ;; disassociates started processes so they wont get killed if emacs is killed.
 (advice-add 'org-open-file :around  #'aj/org-open-file-around-advice)
@@ -965,7 +965,9 @@ That is, always create a new buffer. (Is there anything more changed?)
 
 (defun aj/org-open-file-with-system (path)
   (org-open-file path 'system))
+
 #+END_SRC
+
 ** Local variables headings
 A local variables comment block that is placed at the end of the file may be lost or moved if the last subtree (under which it is viewed as being filed) is removed or moved. We don’t want that! Instead, automatically place local variables under their own top-level heading. By default I put the ~ARCHIVE~ tag on this heading, to hide it away a bit and avoid exporting it.
 #+BEGIN_SRC emacs-lisp
