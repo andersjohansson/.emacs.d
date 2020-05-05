@@ -1890,14 +1890,13 @@ List of prefix strings or regex."
     (helm-build-sync-source "Inline comment names"
       :candidates 'aj/org-annotate-name-history
       :fuzzy-match t
-      :action (helm-make-actions "Insert" 'identity "Delete" 'aj/org-annotate-remove-name)
+      :action (helm-make-actions "Insert" #'identity "Delete" #'aj/org-annotate-remove-name)
       :persistent-action 'aj/org-annotate-remove-name)
     "Source for inline comment names")
 
   (defvar aj/org-annotate-names-fallback-source
-    '((name . "Insert")
-      (dummy)
-      (action . (("insert" . identity)))))
+    (helm-build-dummy-source "New"
+      :action '(("Insert" . identity))))
 
   (defun aj/org-annotate-remove-name (_cand)
     (let ((marked (helm-marked-candidates)))
