@@ -1932,11 +1932,18 @@ List of prefix strings or regex."
           (add-text-properties (1- (match-beginning 1)) (match-beginning 1) ;; note bracket start
                                '(invisible t))
 
-          (add-text-properties (match-beginning 1) (match-end 1) ; note
-                               `(invisible nil face org-annotate-face
-                                           display ((margin right-margin)
-                                                    ,(concat "·" (buffer-substring-no-properties
-                                                                  (+ 5 (match-beginning 1)) (match-end 1))))))
+          ;; note, inline if inline and in margin otherwise
+          (if (string-prefix-p "note:inline" (match-string 1))
+              (progn
+                (add-text-properties (match-beginning 1) (+ 12 (match-beginning 1))
+                                     '(invisible nil display "▸ " face org-annotate-bracket-face))
+                (add-text-properties (+ 12 (match-beginning 1)) (match-end 1)
+                                     '(invisible nil face font-lock-comment-face)))
+            (add-text-properties (match-beginning 1) (match-end 1) ; note
+                                 `(invisible nil face org-annotate-face
+                                             display ((margin right-margin)
+                                                      ,(concat "·" (buffer-substring-no-properties
+                                                                    (+ 5 (match-beginning 1)) (match-end 1)))))))
 
           (add-text-properties (match-end 1) (1+ (match-end 1)) ;; note bracket end
                                '(invisible t))
