@@ -296,12 +296,10 @@ Otherwise hydra for template insertion.
 *** Todo stuff
 **** Todo keywords, Todo states
 #+BEGIN_SRC emacs-lisp
-(defface aj/org-waiting '((t :inherit org-formula :bold t)) "Face for waiting org-state" :group 'org-faces)
-(defface aj/org-started '((t :inherit org-sexp-date :bold t :underline nil)) "Face for started org-state" :group 'org-faces)
-
-
-;; more visible than default (cyan) in solarized (good for the small ❢)
-(defface aj/org-todo '((t :inherit 'font-lock-warning-face :bold t)) "Face for todo org-state" :group 'org-faces)
+(defface aj/org-waiting '((t :inherit all-the-icons-yellow :bold t)) "Face for waiting org-state" :group 'org-faces)
+(defface aj/org-started '((t :inherit all-the-icons-blue :bold t :underline nil)) "Face for started org-state" :group 'org-faces)
+(defface aj/org-todo '((t :inherit 'all-the-icons-red :bold t)) "Face for todo org-state" :group 'org-faces)
+(set-face-attribute 'org-done nil :bold t)
 
 (setq org-todo-keywords '((sequence "TODO(t)" "STARTAD(s)" "VÄNTAR(v)" "DONE(d)")
                           (sequence "|" "AVFÖRD(a)"))
