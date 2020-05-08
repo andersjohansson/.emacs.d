@@ -681,11 +681,9 @@ Example of alist entry:
           helm-def-source--eieio-classes
           helm-def-source--eieio-generic
           helm-def-source--emacs-faces))
-
   )
-
-
 #+end_src
+
 **** Helm-fuz
 For modern fuzzy matching with a binary module built on Rust libraries.
 We need to add "target" to the fuz recipe so that it isn’t removed by straight (we don’t want to rebuild the fuz module every time we start Emacs).
