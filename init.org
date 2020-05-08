@@ -10,6 +10,11 @@ Additional configuration is in [[file:lisp/aj-org-config.org][aj-org-config.org]
 
 Hopefully some of this could be useful to others.
 
+* Lexical-binding
+#+BEGIN_SRC emacs-lisp
+;; -*- lexical-binding: t -*-
+#+END_SRC
+
 * All configuration
 ** Meta
 *** Tangling
