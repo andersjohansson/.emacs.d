@@ -198,56 +198,56 @@ https://gitlab.com/andersjohansson/mu4e-helm-contact
 #+END_SRC
 
 *** mu4e-alert
+Only display unread count in modeline
 #+BEGIN_SRC emacs-lisp
 (use-package mu4e-alert
   :after mu4e
-  :defer t
-  :init
-  (setq mu4e-alert-set-window-urgency nil
-        mu4e-alert-email-notification-types '(subjects)
-        mu4e-alert-group-by :maildir)
+  :custom (mu4e-alert-set-window-urgency nil)
   :config
-  (mu4e-alert-set-default-style 'notifications)
-  (defun aj/open-mu4e-unread (&rest _args)
-    (if-let (window
-             (cl-loop with res = nil
-                      for buffer in (list mu4e~headers-buffer mu4e~view-buffer mu4e~main-buffer-name)
-                      if (setq res (and buffer (get-buffer-window buffer t))) return res))
-        (progn
-          (select-frame-set-input-focus (window-frame window))
-          (select-window window))
-      (select-frame-set-input-focus (make-frame)))
-    (mu4e-alert-view-unread-mails))
+  (mu4e-alert-enable-mode-line-display)
 
-  (defun mu4e-alert-notify-unread-messages (mails)
-    "Display desktop notification for given MAILS."
-    (let* ((mail-groups (funcall mu4e-alert-mail-grouper
-                                 mails))
-           (sorted-mail-groups (sort mail-groups
-                                     mu4e-alert-grouped-mail-sorter))
-           (notifications (mapcar (lambda (group)
-                                    (funcall mu4e-alert-grouped-mail-notification-formatter
-                                             group
-                                             mails))
-                                  sorted-mail-groups)))
-      (dolist (notification (cl-subseq notifications 0 (min 5 (length notifications))))
-        (notifications-notify :body (plist-get notification :body)
-                              :title (plist-get notification :title)
-                              :actions '("default" "Open mails")
-                              :on-action 'aj/open-mu4e-unread
-                              :category "mu4e-alert"))
-      (when notifications
-        (mu4e-alert-set-window-urgency-maybe))))
+  ;; (mu4e-alert-set-default-style 'notifications)
+  ;; (defun aj/open-mu4e-unread (&rest _args)
+  ;;   (if-let (window
+  ;;            (cl-loop with res = nil
+  ;;                     for buffer in (list mu4e~headers-buffer mu4e~view-buffer mu4e~main-buffer-name)
+  ;;                     if (setq res (and buffer (get-buffer-window buffer t))) return res))
+  ;;       (progn
+  ;;         (select-frame-set-input-focus (window-frame window))
+  ;;         (select-window window))
+  ;;     (select-frame-set-input-focus (make-frame)))
+  ;;   (mu4e-alert-view-unread-mails))
 
-  (defun mu4e-alert-notify-unread-messages-count (mail-count)
-    "Display desktop notification for given MAIL-COUNT."
-    (when (not (zerop mail-count))
-      (notifications-notify :body (funcall mu4e-alert-email-count-notification-formatter
-                                           mail-count)
-                            :title mu4e-alert-email-count-title
-                            :actions '("default" "Open mails")
-                            :on-action 'aj/open-mu4e-unread
-                            :category "mu4e-alert"))))
+  ;; (defun mu4e-alert-notify-unread-messages (mails)
+  ;;   "Display desktop notification for given MAILS."
+  ;;   (let* ((mail-groups (funcall mu4e-alert-mail-grouper
+  ;;                                mails))
+  ;;          (sorted-mail-groups (sort mail-groups
+  ;;                                    mu4e-alert-grouped-mail-sorter))
+  ;;          (notifications (mapcar (lambda (group)
+  ;;                                   (funcall mu4e-alert-grouped-mail-notification-formatter
+  ;;                                            group
+  ;;                                            mails))
+  ;;                                 sorted-mail-groups)))
+  ;;     (dolist (notification (cl-subseq notifications 0 (min 5 (length notifications))))
+  ;;       (notifications-notify :body (plist-get notification :body)
+  ;;                             :title (plist-get notification :title)
+  ;;                             :actions '("default" "Open mails")
+  ;;                             :on-action 'aj/open-mu4e-unread
+  ;;                             :category "mu4e-alert"))
+  ;;     (when notifications
+  ;;       (mu4e-alert-set-window-urgency-maybe))))
+
+  ;; (defun mu4e-alert-notify-unread-messages-count (mail-count)
+  ;;   "Display desktop notification for given MAIL-COUNT."
+  ;;   (when (not (zerop mail-count))
+  ;;     (notifications-notify :body (funcall mu4e-alert-email-count-notification-formatter
+  ;;                                          mail-count)
+  ;;                           :title mu4e-alert-email-count-title
+  ;;                           :actions '("default" "Open mails")
+  ;;                           :on-action 'aj/open-mu4e-unread
+  ;;                           :category "mu4e-alert")))
+  )
 #+END_SRC
 
 *** mu4e-query-helper
