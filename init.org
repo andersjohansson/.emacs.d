@@ -336,8 +336,11 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 
 *** Save-hist (don't use session, but save many useful history variables)
 #+BEGIN_SRC emacs-lisp
+(setq history-delete-duplicates t)
+
 (setq savehist-additional-variables
-      '(kill-ring search-ring regexp-search-ring extended-command-history
+      '(kill-ring search-ring regexp-search-ring
+                  ;; extended-command-history
 
                   ;; all these should be added automatically when minibuffer is used in savehist-minibuffer-history-variables
                   ;; helm-M-x-input-history
