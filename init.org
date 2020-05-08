@@ -3309,7 +3309,7 @@ That’s a stupid convention from the days of the typewriter (and in Swedish we 
 #+BEGIN_SRC emacs-lisp
 (setq sentence-end-double-space nil)
 #+END_SRC
-*** Fill-paragraph fixes
+*** Fill-paragraph fixes + ~aj/one-sentence-per-line-mode~
 I generally don’t want hard line breaks in my text-mode paragraphs, so a very wide fill-column allows me to use ~M-q~ to remove all line breaks in a paragraph.
 
 However, sometimes I put every sentence on it’s own line (good for version control) and then it would be good if ~fill-paragraph~ made sure that this was the case instead.
@@ -3321,19 +3321,7 @@ The minor mode defined below takes care of this. I advice ~fill-region-as-paragr
 
 (define-minor-mode aj/one-sentence-per-line-mode
   "Minor mode that overrides `fill-region-as-paragraph' to
-  arrange every sentence on its own line"
-  nil nil nil
-  (if aj/one-sentence-per-line-mode
-      (font-lock-add-keywords nil aj/missing-eol-period-fl-keywords)
-    (font-lock-remove-keywords nil aj/missing-eol-period-fl-keywords)))
-
-(defface aj/missing-eol-period '((t :inherit trailing-whitespace :extend t)) "Face for marking missing periods")
-
-(defvar aj/missing-eol-period-fl-keywords
-  ;; anchored match: First matches lines starting with alnum (not
-  ;; org-headlines for example), and then highlights words at eol
-  ;; without periods etc.
-  '(("^[[:alnum:]]" "\\b[[:word:]]+[^].?!:]$" nil nil (0 'aj/missing-eol-period prepend))))
+  arrange every sentence on its own line")
 
 (defun aj/one-sentence-fill-override (fun from to &rest args)
   (if aj/one-sentence-per-line-mode
@@ -3356,7 +3344,6 @@ The minor mode defined below takes care of this. I advice ~fill-region-as-paragr
       (while (search-forward-regexp se (- to 2) t)
         (replace-match "\n" t nil nil 2)))))
 
-
 (defun aj/set-org-sentence-end ()
   "Allow sentences to end with an org-bracket-link
 
@@ -3367,10 +3354,34 @@ should be kept together."
    (format
     "\\(?9:[.?!…‽][]\"'”’)}]*\\(?8:%s\\)?\\(?2:$\\|[	  ]\\)\\|[。．？！]+\\)[
 ]*"
-    org-bracket-link-regexp)))
+    org-link-bracket-re)))
 
 (add-hook 'org-mode-hook #'aj/set-org-sentence-end)
 #+END_SRC
+
+*** ~aj/one-sentence-per-line-highlight-mode~, highlight missing end of sentence characters
+#+begin_src emacs-lisp
+(defface aj/missing-eol-period '((t :inherit trailing-whitespace :extend t))
+  "Face for marking missing end-of-sentence characters in
+‘aj/one-sentence-per-line-highlight-mode’"
+  :group 'aj)
+
+(defvar aj/missing-eol-period-fl-keywords
+  ;; anchored match: First matches lines starting with alnum (not
+  ;; org-headlines for example), and then highlights words at eol
+  ;; without periods etc.
+  '(("^[[:alnum:]]" "\\b[[:word:]]+[^].?!:…‽\"'”’]$" nil nil
+     (0 'aj/missing-eol-period prepend))))
+
+
+(define-minor-mode aj/one-sentence-per-line-highlight-mode
+  "Minor mode that marks missing end of senptence characters when
+  writing one sentence per line"
+  nil nil nil
+  (if aj/one-sentence-per-line-highlight-mode
+      (font-lock-add-keywords nil aj/missing-eol-period-fl-keywords)
+    (font-lock-remove-keywords nil aj/missing-eol-period-fl-keywords)))
+#+end_src
 
 *** Fix text-mode syntax table and char table for quote symbols
 When writing english with contractions using "right single quotation mark", ~’~, it needs to be treated as a word character, similar to how ~'~ is treated in ~text-mode-syntax-table~.
