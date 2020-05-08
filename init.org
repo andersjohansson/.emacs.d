@@ -645,7 +645,46 @@ Example of alist entry:
 
   (advice-add 'helm-run-or-raise :override #'aj/helm-run-or-raise)
 
+
+  ;;; helm-apropos, mark out custom-variables
+
+  (defun helm-def-source--emacs-variables-aj (&optional default)
+    (helm-build-in-buffer-source "Variables"
+      :init (lambda ()
+              (helm-apropos-init
+               (lambda (x) (and (boundp x) (not (keywordp x)))) default))
+      :fuzzy-match helm-apropos-fuzzy-match
+      :filtered-candidate-transformer
+      (lambda (cands source)
+        (when (null helm-apropos-fuzzy-match)
+          (setq cands (helm-apropos-default-sort-fn cands source)))
+        (cl-loop for c in cands
+                 collect
+                 (if (custom-variable-p (intern c))
+                     (cons (concat c " ⚙") c)
+                   c)))
+      :nomark t
+      :persistent-action (lambda (candidate)
+                           (helm-elisp--persistent-help
+                            candidate 'helm-describe-variable))
+      :persistent-help "Toggle describe variable"
+      :action '(("Describe variable" . helm-describe-variable)
+                ("Find variable" . helm-find-variable)
+                ("Info lookup" . helm-info-lookup-symbol)
+                ("Set variable" . helm-set-variable))
+      :action-transformer 'helm-apropos-action-transformer))
+
+  (setq helm-apropos-function-list
+        '(helm-def-source--emacs-commands
+          helm-def-source--emacs-variables-aj
+          helm-def-source--emacs-functions
+          helm-def-source--eieio-classes
+          helm-def-source--eieio-generic
+          helm-def-source--emacs-faces))
+
   )
+
+
 #+end_src
 **** Helm-fuz
 For modern fuzzy matching with a binary module built on Rust libraries.
