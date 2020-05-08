@@ -47,7 +47,7 @@ org mode async exports, using only trees tagged with “org_async”."
                    ))
 
 	  (let* ((file-el (concat file-noext ".el"))
-             (file-async (concat file-noext "-org-async.el"))
+             ;; (file-async (concat file-noext "-org-async.el"))
              (prog-mode-hook nil)
              ;; avoid garbage-collection for this
              (gc-cons-threshold most-positive-fixnum))
@@ -558,7 +558,7 @@ Example of alist entry:
              real)
      finally return path))
 
-  (defun aj/helm-recentf-filtered-candidates-shorten (candidates source)
+  (defun aj/helm-recentf-filtered-candidates-shorten (candidates _source)
     (mapcar #'aj/shorten-helm-path candidates))
 
   (with-eval-after-load 'helm-for-files
@@ -1538,7 +1538,7 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
   :custom (password-store-password-length 47)
   :config
 
-  (defun aj/password-store-generate (oldfun entry &optional password-length no-symbols)
+  (defun aj/password-store-generate (oldfun entry &optional password-length _no-symbols)
     (interactive (list (aj/password-store-get-new-entry-with-completion)
                        (when current-prefix-arg
                          (abs (prefix-numeric-value current-prefix-arg)))))
@@ -3269,7 +3269,7 @@ cperl instead of perl-mode
 *** Notifications while compiling
 #+begin_src emacs-lisp
   (autoload 'notifications-notify "notifications")
-  (defun aj/compile-notify (buffer message)
+  (defun aj/compile-notify (_buffer message)
     (notifications-notify :title "Emacs kompilering" :body message :urgency "critical"))
   (add-to-list 'compilation-finish-functions 'aj/compile-notify)
 #+end_src
@@ -3629,7 +3629,7 @@ Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t
 
 (advice-add 'ispell-change-dictionary :after #'aj/ispell-change-dictionary-merge-personal)
 
-(defun aj/ispell-change-dictionary-merge-personal (dict &rest args)
+(defun aj/ispell-change-dictionary-merge-personal (dict &rest _args)
   "If this is a combined dictionary (hunspell), merges all
 personal dictionaries into a combined personal dictionary."
   (when (and dict
@@ -4024,16 +4024,15 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
       ((?q ?y) (kill-buffer))))
 
   ;; advice count-words
-  (advice-add 'count-words :before-while #'aj/pdf-count-words)
-  (defun aj/pdf-count-words (start end)
-    (if (eq major-mode 'pdf-view-mode)
-        (progn
-          (pdf-view-assert-active-region)
-          (let ((txt (pdf-view-active-region-text)))
-            (with-temp-buffer
-              (insert (car txt))
-              (count-words--message "PDF region" (point-min) (point-max))))
-          nil)
+  (advice-add 'count-words :before-until #'aj/pdf-count-words)
+  (defun aj/pdf-count-words (_start _end)
+    (when (eq major-mode 'pdf-view-mode)
+      (pdf-view-assert-active-region)
+      (let ((txt (pdf-view-active-region-text)))
+        (with-temp-buffer
+          (insert (car txt))
+          (count-words--message "PDF region" (point-min) (point-max))
+          ))
       t))
 
   (defun aj/other-window-pdf-next-page (n)
@@ -4749,7 +4748,7 @@ I actually liked this more, especially the unified-branch which I used here. But
 #+begin_src emacs-lisp
 (defvar aj/last-fullscreen-param nil)
 
-(defun aj/toggle-fullscreen (&optional f)
+(defun aj/toggle-fullscreen ()
   (interactive)
   (let ((current-value (frame-parameter nil 'fullscreen)))
     (set-frame-parameter nil 'fullscreen
