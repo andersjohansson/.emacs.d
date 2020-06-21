@@ -330,7 +330,12 @@ A numeric prefix determines the depth where TODO states are created."
   (let ((aj/org-todo-tree-maxlevel
          (if maxlevel (+ (org-current-level) (prefix-numeric-value maxlevel))
            100)))
-    (org-map-tree #'aj/org-add-todo-and-cookie)))
+    (save-restriction
+      (save-excursion
+        (org-narrow-to-subtree)
+        (goto-char (point-max))
+        (while (outline-previous-heading)
+          (aj/org-add-todo-and-cookie))))))
 
 (defun aj/org-add-todo-and-cookie ()
   "Add TODO if not in a TODO state and a [/]-cookie if there are children"
@@ -347,7 +352,9 @@ A numeric prefix determines the depth where TODO states are created."
       (let ((org-special-ctrl-a/e t)
             (visual-line-mode nil))
         (org-end-of-line)
-        (insert " [/]")))))
+        (insert " [/]")
+        (org-update-statistics-cookies nil)))
+    (goto-char (point-at-bol))))
 #+END_SRC
 **** Hierarchical TODO automatization
 If you would like a TODO entry to automatically change to DONE when
