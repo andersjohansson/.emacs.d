@@ -3994,9 +3994,9 @@ Taken from: https://emacs.stackexchange.com/a/3843
                                         ; get item under point if
                                         ; nothing is marked
       (dolist (item items)
-        (archive-extract-to-file
+        (aj/archive-extract-to-file
          archive
-         (aref item 0) ; get the name from the descriptor
+         (archive--file-desc-ext-file-name item) ; get the name from the descriptor
          command output-dir))))
 
   (defun aj/archive-extract-to-file (archive-name item-name command dir)
