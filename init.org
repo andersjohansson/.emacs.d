@@ -1330,9 +1330,9 @@ Disable it for now.
 (use-package dash-functional)
 #+END_SRC
 
-** News :ARCHIVE:
+** News
 #+BEGIN_SRC emacs-lisp
-(setq gnus-select-method '(nntp "news.gmane.org"))
+(setq gnus-select-method '(nntp "news.gmane.io"))
 #+END_SRC
 ** Filetypes etc
 *** Don’t warn about large pdfs
