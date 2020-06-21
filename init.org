@@ -404,6 +404,25 @@ of the box `(w h)' inside the box `(cw ch)'."
   (list (/ (- cw w) 2) (/ (- ch h) 2)))
 #+end_src
 
+
+*** all the icons
+**** Base package
+#+BEGIN_SRC emacs-lisp
+(use-package all-the-icons)
+#+END_SRC
+
+**** All the icons dired
+Pretty icons in dired!
+
+Also a hack to make it work with ~dired-subtree~, however this adds double icons when reverting a buffer with inserted subtrees.
+#+BEGIN_SRC emacs-lisp
+(use-package all-the-icons-dired
+  :init (add-hook 'dired-mode-hook #'all-the-icons-dired-mode)
+  :config
+  (add-hook 'dired-subtree-after-insert-hook #'all-the-icons-dired--refresh)
+  (add-hook 'dired-subtree-after-remove-hook #'all-the-icons-dired--refresh))
+#+END_SRC
+
 *** Helm
 **** Loading helm
 (Really too much in config section here. Should probably move it to another file)
@@ -439,15 +458,15 @@ Example of alist entry:
    helm-ff-file-name-history-use-recentf t)
   ;;fuzzy matching
   (setq helm-buffers-fuzzy-matching t
-        helm-recentf-fuzzy-match t
-        helm-locate-fuzzy-match t
-        helm-file-cache-fuzzy-match t
-        helm-mode-fuzzy-match t
-        helm-M-x-fuzzy-match t
-        helm-semantic-fuzzy-match t
-        helm-imenu-fuzzy-match t
-        helm-apropos-fuzzy-match t
-        helm-lisp-fuzzy-completion t)
+	    helm-recentf-fuzzy-match t
+	    helm-locate-fuzzy-match t
+	    helm-file-cache-fuzzy-match t
+	    helm-mode-fuzzy-match t
+	    helm-M-x-fuzzy-match t
+	    helm-semantic-fuzzy-match t
+	    helm-imenu-fuzzy-match t
+	    helm-apropos-fuzzy-match t
+	    helm-lisp-fuzzy-completion t)
   (helm-adaptive-mode 1)
 
   ;; display
@@ -460,11 +479,11 @@ Example of alist entry:
   (defun aj/helm-split-window-fn (window)
     "Reuse a window below or split window below"
     (let* (split-width-threshold
-           (win (if (and (fboundp 'window-in-direction)
-                         (not (minibufferp helm-current-buffer)))
-                    (or (helm-window-in-direction 'below)
-                        (split-window (selected-window) nil 'below))
-                  (split-window-sensibly window))))
+	       (win (if (and (fboundp 'window-in-direction)
+			             (not (minibufferp helm-current-buffer)))
+		            (or (helm-window-in-direction 'below)
+			            (split-window (selected-window) nil 'below))
+		          (split-window-sensibly window))))
       (setq helm-persistent-action-window-buffer (window-buffer win))
       win))
 
@@ -520,7 +539,7 @@ Example of alist entry:
   ;; https://www.reddit.com/r/emacs/comments/2z7nbv/lean_helm_window/
   (defun helm-toggle-header-line ()
     (if (eq 1 (length (ignore-errors (with-helm-buffer helm-sources))))
-        (set-face-attribute 'helm-source-header nil :height 1)
+	    (set-face-attribute 'helm-source-header nil :height 1)
       (set-face-attribute 'helm-source-header nil :height 1.0)))
 
   (add-hook 'helm-before-initialize-hook #'helm-toggle-header-line)
@@ -541,17 +560,36 @@ Example of alist entry:
 ;;; Helm mini:
 
   (setq helm-mini-default-sources
-        '(helm-source-buffers-list
-          ;;aj/helm-source-favourite-files
-          helm-source-recentf
-          helm-source-files-in-current-dir
-          aj/helm-source-dired-recent
-          helm-source-buffer-not-found))
+	    '(helm-source-buffers-list
+	      ;;aj/helm-source-favourite-files
+	      helm-source-recentf
+	      helm-source-files-in-current-dir
+	      aj/helm-source-dired-recent
+	      helm-source-buffer-not-found))
+
+  (require 'helm-for-files)
+  (defun aj/remove-dired-recent-dir (_c)
+    ;; to be run from helm
+    (cl-loop for c in (helm-marked-candidates)
+             do (setq dired-recent-directories (delete c dired-recent-directories))))
+
+  (defclass aj/helm-dired-recent-source (helm-source-sync helm-type-file)
+    ((candidates :initform (lambda () dired-recent-directories))
+     (pattern-transformer :initform 'helm-recentf-pattern-transformer)
+     (match-part :initform (lambda (candidate)
+                             (if (or helm-ff-transformer-show-only-basename
+                                     helm-recentf--basename-flag)
+                                 (helm-basename candidate) candidate)))
+     (fuzzy-match :initform t)))
+
   (defvar aj/helm-source-dired-recent
-    (helm-build-sync-source "Recent directories"
-      :candidates 'dired-recent-directories
-      :action '(("Open directory" . dired)
-                ("Delete from dired-recent list" . aj/helm-action-dired-recent-delete))))
+    (helm-make-source "Recent directories" 'aj/helm-dired-recent-source))
+  (helm-add-action-to-source "Delete file(s) from dired-recent-directories"
+                             #'aj/remove-dired-recent-dir aj/helm-source-dired-recent)  
+
+  (setf (helm-attr 'filtered-candidate-transformer aj/helm-source-dired-recent)
+        '(helm-fuzzy-matching-default-sort-fn helm-fuzzy-highlight-matches aj/helm-recentf-filtered-candidates-shorten))
+  
 
   (defun aj/shorten-helm-path (path)
     (cl-loop
@@ -559,10 +597,10 @@ Example of alist entry:
      for (match . replace) in aj/shortened-helm-paths
      when (string-match match disp)
      return (cons
-             (concat (substring disp 0 (match-beginning 0))
-                     (propertize replace 'face '(bold helm-ff-symlink))
-                     (substring disp (match-end 0)))
-             real)
+	         (concat (substring disp 0 (match-beginning 0))
+		             (propertize replace 'face 'helm-buffer-archive)
+		             (substring disp (match-end 0)))
+	         real)
      finally return path))
 
   (defun aj/helm-recentf-filtered-candidates-shorten (candidates _source)
@@ -571,13 +609,13 @@ Example of alist entry:
   (with-eval-after-load 'helm-for-files
     (dolist (source '(helm-source-recentf helm-source-files-in-current-dir))
       (cl-callf append
-          (alist-get 'filtered-candidate-transformer (symbol-value source))
-        '(aj/helm-recentf-filtered-candidates-shorten))))
+	      (alist-get 'filtered-candidate-transformer (symbol-value source))
+	    '(aj/helm-recentf-filtered-candidates-shorten))))
 
   ;;; helm-recentf, delete and add to ignore-list
   (with-eval-after-load 'helm-for-files
     (cl-callf append
-        (alist-get 'action helm-source-recentf)
+	    (alist-get 'action helm-source-recentf)
       '(("Delete from recentf and ignore" . aj/helm-remove-from-recentf-and-ignore))))
 
   (defun aj/helm-remove-from-recentf-and-ignore (candidate)
@@ -587,20 +625,20 @@ Example of alist entry:
 
   ;;; grep --> ripgrep
 
-  (setq helm-grep-ag-command "rg -u --color=never --smart-case --no-heading --line-number %s %s %s"
-        helm-grep-file-path-style 'relative)
+  (setq helm-grep-ag-command "rg -u --color=never --follow --smart-case --no-heading --line-number %s %s %s"
+	    helm-grep-file-path-style 'relative)
   (bind-key "C-s" #'helm-ff-run-grep-ag helm-find-files-map)
 
   (defun aj/helm-rg-org-files ()
     "Function for searching through all org files in home directory."
     (interactive)
     (advice-add 'helm-grep--filter-candidate-1 :filter-return
-                #'aj/shorten-helm-path)
+		        #'aj/shorten-helm-path)
     (unwind-protect
-        (let ((helm-grep-file-path-style 'absolute))
-          (helm-grep-ag-1 (expand-file-name "~") '("-torg")))
+	    (let ((helm-grep-file-path-style 'absolute))
+	      (helm-grep-ag-1 (expand-file-name "~") '("-torg")))
       (advice-remove 'helm-grep--filter-candidate-1
-                     #'aj/shorten-helm-path)))
+		             #'aj/shorten-helm-path)))
 
 
   ;;; more candidates for helm-ucs
@@ -615,7 +653,7 @@ Example of alist entry:
   (defun aj/pop-to-mark-invoke-helm (fun)
     (interactive)
     (if (eq last-command 'pop-to-mark-command)
-        (helm-all-mark-rings)
+	    (helm-all-mark-rings)
       (funcall fun)))
 
   (defvar helm-mark-ring-map
@@ -638,17 +676,17 @@ Example of alist entry:
   (defun aj/helm-run-or-raise (exe &optional file)
     (let ((real-com (car (split-string exe))))
       (when (member real-com helm-external-commands-list)
-        (message "Starting %s..." real-com)
-        (if file
-            (call-process-shell-command
-             (format "%s %s"
-                     real-com
-                     (shell-quote-argument
-                      (if (eq system-type 'windows-nt)
-                          (helm-w32-prepare-filename file)
-                        (expand-file-name file))))
-             nil 0)
-          (call-process-shell-command real-com nil 0)))))
+	    (message "Starting %s..." real-com)
+	    (if file
+	        (call-process-shell-command
+	         (format "%s %s"
+		             real-com
+		             (shell-quote-argument
+		              (if (eq system-type 'windows-nt)
+			              (helm-w32-prepare-filename file)
+			            (expand-file-name file))))
+	         nil 0)
+	      (call-process-shell-command real-com nil 0)))))
 
   (advice-add 'helm-run-or-raise :override #'aj/helm-run-or-raise)
 
@@ -658,36 +696,36 @@ Example of alist entry:
   (defun helm-def-source--emacs-variables-aj (&optional default)
     (helm-build-in-buffer-source "Variables"
       :init (lambda ()
-              (helm-apropos-init
-               (lambda (x) (and (boundp x) (not (keywordp x)))) default))
+	          (helm-apropos-init
+	           (lambda (x) (and (boundp x) (not (keywordp x)))) default))
       :fuzzy-match helm-apropos-fuzzy-match
       :filtered-candidate-transformer
       (lambda (cands source)
-        (when (null helm-apropos-fuzzy-match)
-          (setq cands (helm-apropos-default-sort-fn cands source)))
-        (cl-loop for c in cands
-                 collect
-                 (if (custom-variable-p (intern c))
-                     (cons (concat c " ⚙") c)
-                   c)))
+	    (when (null helm-apropos-fuzzy-match)
+	      (setq cands (helm-apropos-default-sort-fn cands source)))
+	    (cl-loop for c in cands
+		         collect
+		         (if (custom-variable-p (intern c))
+		             (cons (concat c " ⚙") c)
+		           c)))
       :nomark t
       :persistent-action (lambda (candidate)
-                           (helm-elisp--persistent-help
-                            candidate 'helm-describe-variable))
+			               (helm-elisp--persistent-help
+			                candidate 'helm-describe-variable))
       :persistent-help "Toggle describe variable"
       :action '(("Describe variable" . helm-describe-variable)
-                ("Find variable" . helm-find-variable)
-                ("Info lookup" . helm-info-lookup-symbol)
-                ("Set variable" . helm-set-variable))
+		        ("Find variable" . helm-find-variable)
+		        ("Info lookup" . helm-info-lookup-symbol)
+		        ("Set variable" . helm-set-variable))
       :action-transformer 'helm-apropos-action-transformer))
 
   (setq helm-apropos-function-list
-        '(helm-def-source--emacs-commands
-          helm-def-source--emacs-variables-aj
-          helm-def-source--emacs-functions
-          helm-def-source--eieio-classes
-          helm-def-source--eieio-generic
-          helm-def-source--emacs-faces))
+	    '(helm-def-source--emacs-commands
+	      helm-def-source--emacs-variables-aj
+	      helm-def-source--emacs-functions
+	      helm-def-source--eieio-classes
+	      helm-def-source--eieio-generic
+	      helm-def-source--emacs-faces))
   )
 #+end_src
 
@@ -704,6 +742,20 @@ We need to add "target" to the fuz recipe so that it isn’t removed by straight
   :config (helm-fuz-mode t))
 #+end_src
 
+
+**** helm-all-the-icons
+#+begin_src emacs-lisp
+(use-package helm-all-the-icons
+  :straight (helm-all-the-icons :type git :repo "/home/aj/kodat/elisp/helm-all-the-icons/")
+  :custom (helm-all-the-icons-files-sources
+           '(helm-source-recentf
+             helm-source-find-files
+             helm-source-locate
+             helm-source-files-in-current-dir
+             aj/helm-source-dired-recent))
+  :commands (helm-all-the-icons-enable)
+  :init (helm-all-the-icons-enable))
+#+end_src
 **** helm-flx :ARCHIVE:
 Different fuzzy search algorithm, is this needed?
 #+BEGIN_SRC emacs-lisp
@@ -711,6 +763,56 @@ Different fuzzy search algorithm, is this needed?
   :after helm
   :init (helm-flx-mode t))
 #+END_SRC
+
+**** Launch in small frame
+#+begin_src emacs-lisp
+(with-eval-after-load 'helm
+  (defvar aj/running-cmd-in-small-frame nil)
+
+  (defun aj/run-cmd-in-small-frame (width height cmd name &optional forcecleanup frame-params face-customizations)
+    (let ((ocframe
+           (make-frame
+            `(,@frame-params
+              (width . ,width) (height . ,height) (name . ,name)
+              (undecorated . t) (window-system . x) (fullscreen . nil))))
+          (helm-full-frame t)
+          (aj/running-cmd-in-small-frame t))
+      (select-frame-set-input-focus ocframe)
+      (aj/center-frame ocframe)
+      (cl-loop for (f . c) in face-customizations
+               do (apply #'set-face-attribute f ocframe c))
+      (funcall cmd)
+      (when (or forcecleanup (eq 1 helm-exit-status))
+        (delete-frame))))
+  )
+#+end_src
+
+**** helm-launcher
+#+begin_src emacs-lisp
+(use-package helm-launcher
+  :straight nil
+  :load-path "/home/aj/kodat/elisp/helm-launcher/"
+  :commands helm-launcher
+  :custom (helm-launcher-sources
+           '(helm-launcher-desktop-applications-source
+             helm-launcher-file-history-source
+             helm-launcher-recentf-mime-source
+             aj/helm-source-favourite-files
+             ;; aj/helm-source-dired-recent
+             ))
+  ;; :after helm
+  :init
+  (defun aj/helm-launcher-frame ()
+    (interactive)
+    (aj/run-cmd-in-small-frame 100 20 #'helm-launcher "Helm launcher" t nil
+                               '(;; (helm-selection :background "transparent")
+                                 )))
+  :config
+  (dolist (s '(helm-launcher-file-history-source
+               helm-launcher-recentf-mime-source
+               aj/helm-source-favourite-files))
+    (helm-all-the-icons-add-transformer #'helm-all-the-icons-files-add-icons (symbol-value s))))
+#+end_src
 
 **** Open zotero library files
 #+BEGIN_SRC emacs-lisp
@@ -721,33 +823,24 @@ Different fuzzy search algorithm, is this needed?
     :type 'directory)
 
   (defvar aj/helm-zoterofile-history)
-  (defvar aj/zoterofiles-frame-manage nil)
 
   (defun aj/open-zoterofile-new-frame ()
-    (interactive)
-    (let ((ocframe
-           (make-frame '((width . 100) (height . 20) (name . "helm-zotero")
-                         (window-system . x) (fullscreen . nil))))
-          (helm-full-frame t)
-          (aj/zoterofiles-frame-manage t))
-      (select-frame-set-input-focus ocframe)
-      (aj/center-frame)
-      (aj/helm-open-zoterofile)))
+    (aj/run-cmd-in-small-frame 100 20 #'aj/helm-open-zoterofile "helm-zotero"))
 
   (defun aj/helm-open-zoterofile ()
     (interactive)
     (let* ((oe '("Open externally" . aj/helm-open-file-externally-delete-frame))
            (ff '("Find file" . aj/helm-find-many-files-widen-frame))
-           (active-actions (if aj/zoterofiles-frame-manage
+           (active-actions (if aj/running-cmd-in-small-frame
                                (list oe ff)
                              (list ff oe))))
       (helm :sources
             (list
              (helm-build-sync-source "Zotero recently modified"
+               :candidates #'aj/helm-zotero-recently-modified
                :action active-actions
                :pattern-transformer #'helm-recentf-pattern-transformer
-               :keymap helm-generic-files-map
-               :candidates #'aj/helm-zotero-recently-modified)
+               :keymap helm-generic-files-map)
              (helm-build-sync-source "Zotero recentf"
                :candidates #'aj/recentf-list-zotero
                :action active-actions
@@ -764,9 +857,7 @@ Different fuzzy search algorithm, is this needed?
                :filtered-candidate-transformer #'helm-highlight-files
                :pattern-transformer #'helm-recentf-pattern-transformer
                :match-part #'aj/helm-zotero-match-part
-               :keymap helm-generic-files-map
-               ))
-
+               :keymap helm-generic-files-map))
 
             :buffer "*helm-zoterofile*"
             :history 'aj/helm-zoterofile-history
@@ -777,17 +868,16 @@ Different fuzzy search algorithm, is this needed?
     (when (file-accessible-directory-p aj/helm-zotero-library)
       (with-temp-buffer
         (call-process "ls" nil t nil "-t" "-1" aj/helm-zotero-library)
-        (mapcar (lambda (x) (cons x (expand-file-name x aj/helm-zotero-library)))
-                (split-string
-                 (buffer-substring (point-min)
-                                   (progn (goto-char (point-min))
-                                          (forward-line 20) (point)))
-                 "\n"
-                 t)))))
+        (cl-loop for f in (split-string
+                           (buffer-substring (point-min)
+                                             (progn (goto-char (point-min))
+                                                    (forward-line 20) (point)))
+                           "\n"
+                           t)
+                 collect (cons f (expand-file-name f aj/helm-zotero-library))))))
 
   (defun aj/recentf-list-zotero ()
-    (cl-remove-if-not (lambda (it) (string-match-p aj/helm-zotero-library it))
-                      recentf-list))
+    (--filter (string-match-p aj/helm-zotero-library it) recentf-list))
 
   (defun aj/helm-zotero-files ()
     (when (file-accessible-directory-p aj/helm-zotero-library)
@@ -800,13 +890,15 @@ Different fuzzy search algorithm, is this needed?
 
   (defun aj/helm-find-many-files-widen-frame (_ignore)
     (helm-find-many-files t)
-    (when aj/zoterofiles-frame-manage
+    (when aj/running-cmd-in-small-frame
       (aj/frame-to-left)
       (set-frame-name (buffer-file-name))))
+
   (defun aj/helm-open-file-externally-delete-frame (file)
     (helm-open-file-externally file)
-    (when aj/zoterofiles-frame-manage
-      (delete-frame))))
+    (when aj/running-cmd-in-small-frame
+      (delete-frame)))
+  )
 #+END_SRC
 **** TODO Utvärdera om vi borde använda helm-multi-files istället för att lägga allt i helm-mini
 **** COMMENT Helm omni-files, buffers, recentf                      :ARCHIVE:
@@ -864,10 +956,10 @@ Different fuzzy search algorithm, is this needed?
   :config (helm-recoll-create-source "default" "~/.recoll/"))
 #+end_src
 
-**** Favourite files (to mark files which should be prioritized in helm matches) :ARCHIVE:
+**** Favourite files (to mark files which should be prioritized in helm matches)
 #+BEGIN_SRC emacs-lisp
 (defvar aj/favourite-files nil)
-(with-eval-after-load "savehist-mode"
+(with-eval-after-load 'savehist-mode
   (add-to-list 'savehist-additional-variables 'aj/favourite-files))
 
 (defun aj/add-favourite-file ()
@@ -878,14 +970,14 @@ Different fuzzy search algorithm, is this needed?
       (cl-pushnew name aj/favourite-files :test #'string=)
     (user-error "Not in a file- or dired-buffer")))
 
-(with-eval-after-load "helm-for-files"
+(with-eval-after-load  'helm-for-files
   (defun aj/remove-favourite-file (_candidate)
     ;; to be run from helm
     (cl-loop for file in (helm-marked-candidates)
              do (setq aj/favourite-files (delete file aj/favourite-files))))
 
   (defclass aj/helm-favourite-files-source (helm-source-sync helm-type-file)
-    ((candidates :initform (lambda () aj/favourite-files))
+    ((candidates :initform 'aj/favourite-files)
      (pattern-transformer :initform 'helm-recentf-pattern-transformer)
      (match-part :initform (lambda (candidate)
                              (if (or helm-ff-transformer-show-only-basename
@@ -898,10 +990,11 @@ Different fuzzy search algorithm, is this needed?
     (setf (slot-value source 'action)
           (append (symbol-value (helm-actions-from-type-file))
                   '(("Delete file(s) from aj/favourite-files" .
-                     aj/remove-favourite-file))))
-    (setf (slot-value source 'filtered-candidate-transformer)
+                     aj/remove-favourite-file)))
+          (slot-value source 'filtered-candidate-transformer)
           (append (slot-value source 'filtered-candidate-transformer)
-                  '(aj/helm-recentf-filtered-candidates-shorten))))
+                  '(aj/helm-recentf-filtered-candidates-shorten))
+          ))
 
   (defvar aj/helm-source-favourite-files
     (helm-make-source "Favourite files" 'aj/helm-favourite-files-source)))
