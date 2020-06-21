@@ -2113,8 +2113,12 @@ https://github.com/andersjohansson/tex-fold-linebreaks
   ("b" #'nswbuff-switch-to-next-buffer "Next buffer")
   ("q" nil "Quit"))
 #+end_src
-*** aj/switch-to-buffer
+*** Next/previous-buffer
 #+BEGIN_SRC emacs-lisp
+(bind-keys
+ ("C-<" . previous-buffer)
+ ("C->" . next-buffer))
+
 (defun aj/switch-to-other-buffer ()
   (interactive)
   (switch-to-buffer nil)
