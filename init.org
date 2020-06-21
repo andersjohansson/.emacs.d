@@ -1183,11 +1183,10 @@ overriding it, but you should know before you do.
   :commands org-mode
   :demand t
   :init
-  ;; (require 'org-protocol) ;; move to modules? autoload the entry commands (don’t seem to be)
   (setq org-directory "~/org"
         org-ellipsis " ⤵"
         org-export-backends '(beamer odt ascii html icalendar latex)
-        org-modules '(org-habit org-inlinetask org-mu4e org-id org-bullets org-pdfview)
+        org-modules '(org-protocol org-habit org-inlinetask org-mu4e org-id org-bullets org-pdfview)
         org-list-allow-alphabetical t
         org-id-method 'ts
         org-id-prefix "aj"
@@ -1200,11 +1199,8 @@ overriding it, but you should know before you do.
   :config
   (setq org-version "9.4")
   (defun org-version () "9.4")
-  ;; (message "Laddade org")
-  ;; (load-library "helm-mode)"
+  ;; (straight--fix-org-function "org")
   (load-library "aj-org-config")
-  ;; (require 'helm-mode)
-  ;; (require 'aj-org-config)
   )
 #+end_src
 **** org init async                             :org_async:no_default_tangle:
