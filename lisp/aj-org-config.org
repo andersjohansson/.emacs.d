@@ -2316,6 +2316,7 @@ Mostly for html and reveal
   :straight (org-re-reveal
              :depth nil
              :fork (:host gitlab :repo "andersjohansson/org-re-reveal" :branch "ajfixes"))
+  :custom (org-re-reveal-revealjs-version "4")
   :demand t)
 #+end_src
 **** Settings
@@ -2326,9 +2327,8 @@ Mostly for html and reveal
 (with-eval-after-load 'org-re-reveal
   (setq
    org-re-reveal-root "../"
-   org-re-reveal-script-files '("js/reveal.js")
-   org-re-reveal-mathjax-url "https://cdnjs.cloudflare.com/ajax/libs/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
-   org-re-reveal-plugins '(classList zoom notes)
+   ;; org-re-reveal-mathjax-url "https://cdnjs.cloudflare.com/ajax/libs/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
+   org-re-reveal-plugins '(zoom notes)
    org-re-reveal-theme "white"
    org-re-reveal-transition "slide"
    org-re-reveal-transition-speed "fast"
@@ -2344,7 +2344,8 @@ Mostly for html and reveal
    org-re-reveal-hashonebasedindex t
    org-re-reveal-extra-options "hash: true, navigationMode: 'linear'"
    ;; org-re-reveal-extra-js "{src: '../assets/aj-fixes.js'}"
-   org-re-reveal-external-plugins '((aj-fixes . "{src: '../assets/aj-fixes.js', async: true}"))))
+   ;; org-re-reveal-external-plugins '((aj-fixes . "{src: '../assets/aj-fixes.js', async: true}"))
+   ))
 #+END_SRC
 
 **** reveal - org-annotate-style
