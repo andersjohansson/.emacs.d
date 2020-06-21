@@ -2313,6 +2313,39 @@ already narrowed."
                                (?A "Å") (?A "Ä") (?O "Ö"))))
 #+end_src
 
+*** CTRLF
+A bit nicer than isearch. I also like to use fuzzy search (words separated by whatever) by default. It is also helpful to use char-fold (é → e) by default, so I define functions for that.
+#+begin_src emacs-lisp
+(use-package ctrlf
+  :custom (ctrlf-mode-bindings
+           '(("C-s" . aj/ctrlf-forward-fuzzy-char-fold)
+             ("C-r" . aj/ctrlf-backward-fuzzy-char-fold)
+             ("C-M-s" . ctrlf-forward-regexp)
+             ("C-M-r" . ctrlf-backward-regexp)
+             ("M-s _" . ctrlf-forward-symbol)
+             ("M-s ." . ctrlf-forward-symbol-at-point)))
+
+  :config
+  (ctrlf-mode t)
+
+  (defun aj/ctrlf-translate-fuzzy-char-fold (input)
+    (ctrlf-translate-fuzzy-regexp (char-fold-to-regexp input)))
+
+  (add-to-list 'ctrlf-style-alist
+               '(fuzzy-char-fold
+                 . (:prompt "fuzzy CF"
+                            :translator aj/ctrlf-translate-fuzzy-char-fold
+                            :case-fold ctrlf-no-uppercase-literal-p)))
+
+  (defun aj/ctrlf-forward-fuzzy-char-fold ()
+    (interactive)
+    (ctrlf-forward 'fuzzy-char-fold))
+  (defun aj/ctrlf-backward-fuzzy-char-fold ()
+    (interactive)
+    (ctrlf-backward 'fuzzy-char-fold))
+
+  (add-hook 'pdf-isearch-minor-mode-hook (lambda () (ctrlf-local-mode -1)))
+  )
 #+end_src
 
 *** Anzu: Shows number of search matches in modeline, replacements inline etc.
@@ -2322,15 +2355,7 @@ already narrowed."
   :bind (("M-%" . anzu-query-replace)
          ("C-M-%" . anzu-query-replace-regexp))
   :config
-  (progn
-    (global-anzu-mode +1)
-    (dolist (f '((anzu-mode-line . font-lock-variable-name-face)
-                 (anzu-replace-to . match)
-                 (anzu-match-1 . font-lock-constant-face)
-                 (anzu-match-2 . font-lock-keyword-face)
-                 (anzu-match-3 . font-lock-type-face)))
-      (set-face-attribute (car f) nil :foreground 'unspecified :background 'unspecified
-                          :inherit (cdr f)))))
+  (global-anzu-mode))
 
 #+END_SRC
 
