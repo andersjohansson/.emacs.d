@@ -1374,6 +1374,65 @@ Present a nicer-looking helm buffer for ~org-refile~
 
 
 #+end_src
+
+** Columns view
+
+*** Cut field length in org-columns-view dblocks
+#+begin_src emacs-lisp
+(el-patch-feature org-colview)
+(with-eval-after-load 'org-colview
+  (el-patch-defun org-columns--capture-view ()
+    "Cut down fields to field format length"
+
+    (org-columns (not local) format)
+    (goto-char org-columns-top-level-marker)
+    (let ((columns (length org-columns-current-fmt-compiled))
+	      (has-item (assoc "ITEM" org-columns-current-fmt-compiled))
+          (el-patch-add (lengths (mapcar (lambda (col) (nth 2 col)) org-columns-current-fmt-compiled)))
+	      table)
+      (org-map-entries
+       (lambda ()
+         (when (get-char-property (point) 'org-columns-key)
+	       (let (row)
+	         (dotimes (i columns)
+	           (let* ((col (+ (line-beginning-position) i))
+		              (p (get-char-property col 'org-columns-key))
+                      (el-patch-add (l (nth i lengths)))
+                      (el-patch-add (str (get-char-property col
+					                                        (if (string= p "ITEM")
+					                                            'org-columns-value
+					                                          'org-columns-value-modified)))))
+	             (push (org-quote-vert
+		                (el-patch-swap
+                          (get-char-property col
+					                         (if (string= p "ITEM")
+					                             'org-columns-value
+					                           'org-columns-value-modified))
+                          (if (and l (< l (length str)))
+                              (substring str 0 l)
+                            str)))
+		               row)))
+	         (unless (or
+		              (and skip-empty
+			               (let ((r (delete-dups (remove "" row))))
+			                 (or (null r) (and has-item (= (length r) 1)))))
+		              (and exclude-tags
+			               (cl-some (lambda (tag) (member tag exclude-tags))
+				                    (org-get-tags))))
+	           (push (cons (org-reduced-level (org-current-level)) (nreverse row))
+		             table)))))
+       (or (and maxlevel (format "LEVEL<=%d" maxlevel))
+	       (and match match))
+       (and local 'tree)
+       'archive 'comment)
+      (org-columns-quit)
+      ;; Add column titles and a horizontal rule in front of the table.
+      (cons (mapcar #'cadr org-columns-current-fmt-compiled)
+	        (cons 'hline (nreverse table))))
+    ))
+
+
+#+end_src
 ** Redefine ~org-paste-special~ to choose from kill-ring (with helm)
 If we have inadvertantly killed something between the special kill and yank we intended, we are then given an opportunity to easily choose the right thing to yank.
 #+BEGIN_SRC emacs-lisp
