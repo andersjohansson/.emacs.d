@@ -2305,6 +2305,14 @@ already narrowed."
 *** Smarter default search with char-folding
 #+begin_src emacs-lisp
 (setq search-default-mode #'char-fold-to-regexp)
+
+;; In Swedish, åäö are separate wovels (not umlauts), and it’s not
+;; good to match them to a and o
+(use-package char-fold
+  :custom (char-fold-exclude '((?a "å") (?a "ä") (?o "ö")
+                               (?A "Å") (?A "Ä") (?O "Ö"))))
+#+end_src
+
 #+end_src
 
 *** Anzu: Shows number of search matches in modeline, replacements inline etc.
