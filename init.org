@@ -4618,28 +4618,34 @@ Add ADDITIONAL-SEGMENTS to the end of the theme."
 **** My own face definitions
 Load my own face customizations after enabling a theme.
 #+BEGIN_SRC emacs-lisp
+(defface aj/goto-address-mail-face '((t :inherit (shadow italic)))
+  "" :group 'aj)
+
 (defun aj/apply-face-definitions (&optional theme)
   "Do face definition stuff after loading theme.
 Also runs hook aj/face-definitions-hook."
   (unless (eq theme 'user) ;enable theme calls itself with user theme.
 
-    ;; (set-face-attribute 'scroll-bar nil :foreground (face-attribute 'widget-field :background))
+    ;; (set-face-attribute 'scroll-bar nil :foreground (face-attribute
+    ;; 'widget-field :background))
+
+    (setq goto-address-mail-face 'aj/goto-address-mail-face)
 
     (with-eval-after-load 'org-faces
 
       (set-face-attribute 'org-document-title nil :height 1.5 :weight 'bold)
-      ;; (set-face-attribute 'org-meta-line nil :inherit 'org-drawer)
+      ;; ;; (set-face-attribute 'org-meta-line nil :inherit 'org-drawer)
 
       (set-face-attribute 'org-block-begin-line nil :height 0.9 :extend t)
-      ;; (set-face-attribute 'org-block-end-line nil :height 0.9 :extend t)
+      (set-face-attribute 'org-block-end-line nil :height 0.9 :extend t)
       (set-face-attribute 'org-block nil :extend t)
 
       (set-face-attribute 'org-quote nil :weight 'light :height 0.95 :inherit 'default)
       (set-face-attribute 'org-verse nil :inherit 'org-table)
 
-      ;; (set-face-attribute 'org-special-keyword nil :weight 'normal :inherit 'shadow)
+      ;; ;; (set-face-attribute 'org-special-keyword nil :weight 'normal :inherit 'shadow)
 
-      ;; Use fixed-pitch for checkbox, compressed font for table
+      ;; ;; Use fixed-pitch for checkbox, compressed font for table
       (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
       (set-face-attribute 'org-table nil :family "Input Mono Compressed")
 
@@ -4710,7 +4716,12 @@ Also runs hook aj/face-definitions-hook."
 **** Modus-operandi theme
 #+begin_src emacs-lisp
 (use-package modus-operandi-theme
-  :custom (modus-operandi-theme-visible-fringes t))
+  :custom (modus-operandi-theme-visible-fringes t)
+  (modus-operandi-theme-subtle-diffs t)
+  (modus-operandi-theme-distinct-org-blocks t)
+  (modus-operandi-theme-heading-block t)
+  :config
+  (setq org-fontify-whole-heading-line t))
 #+end_src
 **** Define themes to use for dark and light and load light theme
 #+BEGIN_SRC emacs-lisp
