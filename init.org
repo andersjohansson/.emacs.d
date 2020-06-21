@@ -1507,40 +1507,9 @@ But some of the options for listing-switches doesn’t work with remote sessions
 Store visited directories in a list, make it accessible from helm
 #+BEGIN_SRC emacs-lisp
 (use-package dired-recent
-  :after (:all dired)
   :config
   (dired-recent-mode 1)
-  (setq dired-recent-mode-map nil)
-  (with-eval-after-load "helm-for-files"
-    (defun aj/remove-dired-recent-dir (_c)
-      ;; to be run from helm
-      (cl-loop for c in (helm-marked-candidates)
-               do (setq dired-recent-directories (delete c dired-recent-directories))))
-
-    (defclass aj/helm-dired-recent-source (helm-source-sync helm-type-file)
-      ((candidates :initform (lambda () dired-recent-directories))
-       (pattern-transformer :initform 'helm-recentf-pattern-transformer)
-       (match-part :initform (lambda (candidate)
-                               (if (or helm-ff-transformer-show-only-basename
-                                       helm-recentf--basename-flag)
-                                   (helm-basename candidate) candidate)))
-       (fuzzy-match :initform t)))
-
-
-    ;; FIX: should be able to use helm-add-action-to-source
-    (defmethod helm--setup-source :after ((source aj/helm-dired-recent-source))
-      (setf (slot-value source 'action)
-            (append (symbol-value (helm-actions-from-type-file))
-                    '(("Delete file(s) from aj/favourite-files" .
-                       aj/remove-dired-recent-dir))))
-      (setf (slot-value source 'filtered-candidate-transformer)
-            (append (slot-value source 'filtered-candidate-transformer)
-                    '(aj/helm-recentf-filtered-candidates-shorten))))
-
-    (defvar aj/helm-source-dired-recent
-      (helm-make-source "Recent directories" 'aj/helm-dired-recent-source))))
-
-
+  (setq dired-recent-mode-map nil))
 #+END_SRC
 
 *** Recentf
