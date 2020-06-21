@@ -4301,7 +4301,7 @@ A way of higlighting where you are, don’t use it now.
   :hook (after-init . mini-modeline-mode)
   :config
   (doom-modeline-def-modeline 'minibuffer-line
-    '(workspace-name window-number matches buffer-info remote-host buffer-position word-count parrot selection-info objed-state misc-info persp-name battery grip irc mu4e gnus github debug lsp minor-modes input-method indent-info buffer-encoding major-mode process vcs checker))
+    '(workspace-name window-number matches buffer-info remote-host buffer-position word-count parrot selection-info objed-state misc-info persp-name battery grip irc mu4e gnus github debug lsp checker minor-modes input-method indent-info buffer-encoding major-mode process vcs))
 
   (setq mini-modeline-r-format (doom-modeline-format--minibuffer-line))
 
