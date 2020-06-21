@@ -4033,7 +4033,7 @@ DIR."
 #+end_src
 *** Pdf-view (pdf-tools)
 **** Main settings
-pdf-loader handles deferred loading. Then settings are applied after loading pdf-view
+pdf-loader handles deferred loading. Then settings are applied after loading pdf-view.
 #+BEGIN_SRC emacs-lisp
 (use-package pdf-tools
   :commands pdf-loader-install ;; TODO (fel?)
