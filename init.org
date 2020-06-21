@@ -4255,24 +4255,6 @@ A way of higlighting where you are, don’t use it now.
             (add-hook 'dired-mode-hook 'turn-on-stripe-buffer-mode)
             (add-hook 'org-mode-hook 'turn-on-stripe-table-mode)))
 #+END_SRC
-*** all the icons
-**** Base package
-#+BEGIN_SRC emacs-lisp
-(use-package all-the-icons)
-#+END_SRC
-
-**** All the icons dired
-Pretty icons in dired!
-
-Also a hack to make it work with ~dired-subtree~, however this adds double icons when reverting a buffer with inserted subtrees.
-#+BEGIN_SRC emacs-lisp
-(use-package all-the-icons-dired
-  :init (add-hook 'dired-mode-hook #'all-the-icons-dired-mode)
-  :config
-  (add-hook 'dired-subtree-after-insert-hook #'all-the-icons-dired--refresh)
-  (add-hook 'dired-subtree-after-remove-hook #'all-the-icons-dired--refresh))
-#+END_SRC
-
 *** Modeline
 **** mini-modeline + doom-modeline
 #+BEGIN_SRC emacs-lisp
