@@ -283,6 +283,7 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 (setq straight-use-package-by-default t
       straight-vc-git-default-clone-depth 1
       straight-cache-autoloads t
+      straight-fix-flycheck t
       straight-repository-branch "develop")
 
 (defvar bootstrap-version)
