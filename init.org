@@ -1686,7 +1686,8 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
              ("m" . aj/pass-magit)
              ("W" . aj/password-store-generate-and-copy)
              ("v" . aj/password-store-generate-and-copy-simpler)
-             ("V" . aj/password-store-generate-and-copy-words))
+             ("V" . aj/password-store-generate-and-copy-words)
+             ("Q" . aj/pass-display-qr))
 
   (defun aj/pass-git-push ()
     (interactive)
