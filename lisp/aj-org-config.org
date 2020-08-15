@@ -820,8 +820,11 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
 
 (defun aj/org-id-update-id-locations-recursive (dir)
   (interactive "D")
-  (org-id-update-id-locations
-   (directory-files-recursively dir ".*\\.org$" nil t t)))
+  (let ((recentf-active recentf-mode))
+    (recentf-mode -1)
+    (org-id-update-id-locations
+     (directory-files-recursively dir ".*\\.org$" nil t t))
+    (when recentf-active (recentf-mode))))
 #+end_src
 
 ** Visibility, folding, display etc.
