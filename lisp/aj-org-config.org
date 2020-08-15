@@ -2814,6 +2814,7 @@ should be relativized or not. Returns the possibly relativized filename"
 
   (setq org-latex-format-drawer-function #'aj/ox-latex-drawers))
 #+END_SRC
+
 **** latex inlinetask
 #+begin_src emacs-lisp
 (defun aj/org-latex-inlinetask (todo todotype prio name tags cont info)
@@ -3397,6 +3398,16 @@ Used it to write this paper: http://dx.doi.org/10.1119/perc.2016.pr.040
 #+begin_src emacs-lisp
 (setq org-latex-pdf-process '("latexmk -g -recorder -pdf %b"))
 #+end_src
+**** Add command for opening exported pdf in external pdf-viewer
+#+begin_src emacs-lisp
+(with-eval-after-load 'ox-latex
+  (defun aj/latex-export-and-open-externally (a s v b)
+    (if a (org-latex-export-to-pdf t s v b)
+	  (org-open-file (org-latex-export-to-pdf nil s v b) '(16))))
+
+  (push '(?O "As PDF - open externally" aj/latex-export-and-open-externally)
+        (car (last (org-export-backend-menu (org-export-get-backend 'latex))))))
+#+end_src
 
 **** Exporting through AUCTeX
 It has better error messages and better async running of file. I have also used this for putting together files through latex includes and the concept of AUCTeX master files (then you can easily just process a sub-file, or a region, like with org subtree-export).
@@ -3521,8 +3532,16 @@ hacks working for async)"
 
 #+END_SRC
 
-
 **** Beamer
+***** Don’t interfere with ordinary latex export
+#+begin_src emacs-lisp
+(with-eval-after-load 'ox-beamer
+  (let ((bb (org-export-get-backend 'beamer)))
+    (setf (car (org-export-backend-menu bb)) ?b
+          (cadr (org-export-backend-menu bb)) "Export to Beamer")
+    (org-export-register-backend bb)))
+#+end_src
+
 ***** Configuration and class loading my beamer customizations
 #+begin_src emacs-lisp
 (with-eval-after-load "ox-beamer"
