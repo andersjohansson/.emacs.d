@@ -463,8 +463,11 @@ I often open a compose buffer without checking the context. The functions below 
 This is to avoid making mistakes in trying to send the current
 message from the wrong account"
   ;; this may be a too strict check
-  (when (not (string= (message-fetch-field "from")
-                      (mu4e~draft-from-construct)))
+  (when (not
+         (or
+          (null mu4e-contexts)
+          (string= (message-fetch-field "from")
+                   (mu4e~draft-from-construct))))
     (let ((context (mu4e-context-determine nil nil)))
       (cond ((and context
                   (y-or-n-p
