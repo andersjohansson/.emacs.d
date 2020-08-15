@@ -4177,6 +4177,16 @@ https://gitlab.com/andersjohansson/pdf-zotxt-quote
   :custom (pdf-zotxt-quote-fill-column 999999))
 #+END_SRC
 
+**** pdf-view-restore
+Save viewed page, like saveplace
+#+begin_src emacs-lisp
+(use-package pdf-view-restore
+  :after pdf-tools
+  :custom (pdf-view-restore-filename "~/.emacs.data/pdf-view-restore.el")
+  :config
+  (add-hook 'pdf-view-mode-hook 'pdf-view-restore-mode))
+#+end_src
+
 ** Display customizations: theme, modeline, etc.
 *** Variable pitch
 I want to use variable pitch for most things. But changing the default face to a variable pitch font is not a good idea, since so many tabular modes etc. depend on a monospace font. Setting it for ~prog-mode~, ~text-mode~ and in the modeline is good though.
