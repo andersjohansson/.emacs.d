@@ -4197,7 +4197,15 @@ But also with some inspiration from here: https://lepisma.github.io/2017/10/28/r
 (use-package doc-font
   ;; in /lisp
   :straight nil
-  :commands doc-font-mode)
+  :commands doc-font-mode
+  :config
+  (defun aj/doc-font-toggle-org-num ()
+    (when (eq major-mode 'org-mode)
+      (if doc-font-mode
+          (org-num-mode)
+        (org-num-mode -1))))
+  (add-hook 'doc-font-mode-hook
+            #'aj/doc-font-toggle-org-num))
 #+end_src
 
 *** Toggle font size
