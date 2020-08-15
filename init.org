@@ -2115,25 +2115,13 @@ https://github.com/andersjohansson/tex-fold-linebreaks
   ("b" #'nswbuff-switch-to-next-buffer "Next buffer")
   ("q" nil "Quit"))
 #+end_src
-*** Next/previous-buffer
+*** Next/previous-buffer with ~<C-tab>~ and ~<C-S-tab>~ (like switching tabs in firefox ..)
 #+BEGIN_SRC emacs-lisp
 (bind-keys
- ("C-<" . previous-buffer)
- ("C->" . next-buffer))
-
-(defun aj/switch-to-other-buffer ()
-  (interactive)
-  (switch-to-buffer nil)
-  (aj/cycle-buffers/body))
-
-(bind-key "C-x C-b" #'aj/switch-to-other-buffer)
-
-(defhydra aj/cycle-buffers (:color red)
-  "Cycle buffers"
-  ("n" #'next-buffer "Next buffer")
-  ("b" #'previous-buffer "Previous buffer")
-  ("q" nil "Quit"))
+ ("<C-tab>" . previous-buffer)
+ ("<C-iso-lefttab>" . next-buffer)) ;; really C-S-tab ...
 #+END_SRC
+
 *** Eyebrowse :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (use-package eyebrowse
