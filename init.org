@@ -4652,11 +4652,11 @@ Also runs hook aj/face-definitions-hook."
       (set-face-attribute 'org-document-title nil :height 1.5 :weight 'bold)
       ;; ;; (set-face-attribute 'org-meta-line nil :inherit 'org-drawer)
 
-      (set-face-attribute 'org-block-begin-line nil :height 0.9 :extend t)
-      (set-face-attribute 'org-block-end-line nil :height 0.9 :extend t)
-      (set-face-attribute 'org-block nil :extend t)
+      ;; (set-face-attribute 'org-block-begin-line nil :height 0.9 :extend t)
+      ;; (set-face-attribute 'org-block-end-line nil :height 0.9 :extend t)
+      ;; (set-face-attribute 'org-block nil :extend nil)
 
-      (set-face-attribute 'org-quote nil :weight 'light :height 0.95 :inherit 'default)
+      (set-face-attribute 'org-quote nil :weight 'light :height 0.95 :inherit nil)
       (set-face-attribute 'org-verse nil :inherit 'org-table)
 
       ;; ;; (set-face-attribute 'org-special-keyword nil :weight 'normal :inherit 'shadow)
@@ -4732,9 +4732,9 @@ Also runs hook aj/face-definitions-hook."
 **** Modus-operandi theme
 #+begin_src emacs-lisp
 (use-package modus-operandi-theme
-  :custom (modus-operandi-theme-visible-fringes t)
+  :custom (modus-operandi-theme-fringes 'subtle)
   (modus-operandi-theme-subtle-diffs t)
-  (modus-operandi-theme-distinct-org-blocks t)
+  (modus-operandi-theme-org-blocks 'greyscale)
   (modus-operandi-theme-heading-block t)
   :config
   (setq org-fontify-whole-heading-line t))
