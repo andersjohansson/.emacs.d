@@ -365,17 +365,26 @@ all children are done, you can use the following setup:
   (let (org-log-done org-todo-log-states)   ; turn off logging
     (org-todo (cond
                ((= n-not-done 0) "DONE")
-               ((and (< 0 n-done) (< 0 n-not-done)
-                     (member "STARTAD" org-not-done-keywords))
+               ((and (member "VÄNTAR" org-not-done-keywords)
+                     (aj/org-any-todo-state-below "VÄNTAR"))
+                "VÄNTAR")
+               ((and (member "STARTAD" org-not-done-keywords)
+                     (or (and (< 0 n-done) (< 0 n-not-done))
+                         (aj/org-any-todo-state-below "STARTAD")))
                 "STARTAD")
-               ;; I would like to put "STARTAD" if any of the children
-               ;; were in a STARTAD state as well. But that would
-               ;; require iterating through and checking each of the
-               ;; children here, kind of repeating the logic in
-               ;; ‘org-update-parent-todo-statistics’ again
                (t "TODO")))))
 
 (add-hook 'org-after-todo-statistics-hook 'aj/org-summary-todo)
+
+(defun aj/org-any-todo-state-below (state)
+  "Checks if any of our children has the todo state STATE."
+  (catch 'found
+    (org-map-region
+     (lambda ()
+       (when (string= state (org-get-todo-state))
+         (throw 'found t)))
+     (1+ (point-at-eol))
+     (save-excursion (progn (org-end-of-subtree) (point))))))
 #+end_src
 *** Agenda
 **** Extra keybindings for agenda
