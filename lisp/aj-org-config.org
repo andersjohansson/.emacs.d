@@ -4018,7 +4018,18 @@ See discussion here: https://lists.gnu.org/archive/html/emacs-orgmode/2019-01/ms
 ;;             #'aj/org-avoid-hooks-in-fontify-block)
 #+END_SRC
 
-*** Org Bullets
+*** [[https://github.com/integral-dw/org-superstar-mode/][org-superstar]] (successor to org-bullets)
+#+begin_src emacs-lisp
+(use-package org-superstar
+  :hook (org-mode . org-superstar-mode)
+  :custom
+  (org-superstar-headline-bullets-list '(?▌))
+  (org-superstar-prettify-item-bullets nil)
+  ;; when I would like to use plain bullets from time to time:
+  (org-superstar-item-bullet-alist '((?- . ?•) (?+ . ?‣))))
+#+end_src
+
+*** Org Bullets :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package org-bullets
   :hook (org-mode . org-bullets-mode)
