@@ -3066,6 +3066,13 @@ Needed when starting in a non-interactive shell.
 
 ** prog-modes
 
+*** Whitespace-cleanup-mode
+#+begin_src emacs-lisp
+(use-package whitespace-cleanup-mode
+  :demand t
+  :config (global-whitespace-cleanup-mode))
+#+end_src
+
 *** LSP, language server protocol
 This is the new thing, and it is good, because it knows a lot about the code and provides completion etc.
 #+begin_src emacs-lisp
