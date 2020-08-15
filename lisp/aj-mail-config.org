@@ -9,7 +9,6 @@
 #+END_SRC
 
 * mail-config
-
 ** Mu4e should be available
 I install it with emacs, and this should prevent other packages below to install it via straight.
 #+begin_src emacs-lisp
@@ -27,6 +26,7 @@ I use ~msmtp~ together with the queueing script ~msmtpq~ (included with ~msmtp~)
 ;; (require 'auth-source-pass)
 ;; (auth-pass-enable)
 #+END_SRC
+
 ** Display mail queue (from ~msmtpq~) in modeline
 #+begin_src emacs-lisp
 (defvar aj/mail-queue-modeline "")
@@ -42,10 +42,11 @@ I use ~msmtp~ together with the queueing script ~msmtpq~ (included with ~msmtp~)
 
 ;; first run
 (aj/update-mail-queue-modeline t)
-;; update on file chanfges
+;; update on file changes
 (defvar aj/mail-queue-watch
   (file-notify-add-watch "~/.msmtp.queue" '(change) #'aj/update-mail-queue-modeline))
 #+end_src
+
 ** My custom tags
 #+BEGIN_SRC emacs-lisp
 (defvar aj/mail-tags
