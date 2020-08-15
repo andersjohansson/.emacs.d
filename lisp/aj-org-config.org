@@ -518,7 +518,7 @@ Currently I need to sync both with my work exchange server (via davmail) and som
   "Defines function aj/org-calendar-sync-NAME for syncing external calendar.
 
 PROBEFILE is a filename whose last modified time should reflect
-the status of the sync, TIME is the number of after which a new
+the status of the sync, TIME is the number of hours after which a new
 sync is expected, UPDATEFORM is the form to evaluate for
 syncing."
   (declare (indent 1))
@@ -533,7 +533,9 @@ syncing."
 (aj/org-calendar-sync-external-defun "gcal"
   "~/org/imp/G.org" 8 (call-process "aj-gcal-to-org"))
 (aj/org-calendar-sync-external-defun "exchange"
-  "~/org/imp/chalmerskalender.org" 3 (org-caldav-sync))
+  "~/org/imp/chalmerskalender.org" 3 (call-process "aj-sync-exchange-calendar")
+  ;; (org-caldav-sync)
+  )
 
 (defun aj/org-calendar-sync-all (&optional force)
   (interactive "P")
@@ -551,7 +553,7 @@ syncing."
   (bind-key "å" #'aj/org-calendar-sync-all-redo-agenda org-agenda-mode-map))
 #+end_src
 
-***** Syncing with org-caldav
+***** Syncing with org-caldav :ARCHIVE:
 Settings for calendars kept in custom.el
 #+begin_src emacs-lisp
 (use-package org-caldav
