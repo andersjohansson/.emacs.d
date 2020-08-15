@@ -3238,18 +3238,17 @@ Very specific code for replacing certain references that get exported in a forma
                '("ajshort"
                  "\\documentclass[a4paper,12pt]{article}
  \\usepackage[AUTO]{inputenc}
- \\usepackage[T1]{fontenc}
  \\usepackage[british,swedish,AUTO]{babel}
  \\usepackage{etoolbox}
  \\usepackage{longtable}
  \\usepackage{float}
  \\usepackage{wrapfig}
- \\usepackage[normalem]{ulem}
- \\usepackage{amsmath}
- \\usepackage{textcomp}
- \\usepackage{marvosym}
- \\usepackage{wasysym}
- \\usepackage{amssymb}
+ % \\usepackage[normalem]{ulem}
+ % \\usepackage{amsmath}
+ % \\usepackage{textcomp}
+ % \\usepackage{marvosym}
+ % \\usepackage{wasysym}
+ % \\usepackage{amssymb}
  \\usepackage{authoraftertitle} %före title!
  [PACKAGES]
  [EXTRA]
