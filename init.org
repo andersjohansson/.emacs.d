@@ -3414,6 +3414,14 @@ cperl instead of perl-mode
   (setq-default visual-fill-column-width 100)
   (setq split-window-preferred-function #'visual-fill-column-split-window-sensibly)
   (advice-add 'text-scale-increase :after #'visual-fill-column-adjust))
+
+
+;; use indicators, but dim them
+(defface aj/shadow-fringe '((nil (:foreground "#AAAAAA"))) "Face for dim fringe bitmaps")
+
+(set-fringe-bitmap-face 'right-curly-arrow 'aj/shadow-fringe)
+(set-fringe-bitmap-face 'left-curly-arrow 'aj/shadow-fringe)
+(setq visual-line-fringe-indicators '(left-curly-arrow right-curly-arrow))
 #+end_src
 
 **** Define a binding for killing logical line in visual-line-mode, make sure this works also in org-mode, and that org-mode calls org-kill-line even if visual-line-mode is activated

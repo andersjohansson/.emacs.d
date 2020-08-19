@@ -374,11 +374,18 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 (bind-key "C-c C-u" #'aj/mu4e-update-mail-and-index mu4e-headers-mode-map)
 #+END_SRC
 
-** Composing and sending 
+** Composing and sending
+*** Format=flowed, but with long lines
+As most clients (outlook etc.) don’t support format=flowed correctly anyway. Sending as long lines as possible will mostly make it look ok.
+https://vxlabs.com/2019/08/25/format-flowed-with-long-lines/
+#+begin_src emacs-lisp
+(setq mu4e-compose-format-flowed t
+      fill-flowed-encode-column 998)
+#+end_src
+
 *** Some compose settings
 #+BEGIN_SRC emacs-lisp
-(setq mu4e-compose-format-flowed t
-      mail-user-agent 'mu4e-user-agent
+(setq mail-user-agent 'mu4e-user-agent
       mu4e-compose-hidden-headers '("^Face:" "^X-Face:" "^X-Draft-From:" "^User-agent:" "References:"))
 
 ;; in case write is invoked before mu4e is loaded 
@@ -387,6 +394,7 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 ;; (with-eval-after-load "helm-mode"
 ;;   (add-to-list 'helm-mode-no-completion-in-region-in-modes 'mu4e-compose-mode))
 #+END_SRC
+
 *** Make header separator a thin line
 The line ~--text follows this line--~ that separaters headers from the message doesn’t look that nice. We can improve on it! 
 We set the face for it to a thin line with the same background and foreground.
