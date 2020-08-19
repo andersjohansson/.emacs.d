@@ -1132,13 +1132,13 @@ date. The formats used for date and time are
 
 *** Set face of subject field to variable-pitch
 #+BEGIN_SRC emacs-lisp
-(defun aj/mu4e~headers-field-set-subject-face (msg field val _width)
+(defun aj/mu4e-headers-field-set-subject-face (msg field)
   "Set face of VAL to variable-pitch if FIELD is :subject."
   (when (member field '(:thread-subject :subject))
-    (add-face-text-property 0 (length val) '(:inherit variable-pitch) nil val)
-    (mu4e~headers-line-apply-flag-face msg val))
-  val)
-(add-to-list 'mu4e~headers-field-handler-functions #'aj/mu4e~headers-field-set-subject-face t)
+    '(:inherit variable-pitch)))
+
+(setq mu4e-headers-field-properties-function
+      #'aj/mu4e-headers-field-set-subeject-face)
 #+END_SRC
 
 *** Load next 500 messages
