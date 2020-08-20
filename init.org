@@ -4657,6 +4657,11 @@ Also runs hook aj/face-definitions-hook."
 
     (setq goto-address-mail-face 'aj/goto-address-mail-face)
 
+    (with-eval-after-load 'org-indent
+      ;; modus-operandi sets it to inherit fixed-pitch, but that is bad!
+      (set-face-attribute 'org-indent nil :inherit 'org-hide)
+      )
+
     (with-eval-after-load 'org-faces
 
       (set-face-attribute 'org-document-title nil :height 1.5 :weight 'bold)

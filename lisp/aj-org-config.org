@@ -3995,11 +3995,14 @@ and :select-tags in org export."
 
 ** Cosmetics, display, faces
 *** Fix org-indent
-Redefine ~org-indent--compute-prefixes~ for better alignment
+Redefine ~org-indent--compute-prefixes~ for better alignment in ~variable-pitch-mode~
 See discussion here: https://lists.gnu.org/archive/html/emacs-orgmode/2019-01/msg00235.html
+
+With my use of [[*\[\[https://github.com/integral-dw/org-superstar-mode/\]\[org-superstar\]\] (successor to org-bullets)][org-superstar]], the last star is replaced by "▌", so making ~org-indent--text-line-prefixes~, lines like =*****▌ =, will make sure it aligns perfectly.
 #+begin_src emacs-lisp
-(with-eval-after-load "org-indent"
-  (defun org-indent--compute-prefixes ()
+(el-patch-feature org-indent)
+(with-eval-after-load 'org-indent
+  (el-patch-defun org-indent--compute-prefixes ()
     "Compute prefix strings for regular text and headlines."
     (setq org-indent--heading-line-prefixes
 	      (make-vector org-indent--deepest-level nil))
@@ -4028,11 +4031,20 @@ See discussion here: https://lists.gnu.org/archive/html/emacs-orgmode/2019-01/ms
         (aset org-indent--text-line-prefixes
 	          n
 	          (org-add-props
-		          (concat (make-string (+ n indentation) ?*)
-			              (and (> n 0)
-			                   (char-to-string org-indent-boundary-char)))
+                  (el-patch-swap
+                    (concat (make-string (+ n indentation) ?\s)
+			                (and (> n 0)
+			                     (char-to-string org-indent-boundary-char)))
+                    (if (> n 0)
+                        (concat
+                         (make-string (+ n indentation -1) ?*)
+                         "▌"
+                         (char-to-string org-indent-boundary-char))
+                      ""))
 		          nil 'face 'org-indent))))))
+
 #+end_src
+
 *** Fontify src blocks natively
 #+BEGIN_SRC emacs-lisp
 (setq org-src-fontify-natively t)
