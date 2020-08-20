@@ -4751,9 +4751,11 @@ Also runs hook aj/face-definitions-hook."
   (modus-operandi-theme-subtle-diffs t)
   (modus-operandi-theme-org-blocks 'greyscale)
   (modus-operandi-theme-heading-block t)
+  (modus-operandi-theme-completions 'opinionated)
   :config
   (setq org-fontify-whole-heading-line t))
 #+end_src
+
 **** Define themes to use for dark and light and load light theme
 #+BEGIN_SRC emacs-lisp
 (defvar aj/light-theme 'modus-operandi
