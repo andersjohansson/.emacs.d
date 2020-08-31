@@ -20,6 +20,7 @@ I install it with emacs, and this should prevent other packages below to install
 I use ~msmtp~ together with the queueing script ~msmtpq~ (included with ~msmtp~).
 #+BEGIN_SRC emacs-lisp
 (setq message-send-mail-function #'message-send-mail-with-sendmail
+      message-interactive nil ;; because msmtpq is slow with my slow network
       sendmail-program "msmtpq"
       message-sendmail-extra-arguments '("--read-recipients")
       mu4e-action-tags-header "Keywords")
@@ -518,11 +519,7 @@ I want to use a single binding to switch (cycle through) contexts when composing
 
 *** Ask for confirmation before sending mail
 #+BEGIN_SRC emacs-lisp
-(add-hook 'message-send-hook #'aj/confirm-send 90)
-
-(defun aj/confirm-send ()
-  (unless (yes-or-no-p "Sure you want to send this?")
-    (signal 'quit nil)))
+(setq message-confirm-send t)
 #+END_SRC
 
 *** Let flyspell only check relevant regions
