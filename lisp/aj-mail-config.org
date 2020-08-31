@@ -949,9 +949,9 @@ attachment - should launch the no-attachment warning.")
         ((:aj-human-date . 12)
          (:flags . 6)
          (:from-or-to . 22)
-         (:othermaildir . 10)
-         (:mailing-list . 7)
          ;; (:ajtags . 3)
+         (:othermaildir . 5)
+         (:ajlists . 8)
          (:thread-subject))
         nil
         ((:aj-human-date . 12)
@@ -1093,6 +1093,39 @@ date. The formats used for date and time are
               'face (list :foreground (cadr found))))))
 
 #+end_src
+**** Custom field for lists
+#+begin_src emacs-lisp
+(add-to-list 'mu4e-header-info-custom
+             '(:ajlists .
+                        (:name "List"
+                               :shortname "List"
+                               :help "List"
+                               :function aj/mu4e-headers-list)))
+
+(defcustom aj/mu4e-mailing-lists nil
+  "Alist with shortnames of mailing lists based on list address.
+Like ‘mu4e-user-mailing-lists’."
+  :group 'aj
+  :type '(alist :key-type string :value-type string))
+
+(defun aj/mu4e-headers-list (msg)
+  "Show a mailing list"
+  (if-let ((list (mu4e-msg-field msg :mailing-list)))
+      (mu4e~headers-mailing-list list)
+    (mapconcat
+     #'identity
+     (cl-loop for (list . short) in aj/mu4e-mailing-lists
+              when (mu4e-message-contact-field-matches
+                    msg '(:to :from :cc :bcc) list)
+              collect short)
+     ", ")))
+
+
+
+
+#+end_src
+
+
 *** Set face of subject field to variable-pitch
 #+BEGIN_SRC emacs-lisp
 (defun aj/mu4e-headers-field-set-subject-face (msg field)
