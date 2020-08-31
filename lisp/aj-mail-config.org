@@ -4,9 +4,9 @@
 #+TODO: KOLLA TODO | DONE
 
 * Lexical-binding
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 ;; -*- lexical-binding: t -*-
-#+END_SRC
+#+end_src
 
 * mail-config
 ** Mu4e should be available
@@ -18,7 +18,7 @@ I install it with emacs, and this should prevent other packages below to install
 
 ** Basic settings for mailing and auth
 I use ~msmtp~ together with the queueing script ~msmtpq~ (included with ~msmtp~).
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (setq message-send-mail-function #'message-send-mail-with-sendmail
       message-interactive nil ;; because msmtpq is slow with my slow network
       sendmail-program "msmtpq"
@@ -26,7 +26,7 @@ I use ~msmtp~ together with the queueing script ~msmtpq~ (included with ~msmtp~)
       mu4e-action-tags-header "Keywords")
 ;; (require 'auth-source-pass)
 ;; (auth-pass-enable)
-#+END_SRC
+#+end_src
 
 ** Display mail queue (from ~msmtpq~) in modeline
 #+begin_src emacs-lisp
@@ -49,7 +49,7 @@ I use ~msmtp~ together with the queueing script ~msmtpq~ (included with ~msmtp~)
 #+end_src
 
 ** My custom tags :ARCHIVE:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defcustom aj/mail-tags '()
   "Tags I use for emails. Each element is a list with the name
 of the tag, the color, the symbol and (optionally) the default refile
@@ -57,11 +57,11 @@ folder (if this is wrapped as a list it means the starting point
 for refile folder selection)"
   :group aj)
 
-#+END_SRC
+#+end_src
 
 
 ** Symbols
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 ;; (defconst aj/mu4e-symbols-override
 ;;   '((mu4e-headers-draft-mark     . ("D" . "📝")) ;; ✒ ✏
 ;;     (mu4e-headers-flagged-mark   . ("F" . "🏴"))
@@ -95,10 +95,10 @@ for refile folder selection)"
 
 (cl-loop for (var . (letter . symbol)) in aj/mu4e-symbols-override
          do (set var (cons letter (propertize symbol 'face '(:weight normal)))))
-#+END_SRC
+#+end_src
 
 ** Definition of contexts -- private settings
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 ;;(shouldn’t this be a macro)
 (defun aj/construct-match-func (emailregexp)
   "Return a match function which matches :to fields of passed msg
@@ -119,9 +119,9 @@ user choose, starting at that path.")
 
 
 (require 'aj-mail-config-private)
-#+END_SRC
+#+end_src
 ** Basic settings
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (setq mu4e-confirm-quit nil
       mu4e-context-policy 'pick-first
       mu4e-compose-context-policy 'ask-if-none
@@ -134,46 +134,46 @@ user choose, starting at that path.")
                '(mu4e-view-save-attachment-single . helm-read-file-name-handler-1))
   (add-to-list 'helm-completing-read-handlers-alist
                '(mu4e-view-save-attachment-multi . helm-read-file-name-handler-1)))
-#+END_SRC
+#+end_src
 
 ** Add ons
 *** org-mu4e
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (use-package org-mu4e
   :straight nil
   :commands org-mu4e-store-link org-mu4e-open)
-#+END_SRC
+#+end_src
 
 *** mu4e-maildirs-extension :ARCHIVE:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (use-package mu4e-maildirs-extension
   :after mu4e
   :config (setq mu4e-maildirs-extension-use-bookmarks nil
                 mu4e-maildirs-extension-toggle-maildir-key (kbd "TAB"))
   (mu4e-maildirs-extension-load))
-#+END_SRC
+#+end_src
 
 *** helm-mu
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (use-package helm-mu
   :commands (helm-mu helm-mu-contacts)
   :config (require 'mu4e-headers)
   (bind-key "S" #'helm-mu mu4e-main-mode-map))
-#+END_SRC
+#+end_src
 
 *** mu4e-helm-contact
 Insert contacts with helm
 https://gitlab.com/andersjohansson/mu4e-helm-contact
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
   (use-package mu4e-helm-contact
 	:straight nil
 	:load-path "~/kodat/elisp/mu4e-helm-contact"
 	:after mu4e-compose)
-#+END_SRC
+#+end_src
 
 *** mu4e-alert
 Only display unread count in modeline
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (use-package mu4e-alert
   :after mu4e
   :custom (mu4e-alert-set-window-urgency nil)
@@ -222,13 +222,13 @@ Only display unread count in modeline
   ;;                           :on-action 'aj/open-mu4e-unread
   ;;                           :category "mu4e-alert")))
   )
-#+END_SRC
+#+end_src
 
 *** mu4e-query-helper
 Some completion for searching.
 Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
   (use-package mu4e-query-helper
 	:straight nil
 	:load-path "~/kodat/elisp/mu4e-query-helper/"
@@ -236,7 +236,7 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 	:bind (:map mu4e-headers-mode-map
 		   ("s" . mu4e-query-helper-search)
 		   ("S" . mu4e-query-helper-search-edit)))
-#+END_SRC
+#+end_src
 
 ** Contact handling
 *** LDAP (EUDC)
@@ -306,16 +306,16 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 #+end_src
 
 ** View mode settings
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (add-hook 'mu4e-view-mode-hook #'visual-line-mode)
 (add-hook 'mu4e-view-mode-hook #'variable-pitch-mode)
 (require 'mu4e-contrib)
 ;; (add-to-list 'mu4e-view-actions '("Webkit-widget" . mu4e-action-view-with-xwidget))
 (setq mu4e-html2text-command 'mu4e-shr2text)
-#+END_SRC
+#+end_src
 
 ** Command for quick check of new mails
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 ;;(defvar aj/mu4e-get-mail-command-quick "mbsync --new -qq uu-inbox gmail-inbox ajf-inbox")
 (defvar aj/mu4e-get-mail-command-quick "aj-mailsync-quick")
 
@@ -327,7 +327,7 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
       (mu4e-update-mail-and-index t))))
 
 (bind-key "C-c C-u" #'aj/mu4e-update-mail-and-index mu4e-headers-mode-map)
-#+END_SRC
+#+end_src
 
 ** Composing and sending
 *** Format=flowed, but with long lines
@@ -339,7 +339,7 @@ https://vxlabs.com/2019/08/25/format-flowed-with-long-lines/
 #+end_src
 
 *** Some compose settings
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (setq mail-user-agent 'mu4e-user-agent
       mu4e-compose-hidden-headers '("^Face:" "^X-Face:" "^X-Draft-From:" "^User-agent:" "References:"))
 
@@ -348,7 +348,7 @@ https://vxlabs.com/2019/08/25/format-flowed-with-long-lines/
 
 ;; (with-eval-after-load "helm-mode"
 ;;   (add-to-list 'helm-mode-no-completion-in-region-in-modes 'mu4e-compose-mode))
-#+END_SRC
+#+end_src
 
 *** Make header separator a thin line
 The line ~--text follows this line--~ that separaters headers from the message doesn’t look that nice. We can improve on it! 
@@ -400,7 +400,7 @@ separator is never written to the message file. Also see
 
 *** Allow and handle context change while composing
 I often open a compose buffer without checking the context. The functions below make sure that switching context in a compose buffer works as expected. A function to switch address and signature when switching context is defined. However, several compose buffers may be open at once, and this will only switch for the current buffer (which I believe is the most reasonable behaviour). To ensure that we don’t attempt to send a message with the wrong context active, a function to check if the context matches with the from address is added to ~message-send-hook~.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/mu4e-compose-context-switch (&rest _ignore)
   "When switching context in a compose buffer, switch “from” and signature."
   (when (eq major-mode 'mu4e-compose-mode)
@@ -447,13 +447,13 @@ message from the wrong account"
             (t (signal 'quit nil))))))
 
 (add-hook 'message-send-hook #'aj/message-send-check-context)
-#+END_SRC
+#+end_src
 
 *** Signature cycling
 I have long and "official" signatures defined for my accounts, but often I want to just include my name, or nothing at all. This function allows me to cycle through the signature set in the context (variable ~message-context~), a list of shorter ones, and localized signatures when writing in different languages (English and Swedish really). 
 
 Also commented below a function for switching signature language automatically with guess-language. I found it too unpredictable however (for example when replying in a different language) and just switching manually gives more control.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defvar aj/message-simple-signatures '("Anders Johansson\n" ""))
 (defvar aj/mu4e-compose-localized-signatures nil
   "Alist of language and signature")
@@ -495,11 +495,11 @@ Also commented below a function for switching signature language automatically w
 ;;   (when (eq major-mode 'mu4e-compose-mode)
 ;;     (aj/message-change-signature
 ;;      (alist-get lang aj/mu4e-compose-localized-signatures))))
-#+END_SRC
+#+end_src
 
 *** Context cycling
 I want to use a single binding to switch (cycle through) contexts when composing.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/mu4e-cycle-contexts ()
   "Cycle through `mu4e-contexts'."
   (interactive)
@@ -515,19 +515,19 @@ I want to use a single binding to switch (cycle through) contexts when composing
                             names)))))
 
 (bind-key "C-c C-i" #'aj/mu4e-cycle-contexts mu4e-compose-mode-map)
-#+END_SRC
+#+end_src
 
 *** Ask for confirmation before sending mail
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (setq message-confirm-send t)
-#+END_SRC
+#+end_src
 
 *** Let flyspell only check relevant regions
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (put 'mu4e-compose-mode 'flyspell-mode-predicate #'mail-mode-flyspell-verify)
-#+END_SRC
+#+end_src
 **** Home grown  :ARCHIVE:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/mu4e-compose-flyspell-ignore ()
   "Function used for `flyspell-generic-check-word-predicate' to ignore headers in message-mode"
   (or (and (message-in-body-p) (not (aj/message-in-signature-p)))
@@ -543,9 +543,9 @@ I want to use a single binding to switch (cycle through) contexts when composing
       (re-search-backward message-signature-separator nil t))))
 
 (put 'mu4e-compose-mode 'flyspell-mode-predicate #'aj/mu4e-compose-flyspell-ignore)
-#+END_SRC
+#+end_src
 *** Identity switching in compose buffer :ARCHIVE:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (bind-keys
  :map mu4e-compose-mode-map
  ("C-c C-i" . aj/message-switch-uu-identity)
@@ -570,12 +570,12 @@ I want to use a single binding to switch (cycle through) contexts when composing
       (aj/message-change-from (message-make-from))
       (aj/message-remove-signature)
       (message-insert-signature))))
-#+END_SRC
+#+end_src
 *** Automatically refile message efter reply or forward :ARCHIVE:
 When I have acted upon a message I refile it from the inbox. Replying or forwarding almost certainly means I want to do this.
 
 I have never gotten this to work though.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 ;; (defvar aj/mu4e-rep-msg-tmp nil)
 ;; (defun aj/mu4e~compose-set-parent-flag (path)
 ;;  "Also refile the replied message to archive"
@@ -655,10 +655,10 @@ I have never gotten this to work though.
 ;;  (setq aj/mu4e-rep-msg-tmp nil))
 ;; (advice-add 'mu4e~compose-set-parent-flag :override #'aj/mu4e~compose-set-parent-flag)
 
-#+END_SRC
+#+end_src
 
 *** Yank adressess
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/message-yank-adressess ()
   (interactive)
   (let* ((ck (current-kill 0))
@@ -668,16 +668,16 @@ I have never gotten this to work though.
       (insert-for-yank ck))))
 
 (bind-key "C-c M-y" #'aj/message-yank-adressess mu4e-compose-mode-map)
-#+END_SRC
+#+end_src
 
 *** Don’t return to mu4e buffers when mail has been sent
 I often invoke a compose buffer in a window where I’m doing something else, and when mu4e then wants to helpfully switch back to the headers buffer or something, my window config gets messed up. This is better.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (advice-add 'mu4e~switch-back-to-mu4e-buffer :override #'ignore)
-#+END_SRC
+#+end_src
 
 *** Customize cite string
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 ;; TODO, anropet till message-cite-original i mu4e-draft (vilken
 ;; funktion?) är ju helt verkningslöst då message-reply-buffer verkar
 ;; vara odefinierad (iaf vid forward). Kolla närmare
@@ -703,12 +703,12 @@ I often invoke a compose buffer in a window where I’m doing something else, an
                 "%a %-e %b %Y %R, skrev %f:\n"
               message-citation-line-format))) 
       (apply #'message-insert-formatted-citation-line args))))
-#+END_SRC
+#+end_src
 
 *** Attachments
 **** Put attachments at end of buffer 
 From: http://mbork.pl/2015-11-28_Fixing_mml-attach-file_using_advice
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/mml-attach-file--go-to-eob (orig-fun &rest args)
   "Go to the end of buffer before attaching files."
   (save-excursion
@@ -719,7 +719,7 @@ From: http://mbork.pl/2015-11-28_Fixing_mml-attach-file_using_advice
       (apply orig-fun args))))
 
 (advice-add 'mml-attach-file :around #'aj/mml-attach-file--go-to-eob)
-#+END_SRC
+#+end_src
 
 **** Use custom command to invert prefix argument logic of ~mml-attach-file~
 #+begin_src emacs-lisp
@@ -732,7 +732,7 @@ From: http://mbork.pl/2015-11-28_Fixing_mml-attach-file_using_advice
 #+end_src
 
 **** Attach with dired
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load "dired"
   (require 'gnus-dired)
   ;; make the `gnus-dired-mail-buffers' function also work on
@@ -751,10 +751,10 @@ From: http://mbork.pl/2015-11-28_Fixing_mml-attach-file_using_advice
 
   (setq gnus-dired-mail-mode 'mu4e-user-agent)
   (add-hook 'dired-mode-hook 'turn-on-gnus-dired-mode))
-#+END_SRC
+#+end_src
 
 **** Attach via dropbox-link
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/copy-to-dropbox-return-link (file)
   "Copies a file to public dropbox folder and returns public url"
   (let ((newfile (expand-file-name (file-name-nondirectory file) "~/Dropbox/delning-publikt")))
@@ -779,7 +779,7 @@ Non-interactive use returns link"
   (interactive)
   (let ((file (mml-minibuffer-read-file "Dropbox link file: ")))
     (insert (aj/copy-to-dropbox-return-link file))))
-#+END_SRC
+#+end_src
 
 **** Add a recipient filename to attachment at point
 #+begin_src emacs-lisp
@@ -846,7 +846,7 @@ attachment - should launch the no-attachment warning.")
 #+end_src
 
 **** Detach attachments :ARCHIVE:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 ;;TODO, fixa! (kolla på mm- funktionerna (mime-biblioteket))
 ;; (defun aj/mu4e-remove-attachment (msg num)
 ;;   "Remove attachment."
@@ -898,11 +898,11 @@ attachment - should launch the no-attachment warning.")
         (mu4e~proc-extract
          'save (mu4e-message-field msg :docid)
          index mu4e-decryption-policy fpath)))))
-#+END_SRC
+#+end_src
 
 
 *** Mail templates :ARCHIVE:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defcustom aj/mu4e-templates-dir "~/.emacs.d/mu4e-templates"
   "Directory for mail templates"
   :type 'directory
@@ -921,7 +921,7 @@ attachment - should launch the no-attachment warning.")
   (insert (format (aj/read-string-from-file
                    (expand-file-name "weekly-report.eml"  aj/mu4e-templates-dir))
                   (aj/weekly-report-copy-link))))
-#+END_SRC
+#+end_src
 
 ** Headers settings
 
@@ -935,7 +935,7 @@ attachment - should launch the no-attachment warning.")
 #+end_src
 *** Headers fields
 **** Set headers fields to view depending on what maildir is viewed
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (setq aj/mu4e-headers-fields
       '(:gmail
         ((:aj-human-date . 12)
@@ -993,10 +993,10 @@ attachment - should launch the no-attachment warning.")
       mu4e-headers-include-related nil
       mu4e-headers-visible-columns nil)
 
-#+END_SRC
+#+end_src
 
 **** My custom headers fields
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (add-to-list 'mu4e-header-info-custom
              '(:gmailtags .
                           (:name "Labels"
@@ -1070,7 +1070,7 @@ date. The formats used for date and time are
           (format-time-string "%a  %H:%M" date))
          
          (t (format-time-string "%x" date)))))))
-#+END_SRC
+#+end_src
 
 **** Custom header, tags :ARCHIVE:
 #+begin_src emacs-lisp
@@ -1146,7 +1146,7 @@ Like ‘mu4e-user-mailing-lists’."
 
 
 *** Set face of subject field to variable-pitch
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/mu4e-headers-field-set-subject-face (msg field)
   "Set face of VAL to variable-pitch if FIELD is :subject."
   (when (member field '(:thread-subject :subject))
@@ -1154,10 +1154,10 @@ Like ‘mu4e-user-mailing-lists’."
 
 (setq mu4e-headers-field-properties-function
       #'aj/mu4e-headers-field-set-subeject-face)
-#+END_SRC
+#+end_src
 
 *** Load next 500 messages
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defvar aj/mu-page 1)
 
 (defun aj/mu-reset-page (&rest _r)
@@ -1188,13 +1188,13 @@ Like ‘mu4e-user-mailing-lists’."
             ;;(mu4e~headers-search-execute expr ignore-history)
             ;; (run-hook-with-args 'mu4e-headers-search-hook expr)
             ))))))
-#+END_SRC
+#+end_src
 
 ** Dynamic folders for refile etc. + special functions for gmail-relabeling
 One could think that it would be reasonable to put this in the contexts, but no, these settings are mostly per message, and is therefore better dynamically matched on the current message.
 
 The most complex part is for choosing refile folders, depending on account and special functions in ~aj/mu4e-refile-fns~.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 ;; Utility function
 ;; In its current form kind of repetitive. But I could want special
 ;; conditions, so I will not abstract it more now.
@@ -1329,12 +1329,12 @@ messages “refiled” in gmail accounts from the inbox listing."
     :ajf (mu4e-action-retag-message msg "-\\Inbox,-\\Starred,-\\Important"))
   
   (mu4e~proc-move docid (mu4e~mark-check-target target) "+T+S-N"))
-#+END_SRC
+#+end_src
 
 ** Marks
 *** Custom marks
 **** Add tag
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/mu4e-choose-tag ()
   (let* ((face (lambda (tag)
                  (cons (propertize (concat (nth 2 tag) " " (car tag)) 'face `(:foreground ,(cadr tag)))
@@ -1356,11 +1356,11 @@ messages “refiled” in gmail accounts from the inbox listing."
 (define-key 'mu4e-headers-mode-map (kbd "ö") 'mu4e-headers-mark-for-tag)
 (mu4e~view-defun-mark-for tag)
 (define-key 'mu4e-view-mode-map (kbd "C-ö") 'mu4e-headers-mark-for-tag)
-#+END_SRC
+#+end_src
 
 **** Refile + mark as read
 At times, I can safely refile messages without reading them and at the same time marking them read.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (add-to-list 'mu4e-marks
              '(refile-read
                :char ("f" . "⧐")
@@ -1380,11 +1380,11 @@ At times, I can safely refile messages without reading them and at the same time
 
 (mu4e~headers-defun-mark-for refile-read)
 (define-key 'mu4e-headers-mode-map "ä" 'mu4e-headers-mark-for-refile-read)
-#+END_SRC
+#+end_src
 
 
 *** Mark all duplicates in current view for deletion
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/mu-mark-duplicates-for-deletion ()
   (interactive)
   (mu4e-headers-mark-for-each-if
@@ -1400,12 +1400,12 @@ At times, I can safely refile messages without reading them and at the same time
 ;;         (mu4e-headers-skip-duplicates nil)
 ;;         (mu4e-headers-found-hook '(aj/mu-mark-duplicates-for-deletion)))
 ;;     (mu4e-headers-search "maildir:/uu/* date:20171001..now ")))
-#+END_SRC
+#+end_src
 
 *** COMMENT Directly applied marks :ARCHIVE:
 Here I define my own variant of ~mu4e~headers-defun-mark-for~ which defines functions taking a prefix argument to optionally execute the mark immediately.
 Some of the functions are redefined.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defmacro aj/mu4e~headers-defun-mark-for (mark)
   "Define a function mu4e~headers-mark-MARK, which takes a prefix argument to execute the mark immediately."
   (let ((funcname (intern (format "mu4e-headers-mark-for-%s" mark)))
@@ -1436,11 +1436,11 @@ Some of the functions are redefined.
 ;;  (aj/mu4e~headers-defun-mark-for untrash)
 (aj/mu4e~headers-defun-mark-for unread)
 ;;  (aj/mu4e~headers-defun-mark-for action)
-#+END_SRC
+#+end_src
 
 
 ** Actions for toggling tags :ARCHIVE:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defvar aj/mu4e-tagchange-history nil)
 (defun aj/mu4e-change-tags ()
   "Add or remove tags for current message"
@@ -1473,7 +1473,7 @@ Some of the functions are redefined.
                 mu4e-headers-mode-map))))
 
 (aj/mu4e-defun-toggle-tags aj/mail-tags)
-#+END_SRC
+#+end_src
 
 ** Action for View in external browser
 #+begin_src emacs-lisp
@@ -1494,13 +1494,13 @@ Some of the functions are redefined.
     c))
 #+end_src
 * Provide statement
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (provide 'aj-mail-config)
 
 ;; Local Variables:
 ;; byte-compile-warnings: '(not free-vars)
 ;; End:
-#+END_SRC
+#+end_src
 
 * Local Variables :ARCHIVE:
 

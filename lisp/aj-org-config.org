@@ -4,9 +4,9 @@
 #+TODO: CHECK TODO | DONE
 
 * Lexical-binding
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 ;; -*- lexical-binding: t -*-
-#+END_SRC
+#+end_src
 
 * Org-config
 ** Customize some variables :org_async:
@@ -48,7 +48,7 @@
  org-startup-indented t
  org-indent-indentation-per-level 2
  org-url-hexify-p nil)
-#+END_SRC
+#+end_src
 ** MobileOrg
 #+begin_src emacs-lisp
 (setq org-mobile-files (list org-directory)
@@ -57,14 +57,14 @@
       org-mobile-directory "~/Dropbox/Apps/MobileOrg")
 #+end_src
 ** Save org-files every hour
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 ;; (run-at-time "00:59" 3600 'org-save-all-org-buffers)
-#+END_SRC
+#+end_src
 ** Cosmetics, early definitions
 *** Prettify-symbols replacements
 **** Use prettify-symbols
 Define a variable where symbols can be added for use later and enable prettify-symbols-mode for org
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defvar aj/org-prettify-symbols nil)
 
 (defun aj/org-enable-prettify ()
@@ -92,7 +92,7 @@ for more information."
          ,alist))
 
 
-#+END_SRC
+#+end_src
 **** Prettify quote-blocks
 #+begin_src emacs-lisp
 ;; (aj/add-visual-replacement "#+BEGIN_QUOTE" "▄▁▁▁▁▁▁▁▁▁▁▁▁▁▁" aj/org-prettify-symbols)
@@ -109,11 +109,11 @@ for more information."
 
 #+end_src
 **** Prettify dashes
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (dolist (kw '(("--" . ?–)
               ("---" . ?—)))
   (add-to-list 'aj/org-prettify-symbols kw))
-#+END_SRC
+#+end_src
 
 ** Keybindings and templates
 *** Special C-a, C-e
@@ -132,35 +132,35 @@ for more information."
 *** Disable some disturbing keybindings
 Disable keys for org-cycle-agenda-files, org-agenda-file-to-front etc.
 I never use this.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (define-key org-mode-map [(control ?,)] nil)
 (define-key org-mode-map [(control ?\')] nil)
 (define-key org-mode-map "\C-c[" nil)
 (define-key org-mode-map "\C-c]" nil)
-#+END_SRC
+#+end_src
 *** Speed commands on all stars
 *** Speed command for "DONE"
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (add-to-list 'org-speed-commands-user
              '("T" . aj/org-done))
 
 (defun aj/org-done ()
   (interactive)
   (org-todo 'done))
-#+END_SRC
+#+end_src
 *** Add extra wrappers for smartparens
 By default, ~smartparens-org~ defines wrappers for all the emphasize characters except ~+~.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load 'smartparens-org
   (sp-local-pair 'org-mode "\\(" "\\)" :trigger "$$")
   ;; (sp-local-pair 'org-mode  "+" "+" :unless
   ;;                '(sp-point-after-word-p) :post-handlers '(("[d1]" "SPC")))
   )
-#+END_SRC
+#+end_src
 
 *** Hydra for emphasize functions
 An alternative to the smartparens solution.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defhydra hydra-org-emphasize (:color pink)
   "
 Org emphasize: _b_old  _i_talic _u_nderline _c_ode _v_erbatim _s_trikethrough  _d_elete [_?_] _q_uit"
@@ -200,7 +200,7 @@ Org emphasize: _b_old  _i_talic _u_nderline _c_ode _v_erbatim _s_trikethrough  _
                    (backward-char))
           (er/expand-region 1)
           (sp-wrap-with-pair wrap))))))
-#+END_SRC
+#+end_src
 *** Template inserting (hydra)
 If before headline, insert options template with completion.
 
@@ -267,22 +267,22 @@ Otherwise hydra for template insertion.
 #+end_src
 
 *** Speed commands at more places?
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-speed-command-here-p ()
   (and (looking-at org-outline-regexp) (looking-back "^\**" (point-at-bol))))
 
 (setq org-use-speed-commands
       #'aj/org-speed-command-here-p)
-#+END_SRC
+#+end_src
 *** Extra bindings
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (bind-keys :map org-mode-map
            ("C-c S-C-l" . org-store-link))
 
 
-#+END_SRC
+#+end_src
 *** Hydra for some not bound commands :ARCHIVE:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defhydra hydra-org-commands (:color blue)
   "Org commands"
   ("s" (org-store-link) "store-link")
@@ -291,11 +291,11 @@ Otherwise hydra for template insertion.
 (bind-keys :map org-mode-map
            ("C-c C-h" . hydra-org-commands/body)
            ("C-c h" . hydra-org-commands/body))
-#+END_SRC
+#+end_src
 ** Agenda, todo, scheduling etc.
 *** Todo stuff
 **** Todo keywords, Todo states
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defface aj/org-waiting '((t :inherit all-the-icons-yellow :bold t)) "Face for waiting org-state" :group 'org-faces)
 (defface aj/org-started '((t :inherit all-the-icons-blue :bold t :underline nil)) "Face for started org-state" :group 'org-faces)
 (defface aj/org-todo '((t :inherit 'all-the-icons-red :bold t)) "Face for todo org-state" :group 'org-faces)
@@ -317,10 +317,10 @@ Otherwise hydra for template insertion.
               ("VÄNTAR" . ?⌛)
               ("AVFÖRD" . ?✘)))
   (add-to-list 'aj/org-prettify-symbols kw))
-#+END_SRC
+#+end_src
 **** Todo tree
 I often find it useful to copy in a tree from somewhere (for instance reviewer comments on a scientific paper) and make every heading a TODO. This makes it easy!
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defvar aj/org-todo-tree-maxlevel 100)
 
 (defun aj/org-todo-tree (&optional maxlevel)
@@ -355,7 +355,7 @@ A numeric prefix determines the depth where TODO states are created."
         (insert " [/]")
         (org-update-statistics-cookies nil)))
     (goto-char (point-at-bol))))
-#+END_SRC
+#+end_src
 **** Hierarchical TODO automatization
 If you would like a TODO entry to automatically change to DONE when
 all children are done, you can use the following setup:
@@ -388,7 +388,7 @@ all children are done, you can use the following setup:
 #+end_src
 *** Agenda
 **** Extra keybindings for agenda
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load 'org-agenda
   (bind-keys :map
              org-agenda-mode-map
@@ -396,7 +396,7 @@ all children are done, you can use the following setup:
              ("D" . aj/org-agenda-todo-to-done)
              ("C-z" . org-agenda-undo))
   (defun aj/org-agenda-todo-to-done () (interactive) (org-agenda-todo 'done)))
-#+END_SRC
+#+end_src
 **** Agenda configuration variables
 #+begin_src emacs-lisp
 (setq org-log-into-drawer t
@@ -423,14 +423,14 @@ all children are done, you can use the following setup:
 ;; change agenda prefix format, add effort, wider categories
 (with-eval-after-load 'org-agenda
   (setf (alist-get 'agenda org-agenda-prefix-format) " %i %-10c%?-12t% s%-4e"))
-#+END_SRC
+#+end_src
 **** Hl-line-mode in agenda
 #+begin_src emacs-lisp
 (add-hook 'org-agenda-mode-hook #'hl-line-mode)
 #+end_src
 
 **** Agenda custom commands
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (setq org-agenda-custom-commands
       '(("n" "Agenda and all TODO's"
          ((agenda "")
@@ -478,7 +478,7 @@ all children are done, you can use the following setup:
         ;; everything ok. skip to next heading of same level.
         (if (number-or-marker-p npos) (1- npos) (aj/org-return-next-hp))
       nil)))
-#+END_SRC
+#+end_src
 
 **** Agenda categories icons :ARCHIVE:
 I don’t use this now, can just put UTF-8, emojis and whatever in category names. Works well
@@ -568,7 +568,7 @@ Downloads and converts ics-files from google calendar (where I keep my appointme
 *** Refile, and agenda refile settings
 I want to be able to refile to all other agenda files, excluding files imported from google calendar (under "imp/" subdirectory).
 In addition, eligible trees should not include TODO entries without subtasks.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 ;; default targets: this file + agenda files
 (setq org-refile-targets
       '((nil . (:maxlevel . 4))
@@ -609,7 +609,7 @@ In addition, eligible trees should not include TODO entries without subtasks.
         (member arg '(aj/org-entry-is-not-todo-done-p
                       aj/org-entry-is-not-single-todo-done-p))))
 
-#+END_SRC
+#+end_src
 **** Agenda evaluation :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package aj-org-agendautv
@@ -620,7 +620,7 @@ In addition, eligible trees should not include TODO entries without subtasks.
 *** Times and clocking
 **** Enable Swedish for parsing of names of weekdays and months
 The date input prompt uses functionality from ~parse-time~. I want it to be able to guess from Swedish names for months and weekdays as well as English. This just means adding a few elements to the relevant lists (some of the names or abbreviations are identical in English and Swedish, e.g. "April").
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load "parse-time"
   (setq parse-time-months
         '(("jan" . 1) ("feb" . 2) ("mar" . 3) ("apr" . 4) ("may" . 5) ("jun" . 6)
@@ -638,10 +638,10 @@ The date input prompt uses functionality from ~parse-time~. I want it to be able
           ("sön" . 0) ("mån" . 1) ("tis" . 2) ("ons" . 3) ("tor" . 4) ("fre" . 5)
           ("lör" . 6) ("söndag" . 0) ("måndag" . 1) ("tisdag" . 2) ("onsdag" . 3)
           ("torsdag" . 4) ("fredag" . 5) ("lördag" . 6))))
-#+END_SRC
+#+end_src
 
 **** Calendar view, show iso-week (we often use week numbers in Sweden)
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (copy-face font-lock-constant-face 'calendar-iso-week-face)
 (set-face-attribute 'calendar-iso-week-face nil
                     :height .7)
@@ -660,9 +660,9 @@ The date input prompt uses functionality from ~parse-time~. I want it to be able
 ;; (setq calendar-intermonth-header
 ;;       (propertize "Wk" ; or e.g. "KW" in Germany
 ;;                   'font-lock-face 'calendar-iso-week-header-face))
-#+END_SRC
+#+end_src
 **** Auto deadline
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-add-auto-deadline (force)
   "Inserts deadline based on scheduled time and effort."
   (interactive "P")
@@ -680,7 +680,7 @@ The date input prompt uses functionality from ~parse-time~. I want it to be able
        (concat "++" eff)))))
 
 (bind-key "C-c C-x C-d" #'aj/org-add-auto-deadline org-mode-map)
-#+END_SRC
+#+end_src
 
 
 **** Clocking
@@ -697,7 +697,7 @@ The date input prompt uses functionality from ~parse-time~. I want it to be able
 
 ;; don’t want unsafe variable complaints about this
 (put 'org-clock-in-switch-to-state 'safe-local-variable 'stringp)
-#+END_SRC
+#+end_src
 
 ***** Only clock in items in a TODO state.
 Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we can throw ~abort~, to abort the clock-in.
@@ -711,7 +711,7 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
 #+end_src
 
 ***** org-pomodoro
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (use-package org-pomodoro
   :init (let ((samesound
                "/usr/share/sounds/freedesktop/stereo/complete.oga"))
@@ -733,7 +733,7 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
 #+end_src
 
 **** Clocksum variables, duration units, effort global properties
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load 'org-duration
   (setq org-duration-units
         `(("min" . 1)
@@ -754,10 +754,10 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
 (add-to-list
  'org-global-properties
  '("Effort_ALL" . "0:15 1p 2p 3p 4p 1h 2h 3h 4h 6h 1d 2d 3d 4d 1w 2w 3w :ETC"))
-#+END_SRC
+#+end_src
 
 **** Org clock with helm
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (advice-add 'org-clock-select-task :override #'aj/helm-org-clock-select-task)
 
 (defun aj/helm-org-clock-select-task (&optional _prompt)
@@ -809,7 +809,7 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
       (goto-char (point-min))
       (cons (buffer-substring 4 (point-at-eol)) (cdr cm)))))
 
-#+END_SRC
+#+end_src
 
 ** org-id, add id's in this file! And for all org files in a directory.
 #+begin_src emacs-lisp
@@ -830,7 +830,7 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
 ** Visibility, folding, display etc.
 *** Make visibility property "folded" behave as if subtree was archived, i.e. always hidden after visibility cycling
 This is based on ~org-cycle-hide-archived-trees~.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (add-hook 'org-cycle-hook #'aj/org-cycle-hide-folded-trees)
 
 (defun aj/org-cycle-hide-folded-trees (state)
@@ -859,12 +859,12 @@ STATE should be one of the symbols listed in the docstring of
      (beginning-of-line) ; Include headline point is currently on.
      (while (and (< (point) end) (search-forward re end t))
        (org-set-visibility-according-to-property)))))
-#+END_SRC
+#+end_src
 
 *** Read-only-trees
 Trees can be defined as read only with tag ~read_only~
 From: http://kitchingroup.cheme.cmu.edu/blog/2014/09/13/Make-some-org-sections-read-only/
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defface aj/org-readonly-face '((t . (:inherit fringe)))
   "Face for read-only-sections"
   :group 'aj)
@@ -899,11 +899,11 @@ From: http://kitchingroup.cheme.cmu.edu/blog/2014/09/13/Make-some-org-sections-r
 (advice-add 'org-set-tags-command :after #'aj/org-mark-readonly)
 (advice-add 'orgqda-helm-tags-set-tags :before #'aj/org-remove-readonly)
 (advice-add 'orgqda-helm-tags-set-tags :after #'aj/org-mark-readonly)
-#+END_SRC
+#+end_src
 
 *** Version of ~org-tree-to-indirect-buffer~ that works as I want it to
 That is, always create a new buffer. (Is there anything more changed?)
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-tree-to-indirect-buffer ()
   "My own simple version of `org-tree-to-indirect-buffer'"
   (interactive)
@@ -928,7 +928,7 @@ That is, always create a new buffer. (Is there anything more changed?)
     (and (window-live-p cwin) (select-window cwin))))
 
 (bind-key "C-c C-x b" #'aj/org-tree-to-indirect-buffer org-mode-map)
-#+END_SRC
+#+end_src
 
 ** COMMENT Linking, link-types
 *** COMMENT org-pdfview
@@ -958,7 +958,7 @@ That is, always create a new buffer. (Is there anything more changed?)
 
 #+end_src
 ** org-download
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (use-package org-download
   :init (org-download-enable)
   :commands (org-download-enable)
@@ -967,9 +967,9 @@ That is, always create a new buffer. (Is there anything more changed?)
   (setq-default org-download-heading-lvl nil
                 org-download-image-dir "./bilder"))
 
-#+END_SRC
+#+end_src
 ** File-associations, opening links externally :org_async:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (add-to-list 'org-file-apps '("\\.pdf\\'" . emacs)) ; open pdfs in emacs
 ;;use xdg-open instead of mailcap
 ;; this won’t work in a real console, but I won’t open files from org in a real console
@@ -985,11 +985,11 @@ That is, always create a new buffer. (Is there anything more changed?)
 (defun aj/org-open-file-with-system (path)
   (org-open-file path 'system))
 
-#+END_SRC
+#+end_src
 
 ** Local variables headings
 A local variables comment block that is placed at the end of the file may be lost or moved if the last subtree (under which it is viewed as being filed) is removed or moved. We don’t want that! Instead, automatically place local variables under their own top-level heading. By default I put the ~ARCHIVE~ tag on this heading, to hide it away a bit and avoid exporting it.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-insert-local-variable-heading (&rest _args)
   "Insert a heading under which local variables can be stored, if not already present"
   (when (eq major-mode 'org-mode)
@@ -1007,7 +1007,7 @@ A local variables comment block that is placed at the end of the file may be los
           (insert "\n* Local Variables :ARCHIVE:\n"))))))
 
 (advice-add 'add-file-local-variable :before #'aj/org-insert-local-variable-heading)
-#+END_SRC
+#+end_src
 
 ** COMMENT org-db
 #+begin_src emacs-lisp
@@ -1048,7 +1048,7 @@ A local variables comment block that is placed at the end of the file may be los
 
 ** Navigation etc. (helm-org)
 *** helm-org
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (use-package helm-org
   :custom (helm-org-format-outline-path t)
   :commands helm-org-goto-marker
@@ -1093,14 +1093,14 @@ Uses CUSTOM_ID or `org-store-link' for linking."
   (defun aj/helm-org--open-heading-in-indirect-buffer (marker)
     (save-excursion (helm-org-goto-marker marker)
                     (aj/org-tree-to-indirect-buffer))))
-#+END_SRC
+#+end_src
 
 *** Redefine ~helm-org--get-candidates-in-file~
 Use ~org-scan-tags~ to get some exclusion tools. Note that also ~org-agenda-skip-archived-trees~, ~org-agenda-skip-comment~, and ~org-agenda-skip-function~ can be let-bound to have effects here.
 
 Should check if it’s less efficient doing this than the homegrown mapping in helm-org. Right now it actually feels snappier, maybe because it excludes unneeded headings.
 
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defvar aj/helm-org-candidates-matcher t)
 (defvar aj/helm-org-candidates-todo-only nil)
 
@@ -1218,10 +1218,10 @@ Should check if it’s less efficient doing this than the homegrown mapping in h
 ;;                                 'helm-realvalue
 ;;                                 (set-marker (make-marker) (point-at-eol)))))))
 ;;                        matcher aj/helm-org-candidates-todo-only))))))))))))
-#+END_SRC
+#+end_src
 
 **** Some tests for this  :ARCHIVE:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/measure-helm-org-cands (times name)
   "Measure the time it takes to evaluate BODY."
   (let ((time (current-time)))
@@ -1243,21 +1243,21 @@ Should check if it’s less efficient doing this than the homegrown mapping in h
     (let ((org-agenda-skip-archived-trees nil) (org-agenda-skip-comment-trees nil))
       (push (aj/measure-helm-org-cands times "New with archived etc.") listan))
     (message (mapconcat #'identity listan "\n"))))
-#+END_SRC
+#+end_src
 
 *** Redefine ~helm-org-in-buffer-preselect~
 This works better for my purposes.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/helm-org-in-buffer-preselect ()
   (condition-case nil
       (concat (org-get-heading t t t t) "$")
     (error nil)))
 
 (advice-add 'helm-org-in-buffer-preselect :override #'aj/helm-org-in-buffer-preselect)
-#+END_SRC
+#+end_src
 *** helm-org-rifle
 Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entries.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (use-package helm-org-rifle
   :commands helm-org-rifle helm-org-rifle-current-buffer
   :init (bind-keys :map org-mode-map
@@ -1265,10 +1265,10 @@ Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entrie
                    ("S-<f2>" . helm-org-rifle))
   (setq helm-org-rifle-show-path t
         helm-org-rifle-show-tags t))
-#+END_SRC
+#+end_src
 
 *** helm-org + helm-org-rifle: Make display of headings focus on first and last
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/override-org-format-outline-path (fn &rest rest)
   (cl-letf (((symbol-function 'org-format-outline-path)
              #'aj/org-format-outline-path))
@@ -1351,7 +1351,7 @@ Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entrie
 ;;     (org-get-outline-path t t)
 ;;     (window-width)
 ;;     nil "/")))
-#+END_SRC
+#+end_src
 
 
 *** Refile with helm
@@ -1449,7 +1449,7 @@ Present a nicer-looking helm buffer for ~org-refile~
 #+end_src
 ** Redefine ~org-paste-special~ to choose from kill-ring (with helm)
 If we have inadvertantly killed something between the special kill and yank we intended, we are then given an opportunity to easily choose the right thing to yank.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defalias 'org-paste-special 'aj/org-paste-special)
 
 (defun aj/org-paste-special (arg)
@@ -1501,7 +1501,7 @@ See the individual commands for more information."
 
 (dolist (fn '(helm-kill-ring-candidates helm-kill-ring-transformer))
   (autoload fn "helm-ring"))
-#+END_SRC
+#+end_src
 
 ** Extra org-entities :org_async:
 #+begin_src emacs-lisp
@@ -1514,13 +1514,13 @@ I want my archive files to retain some structure, placing archived entries in a 
 
 Adapted from code by Florian Adamsky, now here:
 https://gitlab.com/andersjohansson/org-archive-hierarchically
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
   (use-package org-archive-hierarchically
 	:straight nil ; TODO fix
 	:load-path "~/kodat/elisp/org-archive-hierarchically"
 	:commands org-archive-hierarchically
 	:init (setq org-archive-default-command #'org-archive-hierarchically))
-#+END_SRC
+#+end_src
 
 ** Org capture
 *** Capture templates
@@ -1532,7 +1532,7 @@ https://gitlab.com/andersjohansson/org-archive-hierarchically
 I often mess up and remove the last line-break in the capture buffer. This can inadvertantly include the [[file:~/.emacs.d/lisp/aj-org-config.org::*Local%20variables%20headings][Local variables heading]] that is below the last captured headline under this headline.
 This function run with ~org-capture-prepare-finalize-hook~ avoids this problem by always making sure we have at least one linebreak at the end of the capture buffer.
 
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/ensure-linebreak-at-eob ()
   (unless (progn (goto-char (point-max))
                  (looking-back "
@@ -1540,7 +1540,7 @@ This function run with ~org-capture-prepare-finalize-hook~ avoids this problem b
     (insert "\n")))
 
 (add-hook 'org-capture-prepare-finalize-hook #'aj/ensure-linebreak-at-eob)
-#+END_SRC
+#+end_src
 
 *** Capture help functions
 **** Add ID to some notes
@@ -1555,7 +1555,7 @@ Currently those entered with "a", could of course be generalized.
 #+end_src
 
 **** Insert weektree CUSTOM_ID
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (advice-add 'org-datetree--find-create :after #'aj/insert-datetree-custom-id)
 
 (defun aj/insert-datetree-custom-id (&rest _args)
@@ -1568,11 +1568,11 @@ Currently those entered with "a", could of course be generalized.
        "CUSTOM_ID" ch
        ;; (replace-regexp-in-string "[^a-zåäöA-ZÅÄÖ0-9]+" "-" ch)
        ))))
-#+END_SRC
+#+end_src
 
 **** For journal with writing log :ARCHIVE:
 Don’t really use this now. Unsure if it works
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-skrivande-journal-template ()
   (format
    (concat
@@ -1618,10 +1618,10 @@ element"
        (buffer-file-name)
        `(:maxlevel 15 :tags ,tag :tstart ,(car tste) :tend ,(cadr tste)))))))
 
-#+END_SRC
+#+end_src
 
 Att få dagens klockade tid för specifikt item är inte så svårt:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-clock-sum-current-item-today (&optional headline-filter)
   "Return time, clocked on current item today."
   (save-excursion
@@ -1630,10 +1630,10 @@ Att få dagens klockade tid för specifikt item är inte så svårt:
         (org-narrow-to-subtree)
         (org-clock-sum (car range) (cadr range) headline-filter :org-clock-minutes-today)
         org-clock-file-total-minutes))))
-#+END_SRC
+#+end_src
 **** For fieldnotes :ARCHIVE:
 Don’t use it now
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-fieldnote-capture ()
   (let
       ((typ (completing-read "Typ: " '("Observation" "Reflektion" "Forskningsdagbok") nil t nil nil "Observation"))
@@ -1676,14 +1676,14 @@ Don’t use it now
 
 
 **** Return zotxt-references.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-return-org-zotxt-ref ()
   "Fetch an org-zotxt link and return it as a string"
   (let ((zotxt--debug-sync t))
     (with-temp-buffer
       (org-zotxt-insert-reference-link nil)
       (buffer-string))))
-#+END_SRC
+#+end_src
 
 **** Capture in new frame.
 Useful for launching a small capture frame from window manager with a call like:
@@ -1715,7 +1715,7 @@ Useful for launching a small capture frame from window manager with a call like:
 
 ** org-protocol for linking into org files
 I keep some notes for papers in org-mode, but sort my papers in Zotero. With this I can easily add a link to the specific note from Zotero, which is launched and resolved through org-protocol.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (use-package org-protocol
   :straight nil ;; included with org
   :config
@@ -1756,7 +1756,7 @@ I keep some notes for papers in org-mode, but sort my papers in Zotero. With thi
       (user-error "Couldn’t create link")))
   (with-eval-after-load 'org-zotxt
     (bind-key "C-c \" l" #'aj/add-zotero-link-to-headline org-zotxt-mode-map)))
-#+END_SRC
+#+end_src
 
 ** Special commands for org-babel-tangle
 #+begin_src emacs-lisp
@@ -1804,7 +1804,7 @@ Can be passed any ox BACKEND in a non-interactive call"
 #+end_src
 
 ** Org-annotate :org_async:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (use-package org-annotate
   :straight (:host github :repo "girzel/org-annotate"
                    :fork (:host github :repo "andersjohansson/org-annotate" :branch "org9.3"))
@@ -2049,7 +2049,7 @@ List of prefix strings or regex."
   ;;                                                display ,(nth 1 org-annotate-special-brackets))))))))))
   )
 
-#+END_SRC
+#+end_src
 
 
 ** Zotxt
@@ -2186,7 +2186,7 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 
 *** My own view attachment which parses page numbers and jumps to page
 Also a function to get all annotations in a pdf file
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load "org-zotxt"
   (autoload 'pdf-zotxt-quote-acquire-variables "pdf-zotxt-quote")
   (autoload 'pdf-zotxt-quote-goto-page "pdf-zotxt-quote")
@@ -2247,16 +2247,16 @@ Also a function to get all annotations in a pdf file
                         (cdr (assq 'paths (elt data 0))))))))
       d))
   )
-#+END_SRC
+#+end_src
 
 *** Converting back from latex
 Some hackish functions
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (use-package biblatex-to-zotxt
   :straight nil
   :load-path "~/kodat/elisp/biblatex-to-zotxt/"
   :commands biblatex-to-zotxt)
-#+END_SRC
+#+end_src
 ** Export :org_async:
 *** Some more or less general export settings
 #+begin_src emacs-lisp
@@ -2285,7 +2285,7 @@ Some hackish functions
 *** New link types for special exports
 **** Video
 Mostly for html and reveal
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (org-link-set-parameters "video"
                          :export #'aj/org-video-export
                          :complete #'aj/org-video-complete-link
@@ -2309,7 +2309,7 @@ Mostly for html and reveal
 
 (defun aj/org-video-complete-link ()
   (aj/org-complete-link "video:"))
-#+END_SRC
+#+end_src
 *** ox-ascii, don’t fill paragraphs
 #+begin_src emacs-lisp
 (setq org-ascii-inner-margin 0
@@ -2333,7 +2333,7 @@ Mostly for html and reveal
   :demand t)
 #+end_src
 **** Settings
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defvar aj/path-to-revealjs "~/lib/reveal.js/")
 
 ;; loaded with org in init.org
@@ -2359,10 +2359,10 @@ Mostly for html and reveal
    ;; org-re-reveal-extra-js "{src: '../assets/aj-fixes.js'}"
    ;; org-re-reveal-external-plugins '((aj-fixes . "{src: '../assets/aj-fixes.js', async: true}"))
    ))
-#+END_SRC
+#+end_src
 
 **** reveal - org-annotate-style
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load "org-re-reveal"
   (defvar org-annotate-reveal-export-function
     #'aj/org-annotate-export-html-tooltip
@@ -2370,10 +2370,10 @@ Mostly for html and reveal
 
   (defun aj/org-annotate-export-html-tooltip (path desc)
     (format "<span style=\"font-size:.5em;font-style:italic;color:#a00\">[%s]</span> %s" path (or desc ""))))
-#+END_SRC
+#+end_src
 
 **** reveaL: Commands for exporting, starting server, and displaying presentations via server
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (org-export-define-derived-backend
     'reveallink 're-reveal
   :menu-entry
@@ -2478,10 +2478,10 @@ Mostly for html and reveal
   (aj/org-reveal-try-server-start :data nil))
 
 (setq aj/org-reveal-last-url "http://localhost:8000/2019-05-avhandling-l%C3%A4ngre/avhandlingspresentation.html")
-#+END_SRC
+#+end_src
 
 **** Mode and hydra for help with input
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load 'org-re-reveal
   (define-minor-mode aj/org-reveal-mode
     "Minor mode with some custom keybindings for help in creating org-reveal presentations"
@@ -2550,10 +2550,10 @@ Mostly for html and reveal
     ("z" (insert "#+html: <div id=\"zotxtbibliography\"></div>") "Bibliography")
     ("N" (org-toggle-tag "notitle") "No title headline")
     ("q" nil)))
-#+END_SRC
+#+end_src
 
 **** Empty headline
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (add-hook 'org-export-filter-parse-tree-functions #'aj/org-reveal-empty-headline-title)
 
 (defun aj/org-reveal-empty-headline-title (data _backend info)
@@ -2572,10 +2572,10 @@ Mostly for html and reveal
   (if (eq backend 're-reveal)
       (replace-regexp-in-string "<h2[^>]+></h2>" "" string)
     string))
-#+END_SRC
+#+end_src
 
 **** Use ~data-src~ instead of ~src~ for images etc.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-reveal-lazy-load-links (string backend info)
   (when (and (org-export-derived-backend-p backend 'reveal 're-reveal)
              (not (plist-get info :reveal-single-file))
@@ -2583,7 +2583,7 @@ Mostly for html and reveal
     (replace-regexp-in-string "src=" "data-src=" string nil t)))
 
 (add-to-list 'org-export-filter-link-functions #'aj/org-reveal-lazy-load-links)
-#+END_SRC
+#+end_src
 
 **** Fix blockquotes
 Actually, the tree filtering in ~org-re-reveal~ takes care of frag attributes. No need for a custom (weaker) ~org-re-reveal-quote-block~
@@ -2599,7 +2599,7 @@ Actually, the tree filtering in ~org-re-reveal~ takes care of frag attributes. N
 *** Give exported subtrees automatic file names from headline if not present
 Advice which will add a generated EXPORT_FILE_NAME if it does not exist.
 There are two mechanisms for getting filenames, ~org-export--get-subtree-options~ and ~org-export-output-file-name~. I’m unsure if the former is meaningful, as the latter is used for most calls to ~org-export-to-file~, where the filename is really used, in the exporters.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 ;; (advice-add 'org-export--get-subtree-options :filter-return #'aj/org-export-add-subtree-filename)
 
 ;; (defun aj/org-export-add-subtree-filename (plist)
@@ -2632,10 +2632,10 @@ is defined for the subtree during org subtree export."
              t)))
     (concat "./" (reftex-string-to-label headline))))
 
-#+END_SRC
+#+end_src
 *** Helper functions
 **** For inserting list attributes
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-insert-element-attributes (attr)
   (save-excursion
     (if-let ((p (org-in-item-p))
@@ -2648,10 +2648,10 @@ is defined for the subtree during org subtree export."
         (org-backward-paragraph)
         (open-line 1))
       (insert attr))))
-#+END_SRC
+#+end_src
 
 **** CHECK For special completion in custom link types
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-complete-link (rep)
   "Helper function to enable correct handling of relative/absolute
 paths also for links of special types."
@@ -2685,11 +2685,11 @@ should be relativized or not. Returns the possibly relativized filename"
             (substring (expand-file-name path)
                        (match-end 0))
           (expand-file-name path)))))))
-#+END_SRC
+#+end_src
 
 *** My inlinecomments , Inlinekommentarer: ❰❙❱ till kommentar :ARCHIVE:
 **** Exporting
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (add-hook 'org-export-before-parsing-hook #'aj/ox-inline-comment)
 
 (defun aj/ox-inline-comment (backend)
@@ -2722,10 +2722,10 @@ should be relativized or not. Returns the possibly relativized filename"
                    (if (match-string 3) (substring (match-string 3) 1 -2) (user-full-name))
                    (aj/odt-timestamp))))
          nil t)))))
-#+END_SRC
+#+end_src
 
 **** Inserting :org_async_exclude:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (bind-key "C-c C-ä" #'aj/org-insert-inline-comment org-mode-map)
 (defun aj/org-insert-inline-comment (arg)
   (interactive "P")
@@ -2790,21 +2790,21 @@ should be relativized or not. Returns the possibly relativized filename"
                                      (1 'org-target prepend)
                                      (2 'bold prepend t)
                                      (3 'helm-buffer-process prepend))))
-#+END_SRC
+#+end_src
 *** ODT-export
 **** ODT has no problem including a pdf file, let it do that
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (setq org-odt-inline-image-rules '(("file" . "\\.\\(jpeg\\|jpg\\|png\\|gif\\|svg\\|pdf\\)\\'")))
-#+END_SRC
+#+end_src
 *** LaTeX-export
 **** Risky variable fix for ~org-latex-title-command~
 ~org-latex-title-command~ is treated as a risky variable since it ends in "-command" (see [[info:elisp#File%20Local%20Variables][info:elisp#File Local Variables]]). This means annoying dialogs in files where it is set (and that appearently can’t be fixed by adding values to ~safe-local-variable-values~ either). This fixes it.
- #+BEGIN_SRC emacs-lisp
+ #+begin_src emacs-lisp
 (put 'org-latex-title-command 'safe-local-variable #'stringp)
-#+END_SRC
+#+end_src
 
 **** Latex drawers
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load "ox-latex"
   (defun aj/ox-latex-drawers (name contents)
     (pcase (downcase name)
@@ -2812,7 +2812,7 @@ should be relativized or not. Returns the possibly relativized filename"
       (_ contents)))
 
   (setq org-latex-format-drawer-function #'aj/ox-latex-drawers))
-#+END_SRC
+#+end_src
 
 **** latex inlinetask
 #+begin_src emacs-lisp
@@ -2943,7 +2943,7 @@ should be relativized or not. Returns the possibly relativized filename"
 
   (add-hook 'org-export-before-processing-hook
             #'aj/org-export-smart-quotes-install-hook))
-#+END_SRC
+#+end_src
 ***** CSquote-support through interpreting attributes environment and options for quote blocks
 #+begin_src emacs-lisp
 (with-eval-after-load 'ox-latex
@@ -3002,7 +3002,7 @@ The detection of in-word apostrophes etc. often fails. Always using ~´~ to mean
 ***** Configuration for thesis writing
 Here it is, finished ☺: http://urn.kb.se/resolve?urn=urn:nbn:se:uu:diva-357341
 ****** UUthesis, for my thesis
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load "ox-latex"
   (add-to-list 'org-latex-classes
                '("uuthesis"
@@ -3012,10 +3012,10 @@ Here it is, finished ☺: http://urn.kb.se/resolve?urn=urn:nbn:se:uu:diva-357341
                  ("\\subsection{%s}" . "\\subsection*{%s}")
                  ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
                  ("\\paragraph{%s}" . "\\paragraph*{%s}"))))
-#+END_SRC
+#+end_src
 
 ****** Glossaries for thesis
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (org-link-set-parameters "gls"
                          :follow #'ignore
                          :export #'aj/org-gls-export
@@ -3059,9 +3059,9 @@ Here it is, finished ☺: http://urn.kb.se/resolve?urn=urn:nbn:se:uu:diva-357341
              collect (match-string 2))))))))
 
 
-#+END_SRC
+#+end_src
 ****** Paper ref for thesis (references to the papers included in the thesis)
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (org-link-set-parameters "paper"
                          :follow #'aj/org-paperref-show
                          :export #'aj/org-paperref-export
@@ -3114,19 +3114,19 @@ Here it is, finished ☺: http://urn.kb.se/resolve?urn=urn:nbn:se:uu:diva-357341
                while (search-forward-regexp "\\\\label{\\([^}]+\\)}" limit t)
                collect (match-string 1)))))))))
 
-#+END_SRC
+#+end_src
 
 ****** Latin abbreviations for thesis
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (dolist (x '(("eg" "\\eg" nil "e.g." "e.g." "e.g." "e.g.")
              ("etal" "\\etal" nil "et al." "et al." "et al." "et al.")
              ("etc" "\\etc" nil "etc." "etc." "etc." "etc.")
              ("ie" "\\ie" nil "i.e." "i.e." "i.e." "i.e.")
              ("cf" "\\cf" nil "cf." "cf." "cf." "cf.")))
   (add-to-list 'org-entities-user x))
-#+END_SRC
+#+end_src
 ****** Lists in thesis
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-latex-thesis-lists-data (data backend info)
   "Use thesis environments for plain lists.
 Add as a filter in ‘org-export-filter-parse-tree-functions’."
@@ -3158,9 +3158,9 @@ Add as a filter in ‘org-export-filter-parse-tree-functions’."
 ;;        (replace-regexp-in-string "{enumerate}" "{numberedlist}" translist t t))
 ;;     translist))
 
-#+END_SRC
+#+end_src
 ****** Convert ref to cref (from cleverref)
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-latex-ref-to-autoref (string backend _info)
   (if (and
        (org-export-derived-backend-p backend 'latex)
@@ -3174,12 +3174,12 @@ Add as a filter in ‘org-export-filter-parse-tree-functions’."
 
 (add-to-list 'org-export-filter-final-output-functions
              #'aj/org-latex-ref-to-autoref)
-#+END_SRC
+#+end_src
 
 ****** Replace references
 Very specific code for replacing certain references that get exported in a format that biblatex can’t handle correctly from zotero with manually crafted bib-entries (often using workarounds).
 
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (autoload 'bibtex-parse-keys "bibtex")
 
 (defun aj/replace-fixed-references (string backend _info)
@@ -3194,10 +3194,10 @@ Very specific code for replacing certain references that get exported in a forma
                   collect (list (substring (car x) 0 -4) (car x))))))))
 
 (add-to-list 'org-export-filter-final-output-functions #'aj/replace-fixed-references)
-#+END_SRC
+#+end_src
 
 ****** Thesischapter, for old thesis :ARCHIVE:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load "ox-latex"
   (add-to-list 'org-latex-classes
                '("thesischapter"
@@ -3207,7 +3207,7 @@ Very specific code for replacing certain references that get exported in a forma
                  ("\\subsection{%s}" . "\\subsection*{%s}")
                  ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
                  ("\\paragraph{%s}" . "\\paragraph*{%s}"))))
-#+END_SRC
+#+end_src
 ***** Class for ajshort (my own common latex configuration for short texts wrapped up into a package)
 #+begin_src emacs-lisp
 (with-eval-after-load "ox-latex"
@@ -3264,7 +3264,7 @@ Very specific code for replacing certain references that get exported in a forma
 ***** iopart class (for Institute of Physics papers)
 I wrote this paper with it:
 http://iopscience.iop.org/article/10.1088/1361-6404/aa9b42
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load "ox-latex"
   (add-to-list
    'org-latex-classes
@@ -3295,10 +3295,10 @@ http://iopscience.iop.org/article/10.1088/1361-6404/aa9b42
          (buffer-string))))
 
 (add-to-list 'org-export-filter-final-output-functions #'aj/org-export-latex-remove-iopart-title))
-#+END_SRC
+#+end_src
 ***** Revtex-class, adapted from [[https://github.com/jkitchin/jmax/blob/master/ox-manuscript.el][ox-manuscript]]
 Used it to write this paper: http://dx.doi.org/10.1119/perc.2016.pr.040
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load "ox-latex"
   (add-to-list 'org-latex-classes
                '("revtex4-1-aj"
@@ -3313,7 +3313,7 @@ Used it to write this paper: http://dx.doi.org/10.1119/perc.2016.pr.040
  ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
  ("\\paragraph{%s}" . "\\paragraph*{%s}")
  ("\\subparagraph{%s}" . "\\subparagraph*{%s}"))))
-#+END_SRC
+#+end_src
 ***** CV, moderncv class
 ****** cv
 #+begin_src emacs-lisp
@@ -3410,7 +3410,7 @@ Used it to write this paper: http://dx.doi.org/10.1119/perc.2016.pr.040
 
 **** Exporting through AUCTeX
 It has better error messages and better async running of file. I have also used this for putting together files through latex includes and the concept of AUCTeX master files (then you can easily just process a sub-file, or a region, like with org subtree-export).
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load 'ox-latex
   (org-export-define-derived-backend 'auctex 'latex
     :menu-entry
@@ -3529,7 +3529,7 @@ hacks working for async)"
 ;;       (TeX-command "latexmk" #'TeX-region-file -1)))
 ;;   file)
 
-#+END_SRC
+#+end_src
 
 **** Beamer
 ***** Don’t interfere with ordinary latex export
@@ -3608,7 +3608,7 @@ hacks working for async)"
 
 ***** Compatibility with ox-reveal
 I’m trying out ox-reveal, but they have different ways of adding notes (subtrees vs special blocks). This makes sure a file prepared for reveal can also work with beamer
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-export-reveal-note-to-beamer-note (string backend _info)
   (when (eq backend 'beamer)
     (replace-regexp-in-string
@@ -3617,10 +3617,10 @@ I’m trying out ox-reveal, but they have different ways of adding notes (subtre
      )))
 
 (add-to-list 'org-export-filter-special-block-functions #'aj/org-export-reveal-note-to-beamer-note)
-#+END_SRC
+#+end_src
 
 ***** Hydra for templates
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (with-eval-after-load 'ox-beamer
   (bind-key "C-c C-ö" #'hydra-beamer-templates/body org-beamer-mode-map)
   (autoload #'yas-expand-snippet "yasnippet")
@@ -3638,7 +3638,7 @@ I’m trying out ox-reveal, but they have different ways of adding notes (subtre
     ("+" (aj/org-insert-element-attributes "#+ATTR_BEAMER: :overlay +-") "Overlay +-")
     ("T" (aj/org-insert-element-attributes "#+ATTR_BEAMER: :environment tightitemize") "Tightitemize"))
   )
-#+END_SRC
+#+end_src
 **** Latex-check
 #+begin_src emacs-lisp
 (defun aj/org-lacheck (&optional subtreep)
@@ -3673,7 +3673,7 @@ I’m trying out ox-reveal, but they have different ways of adding notes (subtre
 
 This needs to be updated using ~org-num~ (check numbering in overlays). Until I need it, disable.
 
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 ;; this one is what I most often want
 (defun aj/org-export-parent-subtree-infile (arg)
   "Exports the current file narrowed to subtree with scope ‘org-export-initial-scope’.
@@ -3781,7 +3781,7 @@ is defined the subtree during org subtree export."
        string t t))))
 
 
-#+END_SRC
+#+end_src
 
 
 *** Export and ignore everyting below a specific level, for some backends
@@ -3799,7 +3799,7 @@ I don’t really use this now, but I keep these variable definitions around sinc
 
 
 **** Funktioner :ARCHIVE:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-ignore-below-level (backend)
   "Makes sure to clean all content below level set by
 `aj/org-ignore-below-level' if run by
@@ -3827,7 +3827,7 @@ of `aj/org-ignore-below-level-backends'."
 (remove-hook 'org-export-before-parsing-hook 'aj/org-ignore-below-level)
 
 
-#+END_SRC
+#+end_src
 exportera bara manus till odt
 
 
@@ -3837,7 +3837,7 @@ Adapted from: [[http://orgmode.org/cgit.cgi/org-mode.git/plain/contrib/lisp/ox-e
 
 The last parts are some half-successful attempts to solve this for ox-reveal exports
 
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defcustom aj/org-ignoreheading-tags '("ignoreheading")
   "Tags for which the heading should be removed but content kept
   in org export"
@@ -3934,12 +3934,12 @@ parent."
 
 (add-hook 'org-export-filter-parse-tree-functions #'aj/org-export-ignore-headlines)
 
-#+END_SRC
+#+end_src
 
 *** stripheading, pre-parsing alternative to ignoreheading
 Does not promote children so gives a sometimes different effect on the tree.
 
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/org-export-strip-headings (_backend)
   "Strip lines containing \"stripheadings\" tag."
   (save-excursion
@@ -3947,7 +3947,7 @@ Does not promote children so gives a sometimes different effect on the tree.
 
 (add-hook 'org-export-before-parsing-hook #'aj/org-export-strip-headings)
 
-#+END_SRC
+#+end_src
 
 *** by-backend, macro for some exports
 #+begin_src emacs-lisp
@@ -3956,7 +3956,7 @@ Does not promote children so gives a sometimes different effect on the tree.
 #+end_src
 
 *** Ignore or include trees with backend specific tags
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (defun aj/ox-sel-excl-by-backend (options backend)
   "Adds noexport_backend and export_backend to :exclude-tags
 and :select-tags in org export."
@@ -3976,21 +3976,21 @@ and :select-tags in org export."
     options))
 
 (add-to-list 'org-export-filter-options-functions #'aj/ox-sel-excl-by-backend)
-#+END_SRC
+#+end_src
 
 ** Publishing :org_async:
 (projects are in custom.el)
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (setq ange-ftp-try-passive-mode t) ; needed!
-#+END_SRC
+#+end_src
 
 ** org-babel
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (setq org-babel-latex-htlatex-packages
       '("[usenames]{color}" "{tikz}" "{color}" "{listings}" "{amsmath}" "{pgfplots}")
       org-babel-load-languages
       '((awk . t) (latex . t) (emacs-lisp . t) (ditaa . t) (shell . t)))
-#+END_SRC
+#+end_src
 
 ** Cosmetics, display, faces
 *** Fix org-indent
@@ -4045,7 +4045,7 @@ With my use of [[*\[\[https://github.com/integral-dw/org-superstar-mode/\]\[org-
 #+end_src
 
 *** Fontify src blocks natively
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (setq org-src-fontify-natively t)
 
 ;; (defun aj/org-avoid-hooks-in-fontify-block (fun lang beg end)
@@ -4059,7 +4059,7 @@ With my use of [[*\[\[https://github.com/integral-dw/org-superstar-mode/\]\[org-
 
 ;; (advice-add 'org-src-font-lock-fontify-block :around
 ;;             #'aj/org-avoid-hooks-in-fontify-block)
-#+END_SRC
+#+end_src
 
 *** [[https://github.com/integral-dw/org-superstar-mode/][org-superstar]] (successor to org-bullets)
 #+begin_src emacs-lisp
@@ -4243,12 +4243,12 @@ Add special tag faces, add for file-local select/exclude-tags. Highlight the ent
 #+end_src
 *** Tags column at 0
 I use variable-width fonts, so trying to align tags to the right is useless. But in the agenda we want them right aligned and setting it in the hook means we can adapt to the current window.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (setq org-tags-column 0
       org-auto-align-tags nil)
 (add-hook 'org-agenda-mode-hook '(lambda ()
                                   (setq org-agenda-tags-column (- (window-width)))))
-#+END_SRC
+#+end_src
 *** org-fold-linebreaks-mode
 Experimental mode for folding together paragraphs with one sentence per line (good for version control) to make them look nicer when displaying. Works with an overlay per line, so perhaps not so efficient.
 
@@ -4266,7 +4266,7 @@ Experimental mode for folding together paragraphs with one sentence per line (go
 Trying to answer: https://emacs.stackexchange.com/questions/38570/org-mode-quote-block-indentation-highlighting
 
 This works if ~org-indent-mode~ is not used. But I use it all the time so no use for me yet.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (add-hook 'org-font-lock-hook #'aj/org-indent-quotes)
 
 (defun aj/org-indent-quotes (limit)
@@ -4302,32 +4302,32 @@ This works if ~org-indent-mode~ is not used. But I use it all the time so no use
 
 ;; (advice-remove 'org-indent-refresh-maybe #'aj/org-indent-quotes-indent-mode)
 
-#+END_SRC
+#+end_src
 ** org-word-count
 https://github.com/tesujimath/org-wc
 An ideally flexible org word count would be based on the parser in org-element, where the right stuff could be excluded.
 This one is based on regex walking and skipping though. And that is quite fast.
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (use-package org-wc
   :straight nil ;; TODO fix
   :load-path "~/kodat/elisp/org-wc"
   :commands (org-word-count org-wc-count-subtrees org-wc-display org-wc-remove-overlays)
   :bind (:map org-mode-map
               ("C-c C-=" . org-wc-display)))
-#+END_SRC
+#+end_src
 
 ** org-num-mode -- overlays for numbering outlines
 Org 9.3 introduces a brilliant real-time solution for numbering outlines while editing.
 
 Previous, slow solution:
 https://gitlab.com/andersjohansson/org-outline-numbering
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (use-package org-num
   :straight nil
   :custom (org-num-skip-tags '("ignoreheading" "ignoreheadinglocal" "ARCHIVE"))
   (org-num-skip-unnumbered t)
   (org-num-skip-commented t))
-#+END_SRC
+#+end_src
 
 ** Open org links with alternate programs :ARCHIVE:
 #+begin_src emacs-lisp
@@ -4342,21 +4342,21 @@ https://gitlab.com/andersjohansson/org-outline-numbering
 
 
 * Provide statement
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (provide 'aj-org-config)
-#+END_SRC
+#+end_src
 
 * Provide statement async :org_async:no_default_tangle:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 (provide 'aj-org-config-org-async)
-#+END_SRC
+#+end_src
 
 * Local variables for lisp :org_async:
-#+BEGIN_SRC emacs-lisp
+#+begin_src emacs-lisp
 ;; Local Variables:
 ;; byte-compile-warnings: (not make-local)
 ;; End:
-#+END_SRC
+#+end_src
 
 * Local Variables :ARCHIVE:
 
