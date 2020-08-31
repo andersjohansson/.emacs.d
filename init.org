@@ -1234,10 +1234,20 @@ I want to use the echo area (hence ~(tooltip-mode -1)~), but don’t want help e
   :commands (global-flycheck-mode)
   :init (add-hook 'after-init-hook #'global-flycheck-mode)
   :defer 5
-  :config (progn
-            (setq-default flycheck-emacs-lisp-load-path 'inherit)
-            (setq-default flycheck-disabled-checkers '(emacs-lisp-checkdoc))
-            (add-hook 'text-mode-hook (lambda ()(flycheck-mode -1)))))
+  :custom
+  (flycheck-global-modes '(not text-mode))
+  (flycheck-emacs-lisp-load-path 'inherit)
+  (flycheck-emacs-lisp-initialize-packages nil)
+  :config
+  (advice-add 'flycheck-ephemeral-buffer-p :around
+              #'aj/flycheck-ephemeral-advice)
+
+  (defun aj/flycheck-ephemeral-advice (origfun)
+    (or
+     (string-prefix-p "*Org Src " (buffer-name))
+     (string-prefix-p "*scratch*" (buffer-name))
+     (funcall origfun))))
+
 #+end_src
 
 *** Saveplace is neccessary
