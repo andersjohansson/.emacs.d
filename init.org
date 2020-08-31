@@ -2374,12 +2374,12 @@ A bit nicer than isearch. I also like to use fuzzy search (words separated by wh
   :config (global-company-mode))
 
 (use-package company-emoji
+  :straight (:branch "trunk")
   :after company
   :config (add-to-list 'company-backends 'company-emoji))
 
 ;; see https://github.com/sebastiencs/company-box/pull/65
 (use-package company-box
-  :straight (company-box :no-byte-compile t :depth 500 :host github :repo "andersjohansson/company-box" :branch "only-expand-width")
   :after company
   :hook (company-mode . company-box-mode)
   :init (setq company-box-enable-icon nil
