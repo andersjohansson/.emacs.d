@@ -4052,12 +4052,17 @@ DIR."
 #+begin_src emacs-lisp
 (add-to-list 'auto-mode-alist
              '("\\.\\(timer\\|service\\)\\'" . conf-mode))
+
+(add-to-list 'auto-mode-alist
+             '("PKGBUILD$" . sh-mode))
 #+end_src
+
 *** Pdf-view (pdf-tools)
 **** Main settings
 pdf-loader handles deferred loading. Then settings are applied after loading pdf-view.
 #+BEGIN_SRC emacs-lisp
 (use-package pdf-tools
+  ;; :straight (pdf-tools :fork (:host github :repo "flatwatson/pdf-tools" :branch "fix-macros"))
   :commands pdf-loader-install ;; TODO (fel?)
   :init (pdf-loader-install))
 
