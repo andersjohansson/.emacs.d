@@ -4249,7 +4249,7 @@ But also with some inspiration from here: https://lepisma.github.io/2017/10/28/r
 #+end_src
 
 *** Toggle font size
-Sometimes I feel the need for a generally bigger font. Especially when switching between my 13 inch 1920*1080-screen and my 24 inch 1920*1080-screen (systemwide screenwise fractional scaling is still not an option on linux).
+Sometimes I feel the need for a generally bigger font in all emacs frames. Especially when switching between my 13 inch 1920*1080-screen and my 24 inch 1920*1080-screen (systemwide screenwise fractional scaling is still not an option on linux).
 #+begin_src emacs-lisp
 (defvar aj/orig-font-size nil)
 
@@ -4258,12 +4258,11 @@ Sometimes I feel the need for a generally bigger font. Especially when switching
 (defun aj/toggle-font-size ()
   (interactive)
   (if (> 7 (abs (- aj/orig-font-size (face-attribute 'default :height))))
-      (set-face-attribute 'default nil :height 135)
+      (set-face-attribute 'default nil :height 140)
     (set-face-attribute 'default nil :height aj/orig-font-size)))
 
 (bind-key "C-s-T" #'aj/toggle-font-size)
 #+end_src
-
 
 *** Flash active window :ARCHIVE:
 Another way of finding the active buffer, well I don’t use it right now.
