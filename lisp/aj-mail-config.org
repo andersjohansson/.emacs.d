@@ -1070,7 +1070,6 @@ date. The formats used for date and time are
           (format-time-string "%a  %H:%M" date))
          
          (t (format-time-string "%x" date)))))))
-
 #+END_SRC
 
 **** Custom header, tags :ARCHIVE:
@@ -1093,6 +1092,26 @@ date. The formats used for date and time are
               'face (list :foreground (cadr found))))))
 
 #+end_src
+
+**** COMMENT Custom flags including calendar :ARCHIVE:
+#+begin_src emacs-lisp
+(add-to-list 'mu4e-header-info-custom
+             '(:ajflags .
+                        (:name "Flags"
+                               :shortname "Flags"
+                               :help "Flags"
+                               :function aj/mu4e-headers-flags)))
+
+(defun aj/mu4e-headers-flags (msg)
+  (let* ((flags (mu4e-message-field msg :flags))
+         (flags-str (mu4e~headers-flags-str flags))
+         (cal (cl-loop for part in (mu4e-message-field msg :parts)
+                       if (equal (plist-get part :mime-type) "text/calendar")
+                       return "📅")))
+    (propertize (concat flags-str cal)
+                'help-echo (format "%S" flags)))))
+#+end_src
+
 **** Custom field for lists
 #+begin_src emacs-lisp
 (add-to-list 'mu4e-header-info-custom

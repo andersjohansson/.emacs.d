@@ -203,7 +203,7 @@ When using the experimental ~feature/native-comp~ branch of emacs, loaded librar
       '("init\\.el$"
         "aj-org-config\\.el$"
         "aj-mail-config\\.el$"
-        "pdf-[-a-z]+\\.el$"
+        ;; "pdf-[-a-z]+\\.el$"
         "mu4e-query-helper\\.el$"))
 #+end_src
 
@@ -1257,6 +1257,7 @@ I want to use the echo area (hence ~(tooltip-mode -1)~), but don’t want help e
 (setq save-place-limit 1000)
 (save-place-mode 1)
 #+END_SRC
+
 *** Custom file :org_async:
 #+begin_src emacs-lisp
 (setq custom-file "~/.emacs.d/custom.el")
