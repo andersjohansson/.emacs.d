@@ -237,24 +237,6 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 		   ("S" . mu4e-query-helper-search-edit)))
 #+END_SRC
 
-*** Conversation-view
-#+BEGIN_SRC emacs-lisp
-(use-package mu4e-conversation
-  :load-path "~/kodat/elisp/mu4e-conversation"
-  :init (bind-key "C-<return>" #'mu4e-conversation mu4e-headers-mode-map)
-  :config
-  (set-face-attribute 'mu4e-conversation-header nil :foreground
-                      nil :background nil :inherit 'magit-branch-current)
-  (set-face-attribute 'mu4e-conversation-sender-1 nil :inherit 'org-level-1)
-  (set-face-attribute 'mu4e-conversation-sender-2 nil :inherit 'org-level-2)
-  (set-face-attribute 'mu4e-conversation-sender-3 nil :inherit 'org-level-3)
-  (set-face-attribute 'mu4e-conversation-sender-4 nil :inherit 'org-level-4)
-  (set-face-attribute 'mu4e-conversation-sender-5 nil :inherit 'org-level-5)
-  (set-face-attribute 'mu4e-conversation-sender-6 nil :inherit 'org-level-6)
-  (set-face-attribute 'mu4e-conversation-sender-7 nil :inherit 'org-level-7)
-  (set-face-attribute 'mu4e-conversation-sender-8 nil :inherit 'org-level-8))
-#+END_SRC
-
 ** Contact handling
 *** LDAP (EUDC)
 #+begin_src emacs-lisp
