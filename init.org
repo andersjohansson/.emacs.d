@@ -1519,9 +1519,13 @@ But some of the options for listing-switches doesn’t work with remote sessions
 Store visited directories in a list, make it accessible from helm
 #+BEGIN_SRC emacs-lisp
 (use-package dired-recent
+  :custom
+  (dired-recent-max-directories 300)
   :config
   (dired-recent-mode 1)
-  (setq dired-recent-mode-map nil))
+  (setq dired-recent-mode-map nil)
+  ;; cleanup once a day or something (emacs is often running at 16:10)
+  (run-at-time "16:10" nil #'dired-recent-cleanup))
 #+END_SRC
 
 *** Recentf
