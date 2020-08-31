@@ -1736,7 +1736,7 @@ I keep some notes for papers in org-mode, but sort my papers in Zotero. With thi
 
   (defalias 'aj/org-id-org-protocol-link-copy 'aj/org-make-unique-link-clipoard))
 
-(with-eval-after-load "zotxt"
+(with-eval-after-load 'zotxt
   (defun aj/add-zotero-link-to-headline ()
     (interactive)
     (if-let ((link (aj/get-org-protocol-link))
@@ -2169,20 +2169,18 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 						   :face 'org-scheduled-today
 						   :activate-func #'aj/org-zotxt-activate)
 
-  (defun aj/org-zotxt-activate (start end _path bracketp)
+  (defun aj/org-zotxt-activate (start end path bracketp)
 	"Add text properties to display zotxt citation links in a good way"
-	(when bracketp
-	  (save-match-data
-		(save-excursion
-		  (goto-char start)
-		  (when (and (looking-at org-link-bracket-re)
-					 (match-end 2))
-			(let ((bracket '(invisible nil))
-				  (inv '(invisible t)))
-			  (add-text-properties start (1+ start) bracket)
-			  (add-text-properties end (1- end) bracket)
-			  (add-text-properties (1+ start) (match-beginning 2) inv)
-			  (add-text-properties (1- end) (- end 2) inv))))))))
+	(let ((bracket '(invisible nil))
+		  (inv '(invisible t))
+          (pl (length path)))
+	  (add-text-properties start (1+ start) bracket)
+	  (add-text-properties end (1- end) bracket)
+	  (add-text-properties (1+ start) (+ start 3 pl) inv)
+	  (add-text-properties (1- end) (- end 2) inv))
+    ;; but we also want this activation from zotxt-extra
+    (zotxt-extra--activate-links-full-citation start end path bracketp))
+  )
 #+end_src
 
 *** My own view attachment which parses page numbers and jumps to page
