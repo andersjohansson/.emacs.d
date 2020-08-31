@@ -47,52 +47,15 @@ I use ~msmtp~ together with the queueing script ~msmtpq~ (included with ~msmtp~)
   (file-notify-add-watch "~/.msmtp.queue" '(change) #'aj/update-mail-queue-modeline))
 #+end_src
 
-** My custom tags
+** My custom tags :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
-(defvar aj/mail-tags
-  ;; (gruvbox-bright_red      "#9d0006" "#870000")
-  ;; (gruvbox-bright_green    "#79740e" "#878700")
-  ;; (gruvbox-bright_yellow   "#b57614" "#af8700")
-  ;; (gruvbox-bright_blue     "#076678" "#005f87")
-  ;; (gruvbox-bright_purple   "#8f3f71" "#875f87")
-  ;; (gruvbox-bright_aqua     "#427b58" "#5f8787")
-
-  '(("studentkontakt" "#79740e" "S" ("/uu/Archive/Kurser"))
-    ("fyslistor" "#076678" "F")
-    ("genlistor" "#8f3f71" "G" "/uu/Archive/CFG")
-    ("uulistor" "#9d0006" "U")
-    ("kvklistor" "#427b58" "K")
-    ("genus"  "#b57614" "G")
-    ("trist" "#665c54" "≈")
-    )
+(defcustom aj/mail-tags '()
   "Tags I use for emails. Each element is a list with the name
 of the tag, the color, the symbol and (optionally) the default refile
 folder (if this is wrapped as a list it means the starting point
-for refile folder selection)")
+for refile folder selection)"
+  :group aj)
 
-;; (with-eval-after-load "solarized"
-;;   (defvar aj/mail-tags
-;;     (solarized-with-color-variables 'light
-;;       `(("studentkontakt" ,green "S" ("/uu/Archive/Kurser"))
-;;         ("fyslistor" ,blue "F")
-;;         ("genlistor" ,violet "G" "/uu/Archive/CFG")
-;;         ("uulistor" ,magenta "U")
-;;         ("kvklistor" ,cyan "K")
-;;         ("genus"  ,yellow "G")
-;;         ("trist" ,base1 "≈")
-;;         ;;("skickat" s-base1)
-;;         ;; ("studentkontakt" ,green "🅢" ("/uu/Archive/Kurser"))
-;;         ;; ("fyslistor" ,blue "🅕")
-;;         ;; ("genlistor" ,violet "🅖" "/uu/Archive/CFG")
-;;         ;; ("uulistor" ,magenta "🅤")
-;;         ;; ("kvklistor" ,cyan "🅚")
-;;         ;; ("genus"  ,yellow "🅖")
-;;         ;; ("trist" ,base1 "😞")
-;;         ))
-;;     "Tags I use for emails. Each element is a list with the name
-;; of the tag, the color, the symbol and (optionally) the default refile
-;; folder (if this is wrapped as a list it means the starting point
-;; for refile folder selection)"))
 #+END_SRC
 
 
@@ -144,6 +107,15 @@ EMAILREGEXP"
      (or
       (and msg (mu4e-message-contact-field-matches msg :to ,emailregexp))
       (and (not msg) (eq major-mode 'mu4e-compose-mode) (string-match-p ,emailregexp (message-fetch-field "from"))))))
+
+
+(defcustom aj/mu4e-refile-fns nil
+  "List of functions for determining correct refile dir for a message.
+
+Each function receives a message MSG and should return a string
+with maildir or a list with a maildir string, which means let the
+user choose, starting at that path.")
+
 
 (require 'aj-mail-config-private)
 #+END_SRC
@@ -998,15 +970,15 @@ attachment - should launch the no-attachment warning.")
         ((:aj-human-date . 12)
          (:flags . 6)
          (:from-or-to . 22)
-         (:ajtags . 3)
          (:othermaildir . 10)
          (:mailing-list . 7)
+         ;; (:ajtags . 3)
          (:thread-subject))
         nil
         ((:aj-human-date . 12)
          (:flags . 6)
          (:from-or-to . 22)
-         (:ajtags . 3)
+         ;; (:ajtags . 3)
          (:gmailtags . 5)
          (:othermaildir . 10)
          (:mailing-list . 7)
@@ -1069,22 +1041,6 @@ attachment - should launch the no-attachment warning.")
                   'face (list :foreground (cadr label)))
                " "))))
 
-(add-to-list 'mu4e-header-info-custom
-             '(:ajtags .
-                       (:name "Tags"
-                              :shortname "🏷"
-                              :help "Tags"
-                              :function aj/mu4e-header-tags)))
-
-(defun aj/mu4e-header-tags (msg)
-  (let ((tags (sort (mu4e-message-field msg :tags) 'string<)))
-    (cl-loop with found
-             for tag in tags
-             if (setq found (assoc tag aj/mail-tags))
-             concat
-             (propertize
-              (or (nth 2 found ) "⬕")
-              'face (list :foreground (cadr found))))))
 
 (add-to-list 'mu4e-header-info-custom
              '(:othermaildir . (:name "Maildir"
@@ -1138,6 +1094,26 @@ date. The formats used for date and time are
 
 #+END_SRC
 
+**** Custom header, tags :ARCHIVE:
+#+begin_src emacs-lisp
+(add-to-list 'mu4e-header-info-custom
+             '(:ajtags .
+                       (:name "Tags"
+                              :shortname "🏷"
+                              :help "Tags"
+                              :function aj/mu4e-header-tags)))
+
+(defun aj/mu4e-header-tags (msg)
+  (let ((tags (sort (mu4e-message-field msg :tags) 'string<)))
+    (cl-loop with found
+             for tag in tags
+             if (setq found (assoc tag aj/mail-tags))
+             concat
+             (propertize
+              (or (nth 2 found ) "⬕")
+              'face (list :foreground (cadr found))))))
+
+#+end_src
 *** Set face of subject field to variable-pitch
 #+BEGIN_SRC emacs-lisp
 (defun aj/mu4e-headers-field-set-subject-face (msg field)
@@ -1186,7 +1162,7 @@ date. The formats used for date and time are
 ** Dynamic folders for refile etc. + special functions for gmail-relabeling
 One could think that it would be reasonable to put this in the contexts, but no, these settings are mostly per message, and is therefore better dynamically matched on the current message.
 
-The most complex part is for choosing refile folders, depending on account and ~aj/mail-tags~ configuration.
+The most complex part is for choosing refile folders, depending on account and special functions in ~aj/mu4e-refile-fns~.
 #+BEGIN_SRC emacs-lisp
 ;; Utility function
 ;; In its current form kind of repetitive. But I could want special
@@ -1218,26 +1194,21 @@ The most complex part is for choosing refile folders, depending on account and ~
 
 (defun aj/mu4e-refile-folder (msg &optional force-choice)
   "Guess or offer to select a refile folder for MSG.
-Chooses depending on account and tags (by configuration in `aj/mail-tags')
+Chooses depending on account functions in ‘aj/mu4e-refile-fns’
 No automatic guess if FORCE-CHOICE is non-nil."
   (let* ((user-has-chosen nil)
          (found
-          (aj/mu4e-msg-account msg
-            :chalmers (if-let ((tags (mu4e-message-field msg :tags)))
-                          (catch 'found
-                            ;; default if no throw is /chalmers/Arkiv
-                            (dolist (tag tags "/chalmers/Arkiv")
-                              (when-let ((ajtag (assoc tag aj/mail-tags)))
-                                (when-let ((ajrf (nth 3 ajtag)))
-                                  (cond
-                                   ((stringp ajrf) (throw 'found ajrf))
-                                   ((listp ajrf) (throw 'found (prog1 (aj/mu4e-choose-refile (car ajrf) msg)
-                                                                 (setq user-has-chosen t))))
-                                   (t (user-error "Bad config for tag %s in aj/mail-tags" tag)))))))
-                        "/chalmers/Arkiv")
-            ;; Only for show, they get changed labels via custom action
-            :mejla "/mejla/Alla mail"
-            :ajf "/ajf/Alla mail")))
+          (or (cl-loop for fn in aj/mu4e-refile-fns do
+                       (when-let ((res (funcall fn msg)))
+                         (cond
+                          ((stringp res) (cl-return res))
+                          ((listp res) (cl-return (prog1 (aj/mu4e-choose-refile (car ajrf) msg)
+                                                    (setq user-has-chosen t)))))))
+              (aj/mu4e-msg-account msg
+                :chalmers "/chalmers/Arkiv"
+                ;; Only for show, they get changed labels via custom action
+                :mejla "/mejla/Alla mail"
+                :ajf "/ajf/Alla mail"))))
     (if (and found
              (or user-has-chosen (not force-choice)))
         found
@@ -1338,7 +1309,7 @@ messages “refiled” in gmail accounts from the inbox listing."
                  (cons (propertize (concat (nth 2 tag) " " (car tag)) 'face `(:foreground ,(cadr tag)))
                        (car tag))))
          (tags (append
-                (mapcar face aj/mail-tags)
+                ;; (mapcar face aj/mail-tags)
                 (mapcar face aj/mu4e-gmail-labels)))
          (case-fold-search t))
     (helm-comp-read "Add tag:" tags :fuzzy t :case-fold t)))
@@ -1437,7 +1408,7 @@ Some of the functions are redefined.
 #+END_SRC
 
 
-** Actions
+** Actions for toggling tags :ARCHIVE:
 #+BEGIN_SRC emacs-lisp
 (defvar aj/mu4e-tagchange-history nil)
 (defun aj/mu4e-change-tags ()
@@ -1471,9 +1442,12 @@ Some of the functions are redefined.
                 mu4e-headers-mode-map))))
 
 (aj/mu4e-defun-toggle-tags aj/mail-tags)
-
-(add-to-list 'mu4e-view-actions '("View in external browser" . mu4e-action-view-in-browser))
 #+END_SRC
+
+** Action for View in external browser
+#+begin_src emacs-lisp
+(add-to-list 'mu4e-view-actions '("View in external browser" . mu4e-action-view-in-browser))
+#+end_src
 
 ** Contacts
 #+begin_src emacs-lisp
