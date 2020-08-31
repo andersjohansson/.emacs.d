@@ -4913,10 +4913,25 @@ I actually liked this more, especially the unified-branch which I used here. But
 (use-package writeroom-mode
   :commands writeroom-mode
   :bind ("<f12>" . writeroom-mode)
-  :config (setq writeroom-width 80
-                writeroom-mode-line t
-                writeroom-extra-line-spacing 0.1
-                writeroom-global-effects '(writeroom-set-fullscreen)))
+  :custom (writeroom-width 80)
+  (writeroom-mode-line t)
+  (writeroom-extra-line-spacing 0.3)
+  (writeroom-restore-window-config t)
+  (writeroom-global-effects '(writeroom-set-fullscreen))
+  :config
+  (doom-modeline-def-modeline 'writeroom-doom-modeline '(matches buffer-info buffer-position word-count selection-info github  vcs))
+
+  (defun aj/writeroom-mini-modeline ()
+    (setq-local mini-modeline-r-format (doom-modeline-format--writeroom-doom-modeline)))
+
+  (add-hook 'writeroom-mode-hook #'aj/writeroom-mini-modeline)
+
+  (defun aj/writeroom-mini-modeline-disable ()
+    (kill-local-variable 'mini-modeline-r-format))
+
+  (add-hook 'writeroom-mode-disable-hook #'aj/writeroom-mini-modeline-disable))
+
+
 #+END_SRC
 
 *** Hide mode-line
