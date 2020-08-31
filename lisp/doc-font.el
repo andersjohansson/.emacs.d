@@ -75,6 +75,11 @@
 Height and family is kept from the “default” ‘default’ face."
   :type '(repeat face))
 
+(defcustom doc-font-extra-line-spacing 0.3
+  "Extra ‘line-spacing’ used in ‘doc-font-mode’."
+  :type '(choice (const :tag "No extra space" nil)
+                 (float :tag "Scale to default spacing")))
+
 (defvar-local doc-font-cookies nil)
 (defvar-local doc-font-cookies-def nil)
 (defvar-local doc-font-variable-cookies nil)
@@ -82,9 +87,12 @@ Height and family is kept from the “default” ‘default’ face."
 
 
 (defmacro doc-font--store-old-val (var)
+  "Store value of VAR in ‘doc-font-variable-cookies-nokill’."
   `(push (cons ,var (symbol-value ,var)) doc-font-variable-cookies-nokill))
 
 (defmacro doc-font--set-and-store-old-val (var val)
+  "Set buffer-local value of VAR to VAL and store old value.
+Old value is stored in ‘doc-font-variable-cookies’."
   `(progn
      (push (cons ,var (symbol-value ,var)) doc-font-variable-cookies)
      (make-local-variable ,var)
@@ -110,6 +118,12 @@ Height and family is kept from the “default” ‘default’ face."
                  (push (face-remap-add-relative face :family default-family
                                                 :height default-height)
                        doc-font-cookies-def))
+
+        ;; ‘line-spacing’ is buffer-local by default and could be set to
+        ;; someting else
+        (doc-font--store-old-val 'line-spacing)
+        (setq line-spacing doc-font-extra-line-spacing)
+
         (when (eq major-mode 'org-mode)
           (doc-font--store-old-val 'org-indent-mode)
           (org-indent-mode -1)
@@ -118,18 +132,20 @@ Height and family is kept from the “default” ‘default’ face."
             (doc-font--set-and-store-old-val 'org-superstar-headline-bullets-list '(""))
             (doc-font--set-and-store-old-val 'org-superstar-prettify-item-bullets t)
             (org-superstar-restart))))
-    ;;disable
+    ;; DISABLE:
     (cl-loop for c in (append doc-font-cookies doc-font-cookies-def) do
              (face-remap-remove-relative c))
+
+    ;; restore ‘line-spacing’ to possible previous value
+    (setq line-spacing (alist-get 'line-spacing doc-font-variable-cookies-nokill))
     (when
         (alist-get 'org-indent-mode doc-font-variable-cookies-nokill)
       (org-indent-mode))
+
     (cl-loop for (c . v) in doc-font-variable-cookies do
              (kill-local-variable c))
     (when (bound-and-true-p org-superstar-mode)
       (org-superstar-restart))))
-
-
 
 
 (provide 'doc-font)
