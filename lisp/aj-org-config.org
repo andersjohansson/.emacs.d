@@ -1712,6 +1712,7 @@ Useful for launching a small capture frame from window manager with a call like:
 (use-package org-protocol-capture-html
   :straight (org-protocol-capture-html :repo "alphapapa/org-protocol-capture-html" :host github :files ("org-protocol-capture-html.el")))
 #+end_src
+
 ** org-protocol for linking into org files
 I keep some notes for papers in org-mode, but sort my papers in Zotero. With this I can easily add a link to the specific note from Zotero, which is launched and resolved through org-protocol.
 #+BEGIN_SRC emacs-lisp
@@ -4248,7 +4249,20 @@ I use variable-width fonts, so trying to align tags to the right is useless. But
 (add-hook 'org-agenda-mode-hook '(lambda ()
                                   (setq org-agenda-tags-column (- (window-width)))))
 #+END_SRC
-*** COMMENT Indent quote-blocks
+*** org-fold-linebreaks-mode
+Experimental mode for folding together paragraphs with one sentence per line (good for version control) to make them look nicer when displaying. Works with an overlay per line, so perhaps not so efficient.
+
+#+begin_src emacs-lisp
+
+;; depends on auto-overlays:
+(use-package auto-overlays)
+
+(use-package org-fold-linebreaks
+  :straight nil
+  :commands (org-fold-linebreaks org-fold-linebreaks-mode))
+#+end_src
+
+*** COMMENT Indent quote-blocks :ARCHIVE:
 Trying to answer: https://emacs.stackexchange.com/questions/38570/org-mode-quote-block-indentation-highlighting
 
 This works if ~org-indent-mode~ is not used. But I use it all the time so no use for me yet.
