@@ -2473,8 +2473,7 @@ A bit nicer than isearch. I also like to use fuzzy search (words separated by wh
   (define-key Info-mode-map [mouse-5] nil))
 #+end_src
 
-** TODO undo-tree
-Maybe use: https://github.com/emacsorphanage/undo-tree
+** undo-tree
 #+begin_src emacs-lisp
 (use-package undo-tree
   :defer 3
@@ -3083,7 +3082,6 @@ Needed when starting in a non-interactive shell.
 #+end_src
 
 ** prog-modes
-
 *** Whitespace-cleanup-mode
 #+begin_src emacs-lisp
 (use-package whitespace-cleanup-mode
@@ -3396,7 +3394,7 @@ cperl instead of perl-mode
 (global-prettify-symbols-mode t)
 (setq prettify-symbols-unprettify-at-point t)
 #+end_src
-*** A few fixes from ESK
+*** Fill comments in prog-mode
 #+begin_src emacs-lisp
 (defun esk-local-comment-auto-fill ()
   (setq-local comment-auto-fill-only-comments t)
@@ -3410,7 +3408,6 @@ cperl instead of perl-mode
   :hook prog-mode)
 #+end_src
 ** Text-modes and spelling
-
 *** Visual-line-mode
 **** Text-mode uses visual-line-mode and visual-fill-column-mode
 #+begin_src emacs-lisp
@@ -3441,7 +3438,7 @@ cperl instead of perl-mode
 (setq visual-line-fringe-indicators (list nil 'right-curly-arrow))
 #+end_src
 
-**** Define a binding for killing logical line in visual-line-mode, make sure this works also in org-mode, and that org-mode calls org-kill-line even if visual-line-mode is activated
+**** Define a binding (~C-S-k~) for killing logical line in visual-line-mode, make sure this works also in org-mode, and that org-mode calls org-kill-line even if visual-line-mode is activated
 #+begin_src emacs-lisp
 ;;(with-eval-after-load 'simple
 (define-key visual-line-mode-map [remap kill-line] nil)
@@ -3557,15 +3554,6 @@ In addition, words made up of characters from different scripts won’t be consi
 (modify-syntax-entry ?’ "w" text-mode-syntax-table)
 (dolist (c '(?“ ?” ?‘ ?’))
   (set-char-table-range char-script-table c 'latin))
-#+end_src
-
-*** WC-mode :ARCHIVE:
-In some way interacts with the advice in delight.el to ~format-mode-line~ and causes ~wc-mode-count~ to be called even if ~wc-mode~ is not activated.
-Disable for now. (I never use it).
- #+begin_src emacs-lisp
-(use-package wc-mode
-  :commands wc-mode
-  :config (setq wc-modeline-format "[W:%tw]"))
 #+end_src
 
 *** Abbrev-mode
@@ -3920,7 +3908,7 @@ Enable it for buffers in ‘aj/flyspell-modes’ with defined
 #+end_src
 
 *** Typo
-For doing smart (curly) quotes, mainly in emails since org has it’s own mechanism
+For doing smart (curly) quotes, mainly in emails since org has it’s own mechanism when exporting.
 #+begin_src emacs-lisp
 (use-package typo
   :after mu4e
@@ -4879,7 +4867,7 @@ I actually liked this more, especially the unified-branch which I used here. But
 #+end_src
 
 
-*** Hl-line
+*** Hl-line for prog-mode
 #+begin_src emacs-lisp
 (add-hook 'prog-mode-hook 'hl-line-mode)
 #+end_src
@@ -4939,15 +4927,6 @@ I actually liked this more, especially the unified-branch which I used here. But
 #+begin_src emacs-lisp
 (use-package hide-mode-line
   :defer t)
-#+end_src
-
-*** Readable-frame :ARCHIVE:
-With some inspiration from here: https://lepisma.github.io/2017/10/28/ricing-org-mode/
-Launches a frame with a serif font and writeroom, to read texts in org-mode.
-#+begin_src emacs-lisp
-(use-package reading-frame
-  :load-path "~/kodat/elisp/reading-frame/"
-  :commands reading-frame-make-frame)
 #+end_src
 
 *** Colours in shell output
