@@ -306,10 +306,14 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 #+end_src
 
 ** View mode settings
+
+*** Standard settings
 #+begin_src emacs-lisp
-(add-hook 'mu4e-view-mode-hook #'visual-line-mode)
 (add-hook 'mu4e-view-mode-hook #'variable-pitch-mode)
-(require 'mu4e-contrib)
+(add-hook 'mu4e-view-mode-hook #'visual-line-mode)
+;; with visual-line-mode, no need to fill headers
+(setq mu4e-view-fill-headers nil)
+
 ;; (add-to-list 'mu4e-view-actions '("Webkit-widget" . mu4e-action-view-with-xwidget))
 (setq mu4e-html2text-command 'mu4e-shr2text)
 #+end_src
