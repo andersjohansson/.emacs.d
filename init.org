@@ -4910,6 +4910,10 @@ From: http://stackoverflow.com/questions/4726220/how-to-have-colors-in-the-outpu
 
 
 ** Special libraries for research :org_async:
+*** sqlite3
+#+begin_src emacs-lisp
+(use-package sqlite3)
+#+end_src
 *** aj-forskning
 Some special functions for managing my data files.
 #+begin_src emacs-lisp
