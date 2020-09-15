@@ -4231,58 +4231,28 @@ But also with some inspiration from here: https://lepisma.github.io/2017/10/28/r
             #'aj/doc-font-toggle-org-num))
 #+end_src
 
-*** Toggle font size
-Sometimes I feel the need for a generally bigger font in all emacs frames. Especially when switching between my 13 inch 1920*1080-screen and my 24 inch 1920*1080-screen (systemwide screenwise fractional scaling is still not an option on linux).
+*** Cycle font size
+Sometimes I feel the need for a generally bigger font in all emacs frames. Especially when switching between my 13 inch 1920*1080-screen and my 24 inch 1920*1080-screen (systemwide screenwise fractional scaling is still not an option on linux). On the small screen I sometimes toogle text-scaling in gnome, and if emacs is started with that setting it is kept so the font is to large when switching to the large screen. Then I can also cycle to a smaller size.
 #+begin_src emacs-lisp
 (defvar aj/orig-font-size nil)
 
 (add-hook 'after-init-hook (lambda () (setq aj/orig-font-size (face-attribute 'default :height))))
 
-(defun aj/toggle-font-size ()
+(defun aj/cycle-font-size ()
   (interactive)
-  (if (> 7 (abs (- aj/orig-font-size (face-attribute 'default :height))))
-      (set-face-attribute 'default nil :height 140)
-    (set-face-attribute 'default nil :height aj/orig-font-size)))
+  (cond ((< 7 (- aj/orig-font-size (face-attribute 'default :height)))
+         ;; we are smaller
+         (set-face-attribute 'default nil :height aj/orig-font-size))
+        ((< 7 (- (face-attribute 'default :height) aj/orig-font-size))
+         ;; we are larger
+         (set-face-attribute 'default nil :height 90))
+        ((> 7 (abs (- aj/orig-font-size (face-attribute 'default :height))))
+         ;; we are approximately at default
+         (set-face-attribute 'default nil :height 140))))
 
-(bind-key "C-s-T" #'aj/toggle-font-size)
+(bind-key "C-s-T" #'aj/cycle-font-size)
 #+end_src
 
-*** Flash active window :ARCHIVE:
-Another way of finding the active buffer, well I don’t use it right now.
-https://gist.github.com/anonymous/d87a27cc544cb4dd2bb1
-#+begin_src emacs-lisp
-(bind-key "M-å" 'aj/flash-active-buffer)
-
-(make-face 'aj/flash-active-buffer-face)
-(set-face-attribute 'aj/flash-active-buffer-face nil
-                    :inherit 'highlight)
-(defun aj/flash-active-buffer ()
-  (interactive)
-  (run-at-time 0.2 nil
-               (lambda (remap-cookie)
-                 (face-remap-remove-relative remap-cookie))
-               (face-remap-add-relative 'default 'flash-active-buffer-face)))
-#+end_src
-*** Beacon :ARCHIVE:
-A way of higlighting where you are, don’t use it now.
-#+begin_src emacs-lisp
-(use-package beacon
-  :defer 3
-  :config (setq beacon-blink-duration 0.2
-                beacon-blink-delay 0.1
-                beacon-size 40
-                beacon-color "#93a1a1")
-  (dolist (l '(scroll-down-line scroll-up-line))
-    (add-to-list 'beacon-dont-blink-commands l))
-  (beacon-mode 1))
-#+end_src
-*** Stripe-buffer :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package stripe-buffer
-  :config (progn
-            (add-hook 'dired-mode-hook 'turn-on-stripe-buffer-mode)
-            (add-hook 'org-mode-hook 'turn-on-stripe-table-mode)))
-#+end_src
 *** Modeline
 **** mini-modeline + doom-modeline
 #+begin_src emacs-lisp
