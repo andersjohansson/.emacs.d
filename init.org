@@ -3801,14 +3801,14 @@ Enable it for buffers in ‘aj/flyspell-modes’ with defined
 ‘guess-language-mode’)"
   (when (buffer-live-p buf)
     (with-current-buffer buf
-      (cond ((or (and (not aj/inhibit-flyspell)
-                      (member major-mode aj/flyspell-modes)
-                      ispell-local-dictionary))
-             (flyspell-mode 1)
+      (cond ((and (not aj/inhibit-flyspell)
+                  (member major-mode aj/flyspell-modes)
+                  ispell-local-dictionary)
+             (flyspell-mode)
              (aj/set-langtool-language-from-ispell-dict))
             ((eq major-mode 'mu4e-compose-mode)
-             (flyspell-mode 1)
-             (guess-language-mode 1))))))
+             (flyspell-mode)
+             (guess-language-mode))))))
 
 (defun aj/set-langtool-language-from-ispell-dict ()
   (when (and ispell-local-dictionary
