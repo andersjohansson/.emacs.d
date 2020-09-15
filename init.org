@@ -1236,7 +1236,7 @@ I want to use the echo area (hence ~(tooltip-mode -1)~), but don’t want help e
   :init (add-hook 'after-init-hook #'global-flycheck-mode)
   :defer 5
   :custom
-  (flycheck-global-modes '(not text-mode))
+  (flycheck-global-modes '(not text-mode org-mode))
   (flycheck-emacs-lisp-load-path 'inherit)
   (flycheck-emacs-lisp-initialize-packages nil)
   :config
