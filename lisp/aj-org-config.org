@@ -12,6 +12,7 @@
 ** Customize some variables :org_async:
 #+begin_src emacs-lisp
 (setq
+ org-table-header-line-p t
  org-hidden-keywords '(title author date)
  org-refile-allow-creating-parent-nodes 'confirm
  org-special-ctrl-k t
