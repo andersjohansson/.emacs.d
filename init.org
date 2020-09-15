@@ -238,17 +238,6 @@ When using the experimental ~feature/native-comp~ branch of emacs, loaded librar
 (set-fontset-font t '(#x1f300 . #x1F5ff) "Noto Color Emoji")
 #+end_src
 
-**** Monospacified? :ARCHIVE:
-
-I never get this to work really well, the issue is with special (fancy) symbols in [[*Mail-config][mu4e]] that gets the columns misaligned when the characters are taken from another font than the default mono-space (I use Ubuntu mono, which lacks many symbols). The "monospacified" version of Symbola is supposed to solve this problem but seemingly doesn’t. For now, I have switched to symbols that are in Ubuntu mono ([[file:lisp/aj-mail-config.org::*Symbols][defined here]]).
-#+begin_src emacs-lisp
-(dolist (ft (fontset-list))
-  (set-fontset-font ft 'unicode (font-spec :name "Ubuntu Mono"))
-  (set-fontset-font ft 'unicode (font-spec :name "Symbola monospacified for Ubuntu Mono") nil 'append)
-  (set-fontset-font ft nil (font-spec :name "Symbola monospacified for Ubuntu Mono") nil 'append)
-  )
-#+end_src
-
 *** Determine which of my two computers we are running on
 #+begin_src emacs-lisp
 (defvar aj/ajeb (string= "ajeb" (system-name)))
@@ -757,14 +746,6 @@ We need to add "target" to the fuz recipe so that it isn’t removed by straight
   :commands (helm-all-the-icons-enable)
   :init (helm-all-the-icons-enable))
 #+end_src
-**** helm-flx :ARCHIVE:
-Different fuzzy search algorithm, is this needed?
-#+begin_src emacs-lisp
-(use-package helm-flx
-  :after helm
-  :init (helm-flx-mode t))
-#+end_src
-
 **** Launch in small frame
 #+begin_src emacs-lisp
 (with-eval-after-load 'helm
@@ -902,61 +883,6 @@ Different fuzzy search algorithm, is this needed?
   )
 #+end_src
 **** TODO Utvärdera om vi borde använda helm-multi-files istället för att lägga allt i helm-mini
-**** COMMENT Helm omni-files, buffers, recentf                      :ARCHIVE:
-
-#+begin_src emacs-lisp
-  (global-set-key (kbd "C-x C-b") 'aj/helm-omni-buffers)
-  (global-set-key (kbd "C-x b") 'aj/helm-omni-buffers)
-  (global-set-key (kbd "C-x C-r") 'aj/helm-omni-recent)
-
-  (defvar aj/helm-omni-history nil)
-
-  (defun aj/helm-omni-buffers (&rest arg)
-    (interactive)
-    (require 'helm-files)
-    (unless helm-source-buffers-list
-      (setq helm-source-buffers-list
-            (helm-make-source "Buffers" 'helm-source-buffers)))
-    (helm :sources
-          '(helm-source-buffers-list
-            helm-source-recentf
-            helm-source-files-in-current-dir
-            helm-source-locate
-            helm-source-bookmarks
-            helm-source-buffer-not-found)
-          :buffer "*helm omni recentf*"
-          :truncate-lines t
-          :history 'aj/helm-omni-history
-          :ff-transformer-show-only-basename nil))
-
-  (defun aj/helm-omni-recent (&rest arg)
-    (interactive)
-    (require 'helm-files)
-    (unless helm-source-buffers-list
-      (setq helm-source-buffers-list
-            (helm-make-source "Buffers" 'helm-source-buffers)))
-    (helm :sources
-          '(helm-source-recentf
-            helm-source-buffers-list
-            helm-source-locate
-            helm-source-files-in-current-dir
-            helm-source-bookmarks
-            helm-source-buffer-not-found)
-          :buffer "*helm omni recent*"
-          :truncate-lines t
-          :history 'aj/helm-omni-history
-          :ff-transformer-show-only-basename nil))
-
-#+end_src
-
-
-**** Helm-recoll                                                    :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package helm-recoll
-  :commands helm-recoll
-  :config (helm-recoll-create-source "default" "~/.recoll/"))
-#+end_src
-
 **** Favourite files (to mark files which should be prioritized in helm matches)
 #+begin_src emacs-lisp
 (defvar aj/favourite-files nil)
@@ -1222,13 +1148,6 @@ overriding it, but you should know before you do.
 
 #+end_src
 
-*** Tooltip-mode :ARCHIVE:
-I want to use the echo area (hence ~(tooltip-mode -1)~), but don’t want help echo messages to be truncated, but resized!
-#+begin_src emacs-lisp
-(tooltip-mode -1)
-(setq tooltip-resize-echo-area t)
-#+end_src
-
 *** Flycheck
 #+begin_src emacs-lisp
 (use-package flycheck
@@ -1470,12 +1389,6 @@ A simple command to run ~file-roller -h~ for extracting archives in current dire
   )
 #+end_src
 
-**** Dired-ranger :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package dired-ranger
-  :commands dired-ranger)
-#+end_src
-
 **** Sorting and listing-switches (dired-quick-sort)
 https://gitlab.com/xuhdev/dired-quick-sort/
 But also my branch for persistent per-directory options.
@@ -1551,13 +1464,6 @@ Store visited directories in a list, make it accessible from helm
   (recentf-mode 1))
 #+end_src
 
-*** Zeitgeist :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package zeitgeist
-  :straight nil
-  :load-path "~/kodat/elisp/zeitgeist/"
-  :demand t)
-#+end_src
 *** Ignore more files for normal completion
 #+begin_src emacs-lisp
 (with-eval-after-load 'latex
@@ -2066,85 +1972,11 @@ https://github.com/andersjohansson/tex-fold-linebreaks
 (use-package beginend
   :init (beginend-setup-all))
 #+end_src
-*** Buffer flip :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package buffer-flip
-  :bind ("C-<tab>" . #'buffer-flip)
-  :init
-  ;; transient keymap used once cycling starts
-  (setq buffer-flip-map
-        (let ((map (make-sparse-keymap)))
-          (define-key map (kbd "C-<tab>")   'buffer-flip-forward)
-          (define-key map (kbd "C-S-<iso-lefttab>") 'buffer-flip-backward)
-          (define-key map (kbd "ESC")     'buffer-flip-abort)
-          map))
-  (setq buffer-flip-skip-patterns helm-boring-buffer-regexp-list)
-  (with-eval-after-load "org-keys"
-    (bind-key "C-<tab>" nil org-mode-map)))
-#+end_src
-*** Med iflipb? :ARCHIVE:
-#+begin_src emacs-lisp
-(setq iflipb-wrap-around t)
-(setq iflipb-ignore-buffers helm-boring-buffer-regexp-list)
-
-(bind-key "C-§" #'iflipb-previous-buffer)
-(bind-key "C-½" #'iflipb-next-buffer)
-
-
-(defun aj/switch-to-other-buffer ()
-  (interactive)
-  (iflipb-next-buffer nil)
-  (aj/cycle-buffers/body))
-
-(bind-key "C-x C-b" #'aj/switch-to-other-buffer)
-
-(defhydra aj/cycle-buffers (:color red)
-  "Cycle buffers"
-  ("n" #'iflipb-next-buffer "Next buffer")
-  ("b" #'iflipb-previous-buffer "Previous buffer")
-  ("q" nil "Quit"))
-
-(setq iflipb-wrap-around t)
-#+end_src
-*** Flip buffers with nswbuff :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package nswbuff)
-
-(setq nswbuff-exclude-buffer-regexps helm-boring-buffer-regexp-list
-      nswbuff-start-with-current-centered t
-      nswbuff-display-intermediate-buffers t
-      nswbuff-status-window-layout 'scroll)
-
-(set-face-attribute 'nswbuff-special-buffers-face nil :foreground nil :inherit 'shadow)
-(set-face-attribute 'nswbuff-current-buffer-face nil :foreground nil)
-(set-face-attribute 'nswbuff-separator-face nil :foreground nil :inherit 'shadow)
-
-
-(defun aj/switch-to-other-buffer ()
-  (interactive)
-  (nswbuff-switch-to-next-buffer)
-  (aj/cycle-buffers/body))
-
-(bind-key "C-x C-b" #'aj/switch-to-other-buffer)
-
-(defhydra aj/cycle-buffers (:color red)
-  "Cycle buffers"
-  ("n" #'nswbuff-switch-to-previous-buffer "Previous buffer")
-  ("b" #'nswbuff-switch-to-next-buffer "Next buffer")
-  ("q" nil "Quit"))
-#+end_src
 *** Next/previous-buffer with ~<C-tab>~ and ~<C-S-tab>~ (like switching tabs in firefox ..)
 #+begin_src emacs-lisp
 (bind-keys
  ("<C-tab>" . previous-buffer)
  ("<C-iso-lefttab>" . next-buffer)) ;; really C-S-tab ...
-#+end_src
-
-*** Eyebrowse :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package eyebrowse
-  :init (setq eyebrowse-keymap-prefix (kbd "C-c C-å"))
-  (eyebrowse-mode t))
 #+end_src
 
 *** Window management variables
@@ -2463,16 +2295,6 @@ A bit nicer than isearch. I also like to use fuzzy search (words separated by wh
                 try-expand-line)))
 #+end_src
 
-** info+ :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package info+
-  ;; :after info
-  :defer t
-  :config
-  (define-key Info-mode-map [mouse-4] nil)
-  (define-key Info-mode-map [mouse-5] nil))
-#+end_src
-
 ** undo-tree
 #+begin_src emacs-lisp
 (use-package undo-tree
@@ -2654,43 +2476,6 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
 (use-package whole-line-or-region
   :demand t
   :config (whole-line-or-region-global-mode))
-#+end_src
-*** Volatile-highlight :ARCHIVE:
-Highlights previously changed (yanked, undone, etc.) with a temporary highlight.
-#+begin_src emacs-lisp
-(use-package volatile-highlights
-  :commands volatile-highlights-mode
-  :init (volatile-highlights-mode t)
-  :config
-  (with-eval-after-load 'undo-tree
-    (vhl/define-extension 'undo-tree 'undo-tree-yank 'undo-tree-move)
-    (vhl/install-extension 'undo-tree))
-  (vhl/define-extension 'abbrev 'expand-abbrev)
-  (vhl/install-extension 'abbrev)
-  (vhl/define-extension 'helm-yank 'helm-kill-ring-action-yank)
-  (vhl/install-extension 'helm-yank)
-  (vhl/define-extension 'flyspell-prev 'flyspell-auto-correct-previous-word)
-  (vhl/install-extension 'flyspell-prev)
-
-  (defun aj/vhl-face (&optional theme)
-    (when (aj/solarized-theme-p theme)
-      (set-face-attribute 'vhl/default-face nil :background nil :foreground nil :inherit 'flycheck-info)))
-
-  (aj/vhl-face)
-  (add-hook 'aj/face-definitions-hook #'aj/vhl-face))
-#+end_src
-*** [[https://github.com/rejeep/drag-stuff.el][Drag stuff]] :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package drag-stuff
-  :config
-  (defhydra aj/hydra-drag-stuff (:color pink)
-    "Drag stuff"
-    ("f" drag-stuff-right)
-    ("b" drag-stuff-left)
-    ("p" drag-stuff-up)
-    ("n" drag-stuff-down)
-    ("q" nil nil))
-  (bind-key [f9] #'aj/hydra-drag-stuff/body))
 #+end_src
 *** Save interprogram-paste, so it won’t be overwritten by kills done in emacs and is instead kept in the kill ring.
 #+begin_src emacs-lisp
@@ -3218,16 +3003,6 @@ Argument SYM-NAME is the thing to find."
 
 
 *** Outline
-**** Outshine :ARCHIVE:
-Could be used better some day, need to define good keybindings and stuff, and then navigation could be very easy.
-http://www.modernemacs.com/post/outline-ivy/
-#+begin_src emacs-lisp
-(use-package outshine
-  :init
-  (add-hook 'outline-minor-mode-hook 'outshine-hook-function)
-  :config  (setq outshine-use-speed-commands t))
-
-#+end_src
 **** outline-magic
 Well?
 #+begin_src emacs-lisp
@@ -3842,65 +3617,6 @@ Enable it for buffers in ‘aj/flyspell-modes’ with defined
 (advice-add 'org-mode-flyspell-verify :around #'aj/org-flyspell-skip-links)
 #+end_src
 
-**** Ispell-multi, keep processes for multiple languages going. :ARCHIVE:
-
-#+begin_src emacs-lisp
-(use-package ispell-multi
-  :load-path "~/kodat/elisp/ispell-multi"
-  :after ispell
-  :config (ispell-multi-activate))
-
-#+end_src
-
-**** COMMENT With wcheck :ARCHIVE:
-#+begin_src emacs-lisp
-(setq ispell-really-hunspell t)
-
-(setq  wcheck--timer-idle .1)
-(set-face-attribute 'wcheck-default-face nil :underline 'unspecified :inherit 'flyspell-incorrect)
-
-(setq-default
- wcheck-language "English"
- wcheck-language-data
- '(("English"
-    (program . "/usr/bin/hunspell")
-    (args . ("-l" "-d" "en_US"))
-    (action-program . "/usr/bin/hunspell")
-    (action-args . ("-a" "-d" "en_US"))
-    (action-parser . wcheck-parser-ispell-suggestions))
-   ("Swedish"
-    (program . "/usr/bin/hunspell")
-    (args . ("-l" "-d" "sv_SE"))
-    (action-program . "/usr/bin/hunspell")
-    (action-args . ( "-m" "-a" "-d" "sv_SE" "-i" "utf-8"))
-    (action-parser . wcheck-parser-ispell-suggestions))
-   ("sv-en"
-    (program "/usr/bin/hunspell")
-    (args . ("-l" "-d" "sv_SE,en_GB"))
-    (action-program . "/usr/bin/hunspell")
-    (action-args . ( "-m" "-a" "-d" "sv_SE,en_GB" "-i" "utf-8"))
-    (action-parser . wcheck-parser-ispell-suggestions)))))
-
-
-;; toggle between Danish and English easily
-(let ((langs '("English" "Swedish")))
-  (setq lang-ring (make-ring (length langs)))
-  (dolist (elem langs) (ring-insert lang-ring elem)))
-
-(defun aj/cycle-ispell-languages ()
-  (interactive)
-  (let ((lang (ring-ref lang-ring -1)))
-	(ring-insert lang-ring lang)
-	(wcheck-change-language lang)))
-
-(global-set-key (kbd "C-c l") 'aj/cycle-ispell-languages)
-(global-set-key (kbd "C-c L") 'wcheck-mode)
-
-
-(global-set-key "\M-n" 'wcheck-spelling-suggestions)
-
-#+end_src
-
 *** Typo
 For doing smart (curly) quotes, mainly in emails since org has it’s own mechanism when exporting.
 #+begin_src emacs-lisp
@@ -4396,222 +4112,6 @@ Sometimes I feel the need for a generally bigger font in all emacs frames. Espec
 ;;   )
 #+end_src
 
-**** Moody :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package moody
-  :config
-  (setq x-underline-at-descent-line t)
-  (setq moody-mode-line-height 26)
-  ;; (moody-replace-mode-line-buffer-identification)
-  ;; (moody-replace-vc-mode)
-  :init
-  (add-hook 'aj/face-definitions-hook #'aj/modeline-fix)
-
-  (defun aj/modeline-fix (&optional theme)
-    (when (aj/solarized-theme-p theme)
-      (let ((line (face-attribute 'mode-line :underline)))
-        (set-face-attribute 'mode-line          nil :overline line :box nil)
-        (set-face-attribute 'mode-line-inactive nil :overline line :underline line :box nil)))))
-#+end_src
-
-**** [[https://github.com/TheBB/spaceline/][spaceline]] :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package spaceline-config
-  :ensure spaceline
-  :defer 3
-  :config
-  (setq spaceline-responsive t)
-  (spaceline-helm-mode)
-  (spaceline-info-mode)
-  ;; (spaceline-emacs-theme)
-  )
-#+end_src
-
-**** Spaceline all the icons :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package spaceline-all-the-icons
-  :after spaceline
-  :config
-  (setq
-   spaceline-all-the-icons-flycheck-alternate t
-   spaceline-all-the-icons-clock-always-visible nil
-   spaceline-all-the-icons-hide-long-buffer-path t
-   spaceline-all-the-icons-buffer-path-p t
-   spaceline-all-the-icons-highlight-file-name t
-   powerline-default-separator nil
-   spaceline-all-the-icons-separator-type 'none
-   spaceline-all-the-icons-minor-modes-p t)
-
-  (solarized-with-color-variables 'light
-    (setq spaceline-all-the-icons-file-name-highlight base1))
-
-  ;; Better conditions
-  (put 'spaceline-all-the-icons-time-p :when
-       '(or spaceline-all-the-icons-clock-always-visible
-            (eq 'fullboth (frame-parameter nil 'fullscreen))))
-  (put 'spaceline-all-the-icons-battery-status-p :when
-       '(and active (bound-and-true-p fancy-battery-mode)
-             (eq 'fullboth (frame-parameter nil 'fullscreen))))
-
-
-  (put 'spaceline-all-the-icons-region-info-p :when
-       '(and mark-active (not (eq major-mode 'pdf-view-mode))))
-  ;; support pdf
-  (spaceline-define-segment all-the-icons-position-aj
-    "An `all-the-icons' Line & Column indicator"
-    (propertize (if (eq major-mode 'pdf-view-mode)
-                    (spaceline--pdfview-page-number)
-                  (format-mode-line "%l:%2c"))
-
-                'face `(:height ,(spaceline-all-the-icons--height 0.9) :inherit)
-                'display '(raise 0.1))
-    :tight t
-    :priority -0.5)
-
-  ;; shorten long buffer names:
-  (spaceline-define-segment all-the-icons-buffer-id-aj
-    "An `all-the-icons' segment to display current buffer id"
-    (let* ((height (if spaceline-all-the-icons-slim-render 1.0 0.8))
-           (raise  (if spaceline-all-the-icons-slim-render 0.1 0.2))
-
-           (help-echo (format "Major-mode: `%s'" major-mode))
-
-           (file-face `(:height ,(spaceline-all-the-icons--height height)))
-           (show-path? (and active
-                            spaceline-all-the-icons-buffer-path-p
-                            (spaceline-all-the-icons--buffer-path)
-                            (not spaceline-all-the-icons-slim-render)))
-
-           (have-projectile? (and (fboundp 'projectile-project-p) (projectile-project-p)))
-           (show-projectile? (and spaceline-all-the-icons-projectile-p have-projectile?))
-
-           (buffer-id (if (and (buffer-file-name)
-                               (or show-path? show-projectile?))
-                          (file-name-nondirectory (buffer-file-name))
-                        (format-mode-line "%b")))
-           (limit (/ (window-text-width) 5))
-           (buffer-id (if (< limit (length buffer-id))
-                          (concat (substring buffer-id 0 (1- limit)) " ⋯")
-                        buffer-id))
-
-           (mouse-f (if have-projectile? 'projectile-find-file 'find-file)))
-
-      (if (not (and spaceline-all-the-icons-highlight-file-name
-                    show-path?))
-          (add-to-list 'file-face :inherit t)
-        (setq file-face (append `(:background ,(spaceline-all-the-icons--face-background default-face)) file-face))
-        (setq file-face (append `(:foreground ,(or spaceline-all-the-icons-file-name-highlight
-                                                   (spaceline-all-the-icons--face-background highlight-face))) file-face)))
-
-      (propertize buffer-id
-                  'face file-face
-                  'display `(raise ,raise)
-                  'help-echo help-echo
-                  'mouse-face (spaceline-all-the-icons--highlight)
-                  'local-map (make-mode-line-mouse-map 'mouse-1 mouse-f)))
-    :tight t)
-
-
-  ;; (spaceline-define-segment aj/all-the-icons-mode-icon
-  ;;   "An `all-the-icons' segment indicating the current buffer's mode with an icon"
-  ;;   (let ((icon (all-the-icons-icon-for-mode major-mode)))
-  ;;     (unless (symbolp icon)
-  ;;       (propertize icon
-  ;;                   'help-echo (format "Major-mode: `%s'" major-mode)
-  ;;                   'display '(raise 0)
-  ;;                   'face `(:height ,(spaceline-all-the-icons--height 1.0)
-  ;;                                   ,@(get-text-property 0 'face icon)
-  ;;                                   ;; :inherit (powerline-active1)
-  ;;                                   )))))
-
-
-  (defun aj/spaceline-all-the-icons-theme (&rest additional-segments)
-    "Install the `spaceline-ml-all-the-icons'.
-Add ADDITIONAL-SEGMENTS to the end of the theme."
-    (interactive)
-    (spaceline-compile
-      "all-the-icons"
-      '((all-the-icons-anzu
-         :face mode-line
-         :skip-alternate t)
-
-        ((all-the-icons-modified
-          all-the-icons-bookmark
-          all-the-icons-dedicated
-          all-the-icons-window-number
-          all-the-icons-eyebrowse-workspace
-          all-the-icons-buffer-size) :face highlight-face :skip-alternate t)
-
-        ;; all-the-icons-separator-left-active-1
-
-        (all-the-icons-mode-icon
-         ((all-the-icons-buffer-path
-           all-the-icons-buffer-id-aj) :separator ""))
-
-        ;; all-the-icons-separator-left-extra-2
-
-        ;; all-the-icons-separator-left-extra-1
-        ;; all-the-icons-separator-left-inactive
-
-        (all-the-icons-minor-modes :separator " " :priority -0.1)
-
-        ((all-the-icons-vc-icon
-          all-the-icons-vc-status
-          all-the-icons-git-ahead
-          all-the-icons-git-status
-          all-the-icons-flycheck-status
-          all-the-icons-package-updates)
-         ;; :face other-face
-         :separator (spaceline-all-the-icons--separator
-                     spaceline-all-the-icons-secondary-separator " ")
-         :priority 0.5)
-
-        (((all-the-icons-position-aj :priority -1)
-          ((all-the-icons-process
-            all-the-icons-region-info
-            all-the-icons-text-scale)
-           :priority 0.0)
-          (all-the-icons-narrowed :priority -1))
-         :separator (spaceline-all-the-icons--separator
-                     spaceline-all-the-icons-primary-separator " "))
-
-        ;; all-the-icons-separator-left-extra-2
-        ;; all-the-icons-separator-left-inactive
-        ;; all-the-icons-separator-right-active-1
-
-        ((all-the-icons-which-function)
-         :separator ""))
-
-      ;; right
-      `((spaceline-mu4e-alert-segment :when active :priority 1)
-        (global :when active :priority 1)
-
-
-        ((((org-pomodoro
-            (all-the-icons-org-clock-current-task
-             :global-override 'org-mode-line-string))
-           :priority -0.7)
-          all-the-icons-battery-status
-          all-the-icons-time)
-         :separator " " ;; (spaceline-all-the-icons--separator spaceline-all-the-icons-primary-separator " ")
-         ;; :face default-face
-         :when active
-         :priority 0)))
-    (setq-default mode-line-format spaceline-all-the-icons-theme))
-
-  (aj/spaceline-all-the-icons-theme)
-
-  (spaceline-all-the-icons--setup-anzu)
-  (spaceline-toggle-all-the-icons-narrowed-on)
-  )
-#+end_src
-***** Weather :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package yahoo-weather
-  :after spaceline-all-the-icons
-  :config (yahoo-weather-mode))
-#+end_src
-
 *** Themes
 **** My own face definitions
 Load my own face customizations after enabling a theme.
@@ -4767,70 +4267,6 @@ Also runs hook aj/face-definitions-hook."
 
 (bind-key "S-<f11>" #'aj/toggle-light-dark)
 #+end_src
-**** Base 16 :ARCHIVE:
-Works ok... But also here, too bright oranges
-Which are nice?
-- Dark
-  + base16-materia
-  + base16-material (similar)
-- light
-  + mexico-light
-  + tomorrow
-
-
-#+begin_src emacs-lisp
-(use-package base16-theme
-  :config
-  (load-theme 'base16-mexico-light t))
-#+end_src
-**** Tomorrow :ARCHIVE:
-Is almost good, but it lacks some definitions, and the yellow and orange have bad contrast against white (too bright)
-#+begin_src emacs-lisp
-(use-package color-theme-sanityinc-tomorrow
-:init (load-theme 'sanityinc-tomorrow-day))
-
-#+end_src
-**** bbatsov’s solarized :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package solarized-theme
-  :init
-  (setq solarized-scale-org-headlines nil
-        solarized-distinct-fringe-background t
-        solarized-high-contrast-mode-line nil)
-  (load-theme 'solarized-light))
-#+end_src
-**** sellout’s solarized :ARCHIVE:
-I actually liked this more, especially the unified-branch which I used here. But it has kind of stagnated, and has so few definitions.
-#+begin_src emacs-lisp
-(use-package solarized-definitions
-  :if (display-graphic-p)
-  :load-path "~/kodat/elisp/emacs-color-theme-solarized/"
-  :demand t
-  :init (add-to-list 'custom-theme-load-path
-                     "~/kodat/elisp/emacs-color-theme-solarized/"))
-(when (display-graphic-p)
-  (setq frame-background-mode 'light)
-  (load-theme 'solarized t)
-  (mapc 'frame-set-background-mode (frame-list))
-
-  (defun toggle-night-color-theme ()
-    "Switch to/from night color scheme."
-    (interactive)
-    (if (eq frame-background-mode 'dark)
-        (progn
-          (setq frame-background-mode 'light)
-          (setq pdf-view-midnight-colors '("#657b83" . "#fdf6e3")))
-      (setq frame-background-mode  'dark)
-      (setq pdf-view-midnight-colors '("#839496" . "#002b36" )))
-
-    (load-theme 'solarized)
-    (mapc 'frame-set-background-mode (frame-list))
-    (powerline-reset)
-    (aj/apply-face-definitions))
-  (bind-key "<f9>" 'toggle-night-color-theme))
-#+end_src
-
-
 *** Hl-line for prog-mode
 #+begin_src emacs-lisp
 (add-hook 'prog-mode-hook 'hl-line-mode)
