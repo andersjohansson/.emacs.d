@@ -2626,12 +2626,6 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
   )
 #+end_src
 
-** GhostText + atomic-chrome.el for editing text areas etc. from firefox
-#+begin_src emacs-lisp
-(use-package atomic-chrome
-  :init (atomic-chrome-start-server))
-#+end_src
-
 ** New (custom) utility commands
 #+begin_src emacs-lisp
 (use-package aj-custom-commands
