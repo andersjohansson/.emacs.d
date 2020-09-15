@@ -318,6 +318,74 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 (setq mu4e-html2text-command 'mu4e-shr2text)
 #+end_src
 
+*** View shortened addresses
+It is good to be able to see that the address we get an email from is correct, but we don’t need to see the full address. This little patching to ~mu4e~view-construct-contacts-header~  displays the domain name or possibly a short symbol fetched from the list ~aj/mail-domain~.
+
+Secure and economical.
+
+#+begin_src emacs-lisp
+(setq mu4e-view-show-addresses t)
+
+(el-patch-feature mu4e-actions)
+(with-eval-after-load 'mu4e-actions
+  (el-patch-defun mu4e~view-construct-contacts-header (msg field)
+    "Add a header for a contact field (ie., :to, :from, :cc, :bcc)."
+    (mu4e~view-construct-header field
+                                (mapconcat
+                                 (lambda(c)
+                                   (let* ((name (when (car c)
+                                                  (replace-regexp-in-string "[[:cntrl:]]" "" (car c))))
+                                          (email (when (cdr c)
+                                                   (replace-regexp-in-string "[[:cntrl:]]" "" (cdr c))))
+                                          (short (el-patch-wrap 1 2
+                                                   (propertize
+                                                    (or name email)  ;; name may be nil
+                                                    'face 'mu4e-contact-face)))
+                                          (long (if name
+                                                    (el-patch-swap
+                                                      (format "%s <%s>" name email)
+                                                      (format "%s %s"
+                                                              (propertize name 'face 'mu4e-contact-face)
+                                                              (aj/mu4e-mail-domain-symbol email)))
+                                                  email)))
+                                     (propertize
+                                      (if mu4e-view-show-addresses long short)
+                                      'long long
+                                      'short short
+                                      'email email
+                                      'keymap mu4e-view-contacts-header-keymap
+                                      (el-patch-remove 'face 'mu4e-contact-face)
+                                      'mouse-face 'highlight
+                                      'help-echo (format "<%s>\n%s" email
+                                                         "[mouse-2] or C to compose a mail for this recipient"))))
+                                 (mu4e-message-field msg field) ", ") t))
+  )
+
+
+(defun aj/mu4e-mail-domain-symbol (email)
+  (let ((maildomain (cadr (split-string email "@"))))
+    (propertize (concat "<" email ">")
+                'display
+                (cl-loop for (d . s) in aj/mail-domains
+                         when (string-match-p d maildomain)
+                         return (propertize s 'face 'aj/shadow-fringe)
+                         finally return (propertize (concat "(" maildomain ")") 'face 'shadow)))))
+
+(defcustom aj/mail-domains nil
+  "Alist of mappings between regexps for an email domain and display string.
+
+If found, the display string is shown instead of the full domain when displaying emails in mu4e.
+Examples:
+((\"chalmers.se$\" . \"🅒\")
+ (\"uu.se$\" . \"🅤\")))
+"
+  :group 'aj
+  :type '(alist :key-type regexp :value-type string))
+
+
+
+#+end_src
+
 ** Command for quick check of new mails
 #+begin_src emacs-lisp
 ;;(defvar aj/mu4e-get-mail-command-quick "mbsync --new -qq uu-inbox gmail-inbox ajf-inbox")
