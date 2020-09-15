@@ -2343,6 +2343,7 @@ Mostly for html and reveal
   :custom (org-re-reveal-revealjs-version "4")
   :demand t)
 #+end_src
+
 **** Settings
 #+begin_src emacs-lisp
 (defvar aj/path-to-revealjs "~/lib/reveal.js/")
@@ -2596,11 +2597,33 @@ Mostly for html and reveal
 (add-to-list 'org-export-filter-link-functions #'aj/org-reveal-lazy-load-links)
 #+end_src
 
-**** Fix blockquotes
-Actually, the tree filtering in ~org-re-reveal~ takes care of frag attributes. No need for a custom (weaker) ~org-re-reveal-quote-block~
+**** Enable citations in quote blocks
+Kind of messy, but does the job of making org-zotxt links in cite-attributes to correct citations.
 #+begin_src emacs-lisp
-(advice-add 'org-re-reveal-quote-block :override #'org-html-quote-block)
+(with-eval-after-load 'ox
+  (add-to-list 'org-export-filter-quote-block-functions #'aj/org-html-citations-in-code-blocks)
+  (defun aj/org-html-citations-in-code-blocks (qb backend info)
+    (if (and
+         (org-export-derived-backend-p backend 'html)
+         (string-match "cite=\"\\(\\[\\[zotero:[^\"]+\\]\\]\\)\"" qb))
+        (let ((ms (match-string 1 qb)))
+          (replace-match
+           (save-match-data
+             (string-trim
+              (replace-regexp-in-string
+               "</?\\(span\\|p\\)[^>]*?>"
+               ""
+               (org-export-data
+                (org-element-parse-secondary-string ms nil)
+                info)
+               ;; (zotxt-extra-link-export )
+               ;; (org-export-string-as ms backend t)
+               )))
+           t t qb 1))
+      qb)))
+
 #+end_src
+
 *** Ignored drawers
 #+begin_src emacs-lisp
 (with-eval-after-load 'ox
