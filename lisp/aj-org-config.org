@@ -1555,6 +1555,16 @@ Currently those entered with "a", could of course be generalized.
   (add-hook 'org-capture-prepare-finalize-hook #'aj/org-capture-maybe-add-id))
 #+end_src
 
+**** Check off reading habit when capturing a reading note.
+#+begin_src emacs-lisp
+(with-eval-after-load 'org-capture
+  (defun aj/org-capture-maybe-mark-read ()
+    (when (equal "l" (org-capture-get :key t))
+      (aj/org-id-todo-state "aj:read-habit" 'done)))
+
+  (add-hook 'org-capture-prepare-finalize-hook #'aj/org-capture-maybe-mark-read))
+#+end_src
+
 **** Insert weektree CUSTOM_ID
 #+begin_src emacs-lisp
 (advice-add 'org-datetree--find-create :after #'aj/insert-datetree-custom-id)
