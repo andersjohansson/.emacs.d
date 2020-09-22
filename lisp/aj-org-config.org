@@ -512,46 +512,40 @@ I want to be able to use emojis \etc. But that doesn’t work with the way ~org-
 #+end_src
 
 **** External calendars
-Currently I need to sync both with my work exchange server (via davmail) and some private google calendars.
+Currently I need to sync both with my work exchange server and some private google calendars.
 ***** Functions for syncing some or all external calendars
 #+begin_src emacs-lisp
-(defmacro aj/org-calendar-sync-external-defun (name probefile time syncform)
-  "Defines function aj/org-calendar-sync-NAME for syncing external calendar.
+(defun aj/org-cal-sync-maybe (probefile hours program &optional force)
+  (let ((mtime (nth 5 (file-attributes probefile))))
+    (when (or force (not mtime)
+              (< (/ 24 hours) (time-to-number-of-days (time-subtract (current-time) mtime))))
+      (deferred:process program))))
 
-PROBEFILE is a filename whose last modified time should reflect
-the status of the sync, TIME is the number of hours after which a new
-sync is expected, UPDATEFORM is the form to evaluate for
-syncing."
-  (declare (indent 1))
-  `(defun ,(intern (concat "aj/org-calendar-sync-" name)) (&optional force)
-     ,(concat "Sync external calendar " name ".")
-     (interactive "P")
-     (let ((mtime (nth 5 (file-attributes ,probefile))))
-       (when (or force (not mtime)
-                 (< ,(/ 24 time) (time-to-number-of-days (time-subtract (current-time) mtime))))
-         ,syncform))))
-
-(aj/org-calendar-sync-external-defun "gcal"
-  "~/org/imp/G.org" 8 (call-process "aj-gcal-to-org"))
-(aj/org-calendar-sync-external-defun "exchange"
-  "~/org/imp/chalmerskalender.org" 3 (call-process "aj-sync-exchange-calendar")
-  ;; (org-caldav-sync)
-  )
-
-(defun aj/org-calendar-sync-all (&optional force)
+(defun aj/org-calendar-maybe-sync-all (&optional force)
   (interactive "P")
-  (aj/org-calendar-sync-gcal force)
-  (aj/org-calendar-sync-exchange force))
+  (deferred:$
+    (deferred:parallel
+      (aj/org-cal-sync-maybe "~/org/imp/G.org" 8 "aj-gcal-to-org" force)
+      (aj/org-cal-sync-maybe "~/org/imp/chalmerskalender.org" 3 "aj-sync-exchange-calendar" force))
+    (deferred:nextc it
+      (lambda (args)
+        ;; (message "All synced!")
+        (when args (buffer-live-p org-agenda-buffer)
+              (with-current-buffer org-agenda-buffer
+                (org-agenda-redo t)))))))
 
-(defun aj/org-calendar-sync-all-redo-agenda ()
+(defun aj/org-calendar-sync-all ()
   (interactive)
-  (aj/org-calendar-sync-all t)
-  (org-agenda-redo t))
+  (aj/org-calendar-maybe-sync-all t))
 
-(add-hook 'org-agenda-finalize-hook #'aj/org-calendar-sync-all)
+;; no suitable hook, want to do it just after org-agenda-list,
+;; org-agenda-finalize-hook happens too often.
+(advice-add 'org-agenda-list :after #'aj/org-calendar-sync-all-ignore-args)
+(defun aj/org-calendar-sync-all-ignore-args (&rest _ignore)
+  (aj/org-calendar-maybe-sync-all))
 
 (with-eval-after-load 'org-agenda
-  (bind-key "å" #'aj/org-calendar-sync-all-redo-agenda org-agenda-mode-map))
+  (bind-key "å" #'aj/org-calendar-sync-all org-agenda-mode-map))
 #+end_src
 
 ***** Syncing with org-caldav :ARCHIVE:
