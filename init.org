@@ -3909,7 +3909,7 @@ https://gitlab.com/andersjohansson/pdf-zotxt-quote
 (use-package pdf-zotxt-quote
   :straight nil
   :load-path ("~/kodat/elisp/pdf-zotxt-quote/" "~/kodat/elisp/zotxt-emacs/")
-  :commands pdf-zotxt-quote-mode
+  :commands (pdf-zotxt-quote-mode pdf-zotxt-quote-cleanup-mode)
   :custom (pdf-zotxt-quote-fill-column 999999))
 #+end_src
 
