@@ -63,7 +63,7 @@ org mode async exports, using only trees tagged with “org_async”."
   (with-current-buffer
       (find-file-noselect origin-file)
     (let* ((todo-only nil)
-           (trees (mapconcat #'identity
+           (trees (string-join
                              (org-scan-tags #'aj/org-return-entry
                                             (cdr (org-make-tags-matcher match))
                                             todo-only) "\n\n"))
@@ -1577,7 +1577,7 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
                            (match-string 0)))
                into words
                finally return
-               (mapconcat #'identity words "-"))))
+               (string-join words "-"))))
 
   (defun aj/password-store-get-new-entry-with-completion ()
     (helm

@@ -1237,7 +1237,7 @@ Should check if it’s less efficient doing this than the homegrown mapping in h
     (push (aj/measure-helm-org-cands times "New with exclusions") listan)
     (let ((org-agenda-skip-archived-trees nil) (org-agenda-skip-comment-trees nil))
       (push (aj/measure-helm-org-cands times "New with archived etc.") listan))
-    (message (mapconcat #'identity listan "\n"))))
+    (message (string-join listan "\n"))))
 #+end_src
 
 *** Redefine ~helm-org-in-buffer-preselect~
@@ -1302,7 +1302,7 @@ Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entrie
          (lwidth (length last))
          (middle
           (when (< 2 (length fontified))
-            (mapconcat #'identity (cl-subseq fontified 1 -1) separator)))
+            (string-join (cl-subseq fontified 1 -1) separator)))
          (rwidth (- width (length prefix) (* 2 (length separator) 2))) ; possible width for only first+last
          (diff (- rwidth fwidth lwidth))
          fpath)
@@ -1379,7 +1379,7 @@ Present a nicer-looking helm buffer for ~org-refile~
            for p in (split-string outline-path "/")
            do (cl-incf i)
            collect (propertize p 'face (nth (mod i n) org-level-faces)) into l
-           finally return (mapconcat #'identity l "/")))
+           finally return (string-join l "/")))
 
 
 #+end_src
@@ -1846,7 +1846,7 @@ Can be passed any ox BACKEND in a non-interactive call"
           (author path) (aj/org-annotate-extract-author path)
         (setq path (org-export-data-with-backend path 'latex nil))
         (when author (push (concat "author=" author) opt))
-        (when opt (setq optstring (concat "[" (mapconcat #'identity opt ",") "]")))
+        (when opt (setq optstring (concat "[" (string-join opt ",") "]")))
         (if desc
             (format "\\fxnote*%s{%s}{%s}" optstring path
                     (org-export-data-with-backend desc 'latex nil))
@@ -3111,7 +3111,7 @@ Here it is, finished ☺: http://urn.kb.se/resolve?urn=urn:nbn:se:uu:diva-357341
 
 (defun aj/org-paperref-complete (&optional _arg)
   (concat "paper:"
-          (mapconcat #'identity (helm-comp-read
+          (string-join (helm-comp-read
                                  "Paperrefs: "
                                  (aj/org-paperref-find nil t)
                                  :marked-candidates t)
