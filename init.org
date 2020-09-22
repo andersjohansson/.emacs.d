@@ -733,6 +733,14 @@ We need to add "target" to the fuz recipe so that it isn’t removed by straight
 #+end_src
 
 
+**** helm-fd
+Use ~fd~ for searching instead of ~find~. Faster and easier.
+#+begin_src emacs-lisp
+(use-package helm-fd
+  :bind (:map helm-command-map
+              ("/" . helm-fd)))
+#+end_src
+
 **** helm-all-the-icons
 #+begin_src emacs-lisp
 (use-package helm-all-the-icons
