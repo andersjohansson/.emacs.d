@@ -2361,10 +2361,14 @@ Mostly for html and reveal
    org-re-reveal-overview nil
    org-re-reveal-hlevel 2
    org-re-reveal-hashonebasedindex t
-   org-re-reveal-extra-options "hash: true, navigationMode: 'linear'"
-   ;; org-re-reveal-extra-js "{src: '../assets/aj-fixes.js'}"
-   ;; org-re-reveal-external-plugins '((aj-fixes . "{src: '../assets/aj-fixes.js', async: true}"))
-   ))
+   org-re-reveal-extra-options "hash: true, navigationMode: 'linear'")
+
+  ;; these can now be enabled.
+  ;; TODO, make them real plugins for this to work
+  ;; (cl-loop for l in '((ajfixes "ajFixes" "assets/aj-fixes.js")
+  ;;                     (ajfixbubbles "ajFixBubbles" "assets/aj-fix-bubbles.js"))
+  ;;          do (add-to-list 'org-re-reveal-plugin-config l))
+  )
 #+end_src
 
 **** reveal - org-annotate-style
@@ -2508,6 +2512,7 @@ Mostly for html and reveal
       ("very-much-larger" . "very-much-larger")
       ("smaller" . "smaller")
       ("much-smaller" . "much-smaller")
+      ("extra top margin" . "extratopmargin")
       ("attrib (picture attributions)" . "attrib")
       ("whiteoverlay (overlay over background)" . "whiteoverlay")
       ("pic-row (for pictures in row)" . "pic-row")
@@ -2536,7 +2541,8 @@ Mostly for html and reveal
                                 :candidates aj/org-reveal-classes)
                               (helm-build-dummy-source "Custom class")))))
      "Insert html class for element")
-    ("C" (org-set-property "reveal_data_state" "centered-headline") "Centered headline")
+    ("C" (progn (org-set-property "reveal_data_state" "centered-headline")
+                (org-toggle-tag "centered_headline" 'on)) "Centered headline")
     ("F" (insert (completing-read "Frag style" '(grow shrink roll-in fade-out highlight-red highlight-green highlight-blue appear))) "Frag style")
     ("H" (insert "#+reveal_html: ") "HTML")
     ("b" (org-set-property "reveal_background"
@@ -2608,14 +2614,9 @@ Kind of messy, but does the job of making org-zotxt links in cite-attributes to 
                "</?\\(span\\|p\\)[^>]*?>"
                ""
                (org-export-data
-                (org-element-parse-secondary-string ms nil)
-                info)
-               ;; (zotxt-extra-link-export )
-               ;; (org-export-string-as ms backend t)
-               )))
+                (org-element-parse-secondary-string ms '(link)) info))))
            t t qb 1))
       qb)))
-
 #+end_src
 
 *** Ignored drawers
