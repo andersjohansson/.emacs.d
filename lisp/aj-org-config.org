@@ -408,8 +408,7 @@ all children are done, you can use the following setup:
       org-habit-graph-column 50
       org-agenda-time-grid '((daily today require-timed)
                              (800 1000 1200 1300 1500 1700)
-                             "......"
-                             "----------------")
+                             " " " ")
       org-agenda-columns-add-appointments-to-effort-sum t
       org-enforce-todo-dependencies t
       org-agenda-dim-blocked-tasks t
