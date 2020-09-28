@@ -430,6 +430,7 @@ Example of alist entry:
 (use-package helm
   :bind (("<f2>" . helm-imenu))
   :demand t
+  :custom (helm-ff-keep-cached-candidates . nil)
   :config
   (setq-default helm-command-prefix-key "C-c h")
   (require 'helm-config)
