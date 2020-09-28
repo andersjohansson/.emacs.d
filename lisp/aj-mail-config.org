@@ -524,11 +524,13 @@ message from the wrong account"
 *** Signature cycling
 I have long and "official" signatures defined for my accounts, but often I want to just include my name, or nothing at all. This function allows me to cycle through the signature set in the context (variable ~message-context~), a list of shorter ones, and localized signatures when writing in different languages (English and Swedish really). 
 
-Also commented below a function for switching signature language automatically with guess-language. I found it too unpredictable however (for example when replying in a different language) and just switching manually gives more control.
+Also commented below is a function for switching signature language automatically with guess-language. I found it too unpredictable however (for example when replying in a different language) and just switching manually gives better control.
 #+begin_src emacs-lisp
-(defvar aj/message-simple-signatures '("Anders Johansson\n" ""))
+(defvar aj/message-simple-signatures '("" ;; "Anders Johansson\n"
+                                       ))
 (defvar aj/mu4e-compose-localized-signatures nil
-  "Alist of language and signature")
+  "Alist of language symbols and signature strings.
+Set in my private mail config, possibly with mu4e context.")
 
 (defvar-local aj/message-sig-cycle 0)
 
@@ -537,9 +539,9 @@ Also commented below a function for switching signature language automatically w
   (let ((sigs (cl-remove nil
                          (cl-remove-duplicates
                           (append (list message-signature)
-                                  (mapcar #'cdr aj/mu4e-compose-localized-signatures)
-                                  aj/message-simple-signatures)
-                          :test #'equal))))
+                                  aj/message-simple-signatures
+                                  (mapcar #'cdr aj/mu4e-compose-localized-signatures))
+                          :test #'equal :from-end t))))
     (setq aj/message-sig-cycle
           (mod (1+ aj/message-sig-cycle)
                (length sigs)))
