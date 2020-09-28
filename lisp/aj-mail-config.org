@@ -526,8 +526,8 @@ I have long and "official" signatures defined for my accounts, but often I want 
 
 Also commented below is a function for switching signature language automatically with guess-language. I found it too unpredictable however (for example when replying in a different language) and just switching manually gives better control.
 #+begin_src emacs-lisp
-(defvar aj/message-simple-signatures '("" ;; "Anders Johansson\n"
-                                       ))
+(defvar aj/message-simple-signatures '((none . ""))
+  "Alist of signature names (symbol) and signatures (strings).")
 (defvar aj/mu4e-compose-localized-signatures nil
   "Alist of language symbols and signature strings.
 Set in my private mail config, possibly with mu4e context.")
@@ -538,10 +538,10 @@ Set in my private mail config, possibly with mu4e context.")
   (interactive)
   (let ((sigs (cl-remove nil
                          (cl-remove-duplicates
-                          (append (list message-signature)
+                          (append (list (cons 'initial message-signature))
                                   aj/message-simple-signatures
-                                  (mapcar #'cdr aj/mu4e-compose-localized-signatures))
-                          :test #'equal :from-end t))))
+                                  aj/mu4e-compose-localized-signatures)
+                          :test #'equal :key #'cdr :from-end t))))
     (setq aj/message-sig-cycle
           (mod (1+ aj/message-sig-cycle)
                (length sigs)))
@@ -549,15 +549,17 @@ Set in my private mail config, possibly with mu4e context.")
 
 (bind-key "C-c C-p" #'aj/message-signature-cycle mu4e-compose-mode-map)
 
-(defun aj/message-change-signature (sig &optional show)
+(cl-defun aj/message-change-signature ((name . sig) &optional show)
   (save-excursion
     (aj/message-remove-signature)
     (let ((message-signature sig))
-      (unless (or  (not sig) (string= message-signature ""))
-        (message-insert-signature)))
+      (unless (or (not sig) (string= message-signature ""))
+        (message-insert-signature))
+      (message "Switched to signature %s"
+               (propertize (symbol-name name) 'face 'bold)))
     (when show
       ;; to be able to see what happens in a long message:
-      (sit-for 0.4))))
+      (sit-for 0.6))))
 
 ;; Switch signature with guess-language?
 
