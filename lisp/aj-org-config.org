@@ -9,47 +9,6 @@
 #+end_src
 
 * Org-config
-** Customize some variables :org_async:
-#+begin_src emacs-lisp
-(setq
- org-table-header-line-p t
- org-hidden-keywords '(title author date)
- org-refile-allow-creating-parent-nodes 'confirm
- org-special-ctrl-k t
- org-fontify-quote-and-verse-blocks t
- org-fontify-done-headline nil
- org-adapt-indentation nil
- org-yank-adjusted-subtrees t
- org-catch-invisible-edits 'show
- org-footnote-define-inline t
- org-cycle-level-after-item/entry-creation nil
- org-blank-before-new-entry '((heading . auto) (plain-list-item . auto))
- org-cycle-separator-lines 0
- ;; we always want noexport etc. to be offered
- org-tag-persistent-alist '(("noexport") ("outline") ("ignoreheading") ("ignoreheadinglocal") ("read_only"))
- ;; I mostly don’t use fast-tag-selection, perhaps in special files
- ;; with specially defined tags
- org-use-fast-tag-selection 'auto
- ;; then it should be really quick
- org-fast-tag-selection-single-key t
- org-pretty-entities t
- org-pretty-entities-include-sub-superscripts nil
- org-highlight-latex-and-related '(latex script entities)
- org-src-tab-acts-natively t
- org-src-window-setup 'current-window
- org-edit-src-content-indentation 0
- org-edit-src-turn-on-auto-save t
- org-M-RET-may-split-line '((headline . t) (default . t))
- org-agenda-window-setup 'current-window
- ;; org-fontify-whole-heading-line t
- ;; org-level-color-stars-only t
- org-hide-emphasis-markers t
- org-highlight-latex-fragments-and-specials t
- org-startup-folded nil
- org-startup-indented t
- org-indent-indentation-per-level 2
- org-url-hexify-p nil)
-#+end_src
 ** MobileOrg
 #+begin_src emacs-lisp
 (setq org-mobile-files (list org-directory)
@@ -94,6 +53,7 @@ for more information."
 
 
 #+end_src
+
 **** Prettify quote-blocks
 #+begin_src emacs-lisp
 ;; (aj/add-visual-replacement "#+BEGIN_QUOTE" "▄▁▁▁▁▁▁▁▁▁▁▁▁▁▁" aj/org-prettify-symbols)
@@ -106,14 +66,27 @@ for more information."
               ("#+END_QUOTE" . ?❞)
               ("#+end_quote" . ?❞)))
   (add-to-list 'aj/org-prettify-symbols kw))
-
-
 #+end_src
+
 **** Prettify dashes
 #+begin_src emacs-lisp
 (dolist (kw '(("--" . ?–)
               ("---" . ?—)))
   (add-to-list 'aj/org-prettify-symbols kw))
+#+end_src
+
+** Don’t activate mouse-behaviour for tags (I often just accidentally click them)
+#+begin_src emacs-lisp
+(defun aj/org-activate-tags (limit)
+  (when (re-search-forward org-tag-line-re limit t)
+    (org-remove-flyspell-overlays-in (match-beginning 1) (match-end 1))
+    ;; (add-text-properties (match-beginning 1) (match-end 1)
+	;; 		             (list 'mouse-face 'highlight
+	;; 		                   'keymap org-mouse-map))
+    (org-rear-nonsticky-at (match-end 1))
+    t))
+
+(advice-add 'org-activate-tags :override #'aj/org-activate-tags)
 #+end_src
 
 ** Keybindings and templates
@@ -149,6 +122,12 @@ I never use this.
   (interactive)
   (org-todo 'done))
 #+end_src
+
+*** Speed command for adding property
+#+begin_src emacs-lisp
+(add-to-list 'org-speed-commands-user '("P" . org-set-property))
+#+end_src
+
 *** Add extra wrappers for smartparens
 By default, ~smartparens-org~ defines wrappers for all the emphasize characters except ~+~.
 #+begin_src emacs-lisp
@@ -160,7 +139,7 @@ By default, ~smartparens-org~ defines wrappers for all the emphasize characters 
 #+end_src
 
 *** Hydra for emphasize functions
-An alternative to the smartparens solution.
+An alternative to the smartparens solution. Really fast for example when marking up lots of words here and there in a text.
 #+begin_src emacs-lisp
 (defhydra hydra-org-emphasize (:color pink)
   "
@@ -202,6 +181,7 @@ Org emphasize: _b_old  _i_talic _u_nderline _c_ode _v_erbatim _s_trikethrough  _
           (er/expand-region 1)
           (sp-wrap-with-pair wrap))))))
 #+end_src
+
 *** Template inserting (hydra)
 If before headline, insert options template with completion.
 
@@ -279,38 +259,46 @@ Otherwise hydra for template insertion.
 #+begin_src emacs-lisp
 (bind-keys :map org-mode-map
            ("C-c S-C-l" . org-store-link))
-
-
 #+end_src
-*** Hydra for some not bound commands :ARCHIVE:
+
+** Org-table-header-line-mode
+I think this patch makes it work better (correct, that is). Trying it out for a while.
 #+begin_src emacs-lisp
-(defhydra hydra-org-commands (:color blue)
-  "Org commands"
-  ("s" (org-store-link) "store-link")
-  ("q" nil "quit"))
+(setq org-table-header-line-p t)
 
-(bind-keys :map org-mode-map
-           ("C-c C-h" . hydra-org-commands/body)
-           ("C-c h" . hydra-org-commands/body))
+(el-patch-feature org-table)
+(with-eval-after-load 'org-table
+  (el-patch-defun org-table-header-set-header ()
+    "Display the header of the table at point."
+    (when (overlayp org-table-header-overlay)
+      (delete-overlay org-table-header-overlay))
+    (let* ((ws (window-start))
+	       (beg (save-excursion
+                  (el-patch-add (goto-char ws))
+                  (goto-char (org-table-begin))
+		          (while (or (org-at-table-hline-p)
+			                 (looking-at-p ".*|\\s-+<[rcl]?\\([0-9]+\\)?>"))
+		            (move-beginning-of-line 2))
+		          (point)))
+	       (end (save-excursion (goto-char beg) (point-at-eol))))
+      (if (pos-visible-in-window-p beg)
+	      (when (overlayp org-table-header-overlay)
+	        (delete-overlay org-table-header-overlay))
+        (setq org-table-header-overlay
+	          (make-overlay ws (+ ws (- end beg))))
+        (org-overlay-display
+         org-table-header-overlay
+         (org-table-row-get-visible-string beg)
+         'org-table-header)))))
 #+end_src
+
 ** Agenda, todo, scheduling etc.
 *** Todo stuff
 **** Todo keywords, Todo states
+Special faces for these states are also defined, but in [[file:~/.emacs.d/init.org::*My own face definitions][init.org]].
 #+begin_src emacs-lisp
-(defface aj/org-waiting '((t :inherit all-the-icons-yellow :bold t)) "Face for waiting org-state" :group 'org-faces)
-(defface aj/org-started '((t :inherit all-the-icons-blue :bold t :underline nil)) "Face for started org-state" :group 'org-faces)
-(defface aj/org-todo '((t :inherit 'all-the-icons-red :bold t)) "Face for todo org-state" :group 'org-faces)
-(set-face-attribute 'org-done nil :bold t)
-
 (setq org-todo-keywords '((sequence "TODO(t)" "STARTAD(s)" "VÄNTAR(v)" "DONE(d)")
-                          (sequence "|" "AVFÖRD(a)"))
-      org-todo-keyword-faces
-      '(("TODO" . aj/org-todo)
-        ("STARTAD" . aj/org-started)
-        ("VÄNTAR" . aj/org-waiting)
-        ("AVFÖRD" . org-done)
-        ("DONE" . org-done)))
-
+                          (sequence "|" "AVFÖRD(a)")))
 
 (dolist (kw '(("TODO" . ?❢)
               ("DONE" . ?✔)
@@ -319,6 +307,7 @@ Otherwise hydra for template insertion.
               ("AVFÖRD" . ?✘)))
   (add-to-list 'aj/org-prettify-symbols kw))
 #+end_src
+
 **** Todo tree
 I often find it useful to copy in a tree from somewhere (for instance reviewer comments on a scientific paper) and make every heading a TODO. This makes it easy!
 #+begin_src emacs-lisp
@@ -398,17 +387,24 @@ all children are done, you can use the following setup:
              ("C-z" . org-agenda-undo))
   (defun aj/org-agenda-todo-to-done () (interactive) (org-agenda-todo 'done)))
 #+end_src
-**** Agenda configuration variables
+
+**** Agenda configuration variables and general styling
 #+begin_src emacs-lisp
 (setq org-log-into-drawer t
       org-clock-into-drawer t
       org-overriding-columns-format
       "%40ITEM(Task) %TODO %8Effort(Effort){:} %8CLOCKSUM %CLOCKSUM_T %CATEGORY %TAGS %DEADLINE %SCHEDULED %PRIORITY"
       org-habit-show-habits-only-for-today t
-      org-habit-graph-column 50
+      org-habit-graph-column 60
+      ;; time grid with mostly whitespace:
       org-agenda-time-grid '((daily today require-timed)
                              (800 1000 1200 1300 1500 1700)
                              " " " ")
+      org-agenda-current-time-string "───────────"
+
+      ;; better alignment with variable-pitch (see below):
+      org-agenda-time-leading-zero t
+
       org-agenda-columns-add-appointments-to-effort-sum t
       org-enforce-todo-dependencies t
       org-agenda-dim-blocked-tasks t
@@ -420,10 +416,69 @@ all children are done, you can use the following setup:
       org-agenda-start-on-weekday nil
       org-agenda-start-day nil)
 
-;; change agenda prefix format, add effort, wider categories
+
+;; change agenda prefix format, add effort, wider categories,
+;; Use variable-pitch and align with displayed spaces
 (with-eval-after-load 'org-agenda
-  (setf (alist-get 'agenda org-agenda-prefix-format) " %i %-10c%?-12t% s%-4e"))
+  (add-hook 'org-agenda-mode-hook #'variable-pitch-mode)
+  (add-hook 'org-agenda-mode-hook #'aj/org-agenda-line-spacing)
+  (defun aj/org-agenda-line-spacing ()
+    (setq line-spacing 0.15))
+
+  (setf (alist-get 'agenda org-agenda-prefix-format)
+        (concat "  %-14c"
+                (propertize " " 'display '(space :align-to 13))
+                "%?-12t%"
+                (propertize " " 'display '(space :align-to 26))
+                "s%-4e"
+                (propertize " " 'display '(space :align-to 32)))
+        ;; " %i %-10c%?-12t% s%-4e"
+        )
+
+  (setq org-agenda-format-date #'aj/org-agenda-format-date)
+
+  (defun aj/org-agenda-format-date (date)
+    (let ((time (org-time-from-absolute date)))
+      (concat
+       (format-time-string "%A" time)
+       (propertize " " 'display '(space :align-to 13))
+       (format-time-string "%d %B" time)
+       (propertize " " 'display '(space :align-to 25))
+       )))
+
+
+  (defun aj/org-agenda-habit-align-right (graph)
+    (concat (propertize " " 'display '(space :align-to (- right 30)))
+            graph))
+
+  (advice-add 'org-habit-build-graph :filter-return #'aj/org-agenda-habit-align-right))
+
+(defun aj/org-agenda-fix-faces (&rest _ignore)
+  (with-eval-after-load 'org-habit
+    (cl-loop for f in '(org-habit-alert-face
+                        org-habit-alert-future-face
+                        org-habit-clear-face
+                        org-habit-clear-future-face
+                        org-habit-overdue-face
+                        org-habit-overdue-future-face
+                        org-habit-ready-face
+                        org-habit-ready-future-face)
+             do
+             (set-face-attribute f nil :inherit
+                                 (append (let ((fa (face-attribute f :inherit nil nil)))
+                                           (if (listp fa)
+                                               fa
+                                             (list fa)))
+                                         '(fixed-pitch)))))
+  (with-eval-after-load 'org-faces
+    (set-face-attribute 'org-agenda-date nil :overline "#CCCCCC")
+    (set-face-attribute 'org-agenda-date-weekend nil :overline "#CCCCCC")))
+
+(aj/org-agenda-fix-faces)
+
+(add-hook 'aj/face-definitions-hook #'aj/org-agenda-fix-faces)
 #+end_src
+
 **** Hl-line-mode in agenda
 #+begin_src emacs-lisp
 (add-hook 'org-agenda-mode-hook #'hl-line-mode)
@@ -1040,6 +1095,33 @@ A local variables comment block that is placed at the end of the file may be los
                                   (org-show-entry))))))))
 #+end_src
 
+** Editing
+*** Even levels
+Sometimes (especially importing from html) we get trees where a level 4 heading is beneath a level 2 heading. Not pretty. This promotes all such subtrees to the correct level (one level below parent).
+
+#+begin_src emacs-lisp
+(defun aj/org-even-levels ()
+  "Promote all subtrees that are more than two levels below closest parent.
+
+Doesn’t care at all about ‘org-odd-levels-only’, because I don’t use it."
+  (interactive)
+  (save-restriction
+    (save-excursion
+      (org-narrow-to-subtree)
+      (goto-char (point-max))
+      (while (outline-previous-heading)
+        (aj/org-even-levels-maybe-promote)))))
+
+(cl-defun aj/org-even-levels-maybe-promote ()
+  (let ((diff (- (org-current-level)
+                 (save-excursion
+                   (if (org-up-heading-safe)
+                       (org-current-level)
+                     (cl-return-from aj/org-even-levels-maybe-promote))))))
+    (when (< 1 diff)
+      (dotimes (_i (1- diff))
+        (org-promote-subtree)))))
+#+end_src
 ** Navigation etc. (helm-org)
 *** helm-org
 #+begin_src emacs-lisp
@@ -1049,7 +1131,8 @@ A local variables comment block that is placed at the end of the file may be los
   :bind (:map org-mode-map
               ("<f2>" . helm-org-in-buffer-headings)
               :map helm-org-headings-map
-              ("C-c C-x b" . helm-org-run-open-heading-in-indirect-buffer))
+              ("C-c C-x b" . helm-org-run-open-heading-in-indirect-buffer)
+              ("C-x n" . aj/helm-org-toggle-narrowing))
   :config
   (advice-add 'helm-org-insert-link-to-heading-at-marker :override
               #'aj/helm-org-insert-link-to-heading-at-marker)
@@ -1086,7 +1169,48 @@ Uses CUSTOM_ID or `org-store-link' for linking."
 
   (defun aj/helm-org--open-heading-in-indirect-buffer (marker)
     (save-excursion (helm-org-goto-marker marker)
-                    (aj/org-tree-to-indirect-buffer))))
+                    (aj/org-tree-to-indirect-buffer)))
+
+
+  (defvar aj/helm-org-widen nil)
+
+  (defun aj/helm-org-toggle-narrowing ()
+    (interactive)
+    (setq aj/helm-org-widen (not aj/helm-org-widen))
+    (helm-refresh))
+
+  (defvar aj/helm-org-candidates nil)
+  (defun aj/helm-org-in-buffer-init ()
+    (setq aj/helm-org-candidates
+          (helm-org--get-candidates-in-file
+           helm-current-buffer
+           helm-org-headings-fontify
+           t)))
+
+  (defun aj/helm-org-in-buffer-headings (&optional arg)
+    "Preconfigured helm for org buffer headings."
+    (interactive "P")
+    (helm :sources ;; (helm-org-build-sources files nil arg)
+          (helm-build-sync-source "Org headings in buffer"
+            :init #'aj/helm-org-in-buffer-init
+            :candidates 'aj/helm-org-candidates
+            ;; :match-dynamic t
+            ;; :filtered-candidate-transformer
+            ;; #'helm-org-indent-headings
+            :action 'helm-org-headings-actions
+            :help-message 'helm-org-headings-help-message
+            :keymap helm-org-headings-map
+            :group 'helm-org)
+
+          :preselect (helm-org-in-buffer-preselect)
+          :truncate-lines helm-org-truncate-lines
+          :buffer "*helm org inbuffer*"))
+
+  )
+
+
+
+
 #+end_src
 
 *** Redefine ~helm-org--get-candidates-in-file~
@@ -1117,11 +1241,12 @@ Should check if it’s less efficient doing this than the homegrown mapping in h
             (width (window-width (helm-window))))
         (save-excursion
           (save-restriction
-            (unless (and (bufferp filename)
-                         (buffer-base-buffer filename))
-              ;; Only widen direct buffers, not indirect ones.
+            (when (and
+                   aj/helm-org-widen
+                   ;; Only widen direct buffers, not indirect ones.
+                   (not (and (bufferp filename) (buffer-base-buffer filename))))
               (widen))
-            ;; clear cache for new version of org-get-outline-path
+            ;; clear cache for org-get-outline-path
             (and (boundp 'org-outline-path-cache)
                  (setq org-outline-path-cache nil))
             (cl-remove-if
@@ -1249,6 +1374,7 @@ This works better for my purposes.
 
 (advice-add 'helm-org-in-buffer-preselect :override #'aj/helm-org-in-buffer-preselect)
 #+end_src
+
 *** helm-org-rifle
 Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entries.
 #+begin_src emacs-lisp
@@ -1522,6 +1648,7 @@ https://gitlab.com/andersjohansson/org-archive-hierarchically
 #+begin_src emacs-lisp
 (setq org-default-notes-file (expand-file-name "notes.org" org-directory))
 #+end_src
+
 *** Ensure line break in captured section
 I often mess up and remove the last line-break in the capture buffer. This can inadvertantly include the [[file:~/.emacs.d/lisp/aj-org-config.org::*Local%20variables%20headings][Local variables heading]] that is below the last captured headline under this headline.
 This function run with ~org-capture-prepare-finalize-hook~ avoids this problem by always making sure we have at least one linebreak at the end of the capture buffer.
@@ -1714,7 +1841,8 @@ Useful for launching a small capture frame from window manager with a call like:
 ** org-protocol-capture-html: Capture web pages from browser
 #+begin_src emacs-lisp
 (use-package org-protocol-capture-html
-  :straight (org-protocol-capture-html :repo "alphapapa/org-protocol-capture-html" :host github :files ("org-protocol-capture-html.el")))
+  :straight (org-protocol-capture-html :repo "alphapapa/org-protocol-capture-html" :host github :files ("org-protocol-capture-html.el"))
+  :custom org-protocol-capture-html-pandoc-extra-args '("--lua-filter=/home/aj/kodat/000-egna-skript/pandoc-remove-header-attributes.lua"))
 #+end_src
 
 ** org-protocol for linking into org files
@@ -1825,8 +1953,7 @@ Can be passed any ox BACKEND in a non-interactive call"
 
   :config
   (set-face-attribute 'org-annotate-bracket-face nil :inherit 'font-lock-variable-name-face :weight 'bold)
-  (set-face-attribute 'org-annotate-face nil :height 0.7
-                      :weight 'unspecified :underline nil :inherit '(default))
+  (set-face-attribute 'org-annotate-face nil :weight 'bold :underline nil :inherit 'font-lock-comment-face)
 
 
   (defun aj/org-annotate-extract-author (note)
@@ -1893,7 +2020,7 @@ List of prefix strings or regex."
 
   (advice-add 'org-annotate-export-note :around #'aj/org-annotate-maybe-ignore)
 
-  ;; I wan’t my text-mode abbreviations to work when I enter a note,
+  ;; I want my text-mode abbreviations to work when I enter a note,
   (defun aj/org-annotate-add-note-advice (fun &rest args)
     (let ((minibuffer-setup-hook
            (cons 'abbrev-mode minibuffer-setup-hook))
@@ -1956,103 +2083,122 @@ List of prefix strings or regex."
               (delete el aj/org-annotate-name-history))))
     (helm-force-update))
 
-
-  ;;; NOTES IN MARGINS!!
-  (add-hook 'org-mode-hook #'aj/org-annotate-maybe-add-right-margin)
-  (defun aj/org-annotate-maybe-add-right-margin ()
-    (org-with-wide-buffer
-     (goto-char (point-min))
-     (when (search-forward "[[note:" nil t)
-       (aj/org-annotate-add-right-margin))))
-
-  (defun aj/org-annotate-add-right-margin (&rest _ignore)
-    (when (< (or (cdr (window-margins)) 0) 50)
-      (set-window-margins (selected-window) nil 50)))
-
-  (advice-add 'org-annotate-add-note :after #'aj/org-annotate-add-right-margin)
-
+  ;; med author
   (defun aj/org-annotate-activate-note (start end _path _bracketp)
     "Add text properties to display annotation links in a special way"
     (save-match-data
       (save-excursion
         (goto-char start)
         (when (looking-at org-link-bracket-re)
-          (add-text-properties start (1+ start) ;;first bracket
-                               '(invisible nil face org-annotate-bracket-face display "/"))
+          (let ((url-beg (match-beginning 1))
+                (url-end (match-end 1))
+                (desc-beg (match-beginning 2))
+                (desc-end (match-end 2)))
+            (goto-char url-beg)
+            (when (looking-at "\\(note:\\)\\({[^}]+}\\)?")
+              (add-text-properties start (+ 2 start) ; start bracket
+                                   `(invisible nil
+                                               face org-annotate-bracket-face
+                                               display ,(nth 0 org-annotate-special-brackets)))
+              (add-text-properties (- end 2) end ; end bracket
+                                   `(invisible nil
+                                               face org-annotate-bracket-face
+                                               display ,(nth 2 org-annotate-special-brackets)))
+              (add-text-properties (match-beginning 1) (match-end 1) ; hide "note:"
+                                   '(invisible t))
+              (when (match-end 2) ;; fontify author
+                (add-text-properties (match-beginning 2) (1+ (match-beginning 2)) ; hide first {
+                                     '(invisible t))
+                (add-text-properties (1+ (match-beginning 2)) (match-end 2) ; bold author
+                                     '(face bold invisible nil))
+                (add-text-properties (1- (match-end 2)) (match-end 2) ; display } as :
+                                     '(display ":")))
 
-          (add-text-properties (1- (match-beginning 1)) (match-beginning 1) ;; note bracket start
-                               '(invisible t))
-
-          ;; note, inline if inline and in margin otherwise
-          (if (string-prefix-p "note:inline" (match-string 1))
-              (progn
-                (add-text-properties (match-beginning 1) (+ 12 (match-beginning 1))
-                                     '(invisible nil display "▸ " face org-annotate-bracket-face))
-                (add-text-properties (+ 12 (match-beginning 1)) (match-end 1)
-                                     '(invisible nil face font-lock-comment-face)))
-            (add-text-properties (match-beginning 1) (match-end 1) ; note
-                                 `(invisible nil face org-annotate-face
-                                             display ((margin right-margin)
-                                                      ,(concat "·" (buffer-substring-no-properties
-                                                                    (+ 5 (match-beginning 1)) (match-end 1)))))))
-
-          (add-text-properties (match-end 1) (1+ (match-end 1)) ;; note bracket end
-                               '(invisible t))
-
-          (add-text-properties (1- end) end ; end bracket
-                               '(invisible nil face org-annotate-bracket-face display "/"))
-
-          (when (match-end 2) ; make desc visible
-            (add-text-properties (1- (match-beginning 2)) (match-beginning 2)
-                                 '(invisible nil face org-annotate-bracket-face display "·")) ;; start bracket
-            (add-text-properties (match-beginning 2) (match-end 2)
-                                 '(invisible nil face org-annotate-text-face))
-            (add-text-properties (match-end 2) (1+ (match-end 2))
-                                 '(invisible nil face org-annotate-bracket-face display "·")) ;; start bracket
-            )))))
-
-  ;; med author
-  ;; (defun aj/org-annotate-activate-note (start end _path _bracketp)
-  ;;   "Add text properties to display annotation links in a special way"
-  ;;   (save-match-data
-  ;;     (save-excursion
-  ;;       (goto-char start)
-  ;;       (when (looking-at org-link-bracket-re)
-  ;;         (let ((url-beg (match-beginning 1))
-  ;;               (url-end (match-end 1))
-  ;;               (desc-beg (match-beginning 2))
-  ;;               (desc-end (match-end 2)))
-  ;;           (goto-char url-beg)
-  ;;           (when (looking-at "\\(note:\\)\\({[^}]+}\\)?")
-  ;;             (add-text-properties start (+ 2 start) ; start bracket
-  ;;                                  `(invisible nil
-  ;;                                              face org-annotate-bracket-face
-  ;;                                              display ,(nth 0 org-annotate-special-brackets)))
-  ;;             (add-text-properties (- end 2) end ; end bracket
-  ;;                                  `(invisible nil
-  ;;                                              face org-annotate-bracket-face
-  ;;                                              display ,(nth 2 org-annotate-special-brackets)))
-  ;;             (add-text-properties (match-beginning 1) (match-end 1) ; hide "note:"
-  ;;                                  '(invisible t))
-  ;;             (when (match-end 2) ;; fontify author
-  ;;               (add-text-properties (match-beginning 2) (1+ (match-beginning 2)) ; hide first {
-  ;;                                    '(invisible t))
-  ;;               (add-text-properties (1+ (match-beginning 2)) (match-end 2) ; bold author
-  ;;                                    '(face bold invisible nil))
-  ;;               (add-text-properties (1- (match-end 2)) (match-end 2) ; display } as :
-  ;;                                    '(display ":")))
-
-  ;;             (add-text-properties (match-end 0) url-end ; note
-  ;;                                  '(invisible nil face org-annotate-face))
-  ;;             (when desc-end ; with desc
-  ;;               (add-text-properties desc-beg desc-end
-  ;;                                    '(invisible nil face org-annotate-text-face))
-  ;;               (add-text-properties url-end desc-beg ; middle bracket
-  ;;                                    `(invisible nil
-  ;;                                                face org-annotate-bracket-face
-  ;;                                                display ,(nth 1 org-annotate-special-brackets))))))))))
+              (add-text-properties (match-end 0) url-end ; note
+                                   '(invisible nil face org-annotate-face))
+              (when desc-end ; with desc
+                (add-text-properties desc-beg desc-end
+                                     '(invisible nil face org-annotate-text-face))
+                (add-text-properties url-end desc-beg ; middle bracket
+                                     `(invisible nil
+                                                 face org-annotate-bracket-face
+                                                 display ,(nth 1 org-annotate-special-brackets))))))))))
   )
 
+
+;;; NOTES IN MARGINS!!
+(define-minor-mode aj/org-annotate-in-margins-mode
+  "Display ‘org-annotate’ notes in margin."
+  :global t
+  (if aj/org-annotate-in-margins-mode
+      (progn
+        (advice-add 'org-annotate-add-note :after #'aj/org-annotate-add-right-margin)
+        (add-hook 'org-mode-hook #'aj/org-annotate-maybe-add-right-margin)
+        (org-link-set-parameters "note" :activate-func #'aj/org-annotate-activate-note-margin))
+    (advice-remove 'org-annotate-add-note #'aj/org-annotate-add-right-margin)
+    (remove-hook 'org-mode-hook #'aj/org-annotate-maybe-add-right-margin)
+    (when (eq major-mode 'org-mode)
+      (save-buffer)
+      (revert-buffer) ;; doesn’t really work, doesn’t clean out the
+      ;; text properties appropriately. Usually we need to close and
+      ;; reopen the file anyway.
+      (set-window-margins (selected-window) nil nil))
+    (org-link-set-parameters "note" :activate-func #'aj/org-annotate-activate-note)))
+
+
+(defface aj/org-annotate-face-margin
+  `((t (:inherit variable-pitch :height 0.7)))
+  "Face for note links in margin in org-mode.")
+
+(defun aj/org-annotate-add-right-margin (&rest _ignore)
+  (when (< (or (cdr (window-margins)) 0) 50)
+    (set-window-margins (selected-window) nil 50)))
+
+(defun aj/org-annotate-activate-note-margin (start end _path _bracketp)
+  "Add text properties to display annotation links in a special way"
+  (save-match-data
+    (save-excursion
+      (goto-char start)
+      (when (looking-at org-link-bracket-re)
+        (add-text-properties start (1+ start) ;;first bracket
+                             '(invisible nil face org-annotate-bracket-face display "/"))
+
+        (add-text-properties (1- (match-beginning 1)) (match-beginning 1) ;; note bracket start
+                             '(invisible t))
+
+        ;; note, inline if inline and in margin otherwise
+        (if (string-prefix-p "note:inline" (match-string 1))
+            (progn
+              (add-text-properties (match-beginning 1) (+ 12 (match-beginning 1))
+                                   '(invisible nil display "▸ " face org-annotate-bracket-face))
+              (add-text-properties (+ 12 (match-beginning 1)) (match-end 1)
+                                   '(invisible nil face font-lock-comment-face)))
+          (add-text-properties (match-beginning 1) (match-end 1) ; note
+                               `(invisible nil face aj/org-annotate-face-margin
+                                           display ((margin right-margin)
+                                                    ,(concat "·" (buffer-substring-no-properties
+                                                                  (+ 5 (match-beginning 1)) (match-end 1)))))))
+
+        (add-text-properties (match-end 1) (1+ (match-end 1)) ;; note bracket end
+                             '(invisible t))
+
+        (add-text-properties (1- end) end ; end bracket
+                             '(invisible nil face org-annotate-bracket-face display "/"))
+
+        (when (match-end 2) ; make desc visible
+          (add-text-properties (1- (match-beginning 2)) (match-beginning 2)
+                               '(invisible nil face org-annotate-bracket-face display "·")) ;; start bracket
+          (add-text-properties (match-beginning 2) (match-end 2)
+                               '(invisible nil face org-annotate-text-face))
+          (add-text-properties (match-end 2) (1+ (match-end 2))
+                               '(invisible nil face org-annotate-bracket-face display "·")) ;; start bracket
+          )))))
+
+(defun aj/org-annotate-maybe-add-right-margin ()
+  (org-with-wide-buffer
+   (goto-char (point-min))
+   (when (search-forward "[[note:" nil t)
+     (aj/org-annotate-add-right-margin))))
 #+end_src
 
 
@@ -2077,11 +2223,12 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
                    ;; :local-repo "zotxt"
                    :fork (:host gitlab :repo "andersjohansson/zotxt-emacs" :branch "ajfixes"))
   :custom (zotxt-default-bibliography-style "apa")
+  :commands zotxt--json-read
   :config
   (defconst zotxt-url-base
 	"http://127.0.0.1:23200/zotxt"
-	"Base URL to contact.")
-  :commands zotxt--json-read)
+	"Base URL to contact."))
+
 
 (use-package org-pdcite
   :straight nil
@@ -2170,19 +2317,19 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
   ;; Special fontification, I often manipulate rows of references,
   ;; and then it’s useful to display the outer brackets, for easy
   ;; killing and yanking.
+
   (org-link-set-parameters "zotero"
 						   :face 'org-scheduled-today
+                           ;;invisibility is handled in the activate function
 						   :activate-func #'aj/org-zotxt-activate)
 
   (defun aj/org-zotxt-activate (start end path bracketp)
-	"Add text properties to display zotxt citation links in a good way"
-	(let ((bracket '(invisible nil))
-		  (inv '(invisible t))
-          (pl (length path)))
-	  (add-text-properties start (1+ start) bracket)
-	  (add-text-properties end (1- end) bracket)
-	  (add-text-properties (1+ start) (+ start 3 pl) inv)
-	  (add-text-properties (1- end) (- end 2) inv))
+    "Add text properties to display zotxt citation links in a good way"
+    ;; it’s always 36 chars, I think: "[[zotero://select/items/1_EEIVB8QC]["
+    (org-fold-region start (1+ start) t 'org-link-description)
+    (org-fold-region (1+ start) (+ start 36) t 'org-link)
+    (org-fold-region (- end 2) (1- end)  t 'org-link)
+    (org-fold-region (1- end) end t 'org-link-description)
     ;; but we also want this activation from zotxt-extra
     (zotxt-extra--activate-links-full-citation start end path bracketp))
   )
@@ -2313,6 +2460,35 @@ Mostly for html and reveal
 
 (defun aj/org-video-complete-link ()
   (aj/org-complete-link "video:"))
+#+end_src
+
+*** Html-export
+An option for "cleaning up" exported html from some org markup. Good for generating clean html for pasting into systems.
+#+begin_src emacs-lisp
+(defcustom aj/org-export-html-cleanup nil
+  "If non-nil, cleanup html from org classes etc."
+  :group 'aj
+  :type 'boolean
+  :safe #'booleanp)
+
+(add-to-list 'org-export-filter-final-output-functions
+             #'aj/org-export-html-cleanup)
+
+(defun aj/org-export-html-cleanup (string backend _info)
+  (if (and (eq backend 'html)
+           aj/org-export-html-cleanup)
+      (with-temp-buffer
+        (insert string)
+        (goto-char (point-min))
+        (flush-lines "</?div")
+        (cl-loop for r in '(" class=\"org-ul\""
+                            " id=\"[^\"]+\"")
+                 do
+                 (goto-char (point-min))
+                 (while (search-forward-regexp r nil t)
+                   (replace-match "")))
+        (buffer-string))
+    string))
 #+end_src
 *** ox-ascii, don’t fill paragraphs
 #+begin_src emacs-lisp
@@ -2522,8 +2698,28 @@ Mostly for html and reveal
       ("center-emphasize" . "center-emphasize")
       ("bottom-note" . "bottom-note")
       ("random-container" . "random-container")
-      ("absolute-random (elements inside random-container)" . "absolute-random"))
+      ("absolute-random (elements inside random-container)" . "absolute-random")
+      ("fade-out" . "Fragment: Start visible, fade out")
+      ("fade-up" . "Fragment: Slide up while fading in")
+      ("fade-down" . "Fragment: Slide down while fading in")
+      ("fade-left" . "Fragment: Slide left while fading in")
+      ("fade-right" . "Fragment: Slide right while fading in")
+      ("fade-in-then-out" . "Fragment: Fades in, then out on the next step")
+      ("fade-in-then-semi-out" . "Fragment: Fades in, then to 50% on the next step")
+      ("grow" . "Fragment: Scale up")
+      ("shrink" . "Fragment: Scale down")
+      ("strike" . "Fragment: Strike through")
+      ("highlight-red" . "Fragment: Turn text red")
+      ("highlight-green" . "Fragment: Turn text green")
+      ("highlight-blue" . "Fragment: Turn text blue")
+      ("highlight-bold" . "Fragment: Turn text bold")
+      ("highlight-current-red" . "Fragment: Turn text red, then back to original on next step")
+      ("highlight-current-green" . "Fragment: Turn text green, then back to original on next step")
+      ("highlight-current-blue" . "Fragment: Turn text blue, then back to original on next step")
+      ("highlight-current-bold" . "Fragment: Turn text bold, then back to original on next step"))
     "Classes for elements in reveal.js presentations")
+
+
 
   (defhydra aj/hydra-org-reveal-templates (:color blue :columns 4)
     "Reveal templates"
@@ -2561,6 +2757,17 @@ Mostly for html and reveal
     ("z" (insert "#+html: <div id=\"zotxtbibliography\"></div>") "Bibliography")
     ("N" (org-toggle-tag "notitle") "No title headline")
     ("q" nil)))
+#+end_src
+
+**** COMMENT Fix file paths when inserting links in ~aj-org-reveal-mode~
+Fungerar inte på grund av relativiseringen av sökvägar i slutet av org-insert-link
+#+begin_src emacs-lisp
+;; (advice-add 'org-link-complete-file :filter-return #'aj/org-reveal-link-fix-path)
+
+;; (defun aj/org-reveal-link-fix-path (filepath)
+;;   (if aj/org-reveal-mode
+;;       (string-replace "/home/aj/jobb/presentationer/" "../" filepath)
+;;     filepath))
 #+end_src
 
 **** Empty headline
@@ -2616,6 +2823,22 @@ Kind of messy, but does the job of making org-zotxt links in cite-attributes to 
                 (org-element-parse-secondary-string ms '(link)) info))))
            t t qb 1))
       qb)))
+#+end_src
+
+
+**** Possibly add end-slide if using a certain template
+For my university template, add a final slide with the logo.
+#+begin_src emacs-lisp
+(add-hook 'org-export-filter-parse-tree-functions #'aj/org-reveal-add-end-slide)
+
+(defun aj/org-reveal-add-end-slide (data backend info)
+  (when (and (eq backend 're-reveal)
+             (string-search "ajchalmers.css" (plist-get info :reveal-extra-css)))
+    (org-element-adopt-elements data
+      (org-element-create
+       'headline
+       '(:REVEAL_DATA_STATE "chalmers-final-slide" :level 1 :raw-value ""))))
+  data)
 #+end_src
 
 *** Ignored drawers
@@ -4088,6 +4311,7 @@ With my use of [[*\[\[https://github.com/integral-dw/org-superstar-mode/\]\[org-
 ;; (advice-add 'org-src-font-lock-fontify-block :around
 ;;             #'aj/org-avoid-hooks-in-fontify-block)
 #+end_src
+
 
 *** [[https://github.com/integral-dw/org-superstar-mode/][org-superstar]] (successor to org-bullets)
 #+begin_src emacs-lisp

@@ -109,11 +109,8 @@ Old value is stored in ‘doc-font-variable-cookies’."
               doc-font-cookies-def nil
               doc-font-variable-cookies nil
               doc-font-variable-cookies-nokill nil)
-        (cl-loop for x in doc-font-attributes do
-                 (push (apply #'face-remap-add-relative
-                              (car x)
-                              (cdr x))
-                       doc-font-cookies))
+        (cl-loop for (face . attr) in doc-font-attributes do
+                 (push (apply #'face-remap-add-relative face attr) doc-font-cookies))
         (cl-loop for face in doc-font-keep-default do
                  (push (face-remap-add-relative face :family default-family
                                                 :height default-height)
@@ -124,7 +121,7 @@ Old value is stored in ‘doc-font-variable-cookies’."
         (doc-font--store-old-val 'line-spacing)
         (setq line-spacing doc-font-extra-line-spacing)
 
-        (when (eq major-mode 'org-mode)
+        (when (derived-mode-p 'org-mode)
           (doc-font--store-old-val 'org-indent-mode)
           (org-indent-mode -1)
           (when (bound-and-true-p org-superstar-mode)

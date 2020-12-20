@@ -62,39 +62,43 @@ for refile folder selection)"
 
 ** Symbols
 #+begin_src emacs-lisp
-;; (defconst aj/mu4e-symbols-override
-;;   '((mu4e-headers-draft-mark     . ("D" . "📝")) ;; ✒ ✏
-;;     (mu4e-headers-flagged-mark   . ("F" . "🏴"))
-;;     (mu4e-headers-new-mark       . ("N" . ""))
-;;     (mu4e-headers-passed-mark    . ("P" . "❯")) ;; ↪ "→"
-;;     (mu4e-headers-replied-mark   . ("R" . "❮")) ;; "→"
-;;     (mu4e-headers-seen-mark      . ("S" . " ")) ;; ✓ 🗸 ✔
-;;     (mu4e-headers-trashed-mark   . ("T" . "✗")) ;; 🗑
-;;     (mu4e-headers-attach-mark    . ("a" . "📎"))
-;;     (mu4e-headers-encrypted-mark . ("x" . "🔐"))
-;;     (mu4e-headers-signed-mark    . ("s" . "🔏"))
-;;     (mu4e-headers-unread-mark    . ("u" . "●")) ;; ★
-;;))
-
-
-;; Only symbols that are in Ubuntu mono font, to avoid width problems
 (defconst aj/mu4e-symbols-override
-  '((mu4e-headers-draft-mark     . ("D" . "□")) ;; ✒ ✏
-    (mu4e-headers-flagged-mark   . ("F" . "†"))
-    (mu4e-headers-new-mark       . ("N" . " "))
-    (mu4e-headers-passed-mark    . ("P" . "»")) ;; ↪ "→"
-    (mu4e-headers-replied-mark   . ("R" . "«")) ;; "→"
-    (mu4e-headers-seen-mark      . ("S" . "")) ;; ✓ 🗸 ✔
-    (mu4e-headers-trashed-mark   . ("T" . "∏")) ;; 🗑
-    (mu4e-headers-attach-mark    . ("a" . "■"))
-    (mu4e-headers-encrypted-mark . ("x" . "🔐"))
-    (mu4e-headers-signed-mark    . ("s" . "🔏"))
-    (mu4e-headers-unread-mark    . ("u" . "•")) ;; ★
+  '((mu4e-headers-draft-mark      ("D" . "📝")) ;; ✒ ✏
+    (mu4e-headers-flagged-mark    ("F" . "🏴"))
+    (mu4e-headers-new-mark        ("N" . " "))
+    (mu4e-headers-passed-mark     ("P" . "↪")) ;; ↪ "→"
+    (mu4e-headers-replied-mark    ("R" . "↩")) ;; "→"
+    (mu4e-headers-seen-mark       ("S" . " ") modus-theme-mark-symbol) ;; ✓ 🗸 ✔
+    (mu4e-headers-trashed-mark    ("T" . "🗑")) ;; 🗑
+    (mu4e-headers-attach-mark     ("a" . "📎"))
+    (mu4e-headers-encrypted-mark  ("x" . "🔐"))
+    (mu4e-headers-signed-mark     ("s" . "🔏"))
+    (mu4e-headers-unread-mark    ("u" . "⚫ ") modus-theme-mark-symbol) ;; ★
     ))
 
 
-(cl-loop for (var . (letter . symbol)) in aj/mu4e-symbols-override
-         do (set var (cons letter (propertize symbol 'face '(:weight normal)))))
+;; not needed with the new :align-to fix for headers.
+;; Only symbols that are in Ubuntu mono font, to avoid width problems
+;; (defconst aj/mu4e-symbols-override
+;;   '((mu4e-headers-draft-mark     . ("D" . "□")) ;; ✒ ✏
+;;     (mu4e-headers-flagged-mark   . ("F" . "†"))
+;;     (mu4e-headers-new-mark       . ("N" . " "))
+;;     (mu4e-headers-passed-mark    . ("P" . "»")) ;; ↪ "→"
+;;     (mu4e-headers-replied-mark   . ("R" . "«")) ;; "→"
+;;     (mu4e-headers-seen-mark      . ("S" . "")) ;; ✓ 🗸 ✔
+;;     (mu4e-headers-trashed-mark   . ("T" . "∏")) ;; 🗑
+;;     (mu4e-headers-attach-mark    . ("a" . "■"))
+;;     (mu4e-headers-encrypted-mark . ("x" . "🔐"))
+;;     (mu4e-headers-signed-mark    . ("s" . "🔏"))
+;;     (mu4e-headers-unread-mark    . ("u" . "•")) ;; ★
+;;     ))
+
+
+(cl-loop for (var (letter . symbol) face) in aj/mu4e-symbols-override
+         do (set var (cons letter (propertize symbol 'face (or face '(:weight normal))))))
+
+(setq mu4e-headers-visible-flags
+      '(seen unread replied passed attach encrypted signed draft flagged))
 #+end_src
 
 ** Definition of contexts -- private settings
@@ -165,13 +169,15 @@ user choose, starting at that path.")
 Insert contacts with helm
 https://gitlab.com/andersjohansson/mu4e-helm-contact
 #+begin_src emacs-lisp
-  (use-package mu4e-helm-contact
-	:straight nil
-	:load-path "~/kodat/elisp/mu4e-helm-contact"
-	:after mu4e-compose)
+(use-package mu4e-helm-contact
+  :straight nil
+  :bind (:map mu4e-compose-mode-map
+              ("<backtab>" . mu4e-helm-contact-insert))
+  :load-path "~/kodat/elisp/mu4e-helm-contact"
+  :after mu4e-compose)
 #+end_src
 
-*** mu4e-alert
+*** mu4e-alert :ARCHIVE:
 Only display unread count in modeline
 #+begin_src emacs-lisp
 (use-package mu4e-alert
@@ -318,72 +324,156 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 (setq mu4e-html2text-command 'mu4e-shr2text)
 #+end_src
 
-*** View shortened addresses
+*** View shortened addresses (mer saker här!)
 It is good to be able to see that the address we get an email from is correct, but we don’t need to see the full address. This little patching to ~mu4e~view-construct-contacts-header~  displays the domain name or possibly a short symbol fetched from the list ~aj/mail-domain~.
 
 Secure and economical.
 
 #+begin_src emacs-lisp
+(setq mu4e-view-fields '(:from :to :cc :date :maildir :mailing-list :tags
+                               :attachments :signature :decryption :subject))
+
+(defface aj/mu4e-header-subject-face '((t . (:height 1.2 :inherit (mu4e-highlight-face))))
+  "Face for subject in ‘mu4e-view’")
+
 (setq mu4e-view-show-addresses t)
 
-(el-patch-feature mu4e-actions)
-(with-eval-after-load 'mu4e-actions
+(el-patch-feature mu4e-view)
+(with-eval-after-load 'mu4e-view
   (el-patch-defun mu4e~view-construct-contacts-header (msg field)
     "Add a header for a contact field (ie., :to, :from, :cc, :bcc)."
-    (mu4e~view-construct-header field
-                                (mapconcat
-                                 (lambda(c)
-                                   (let* ((name (when (car c)
-                                                  (replace-regexp-in-string "[[:cntrl:]]" "" (car c))))
-                                          (email (when (cdr c)
-                                                   (replace-regexp-in-string "[[:cntrl:]]" "" (cdr c))))
-                                          (short (el-patch-wrap 1 2
-                                                   (propertize
-                                                    (or name email)  ;; name may be nil
-                                                    'face 'mu4e-contact-face)))
-                                          (long (if name
-                                                    (el-patch-swap
-                                                      (format "%s <%s>" name email)
-                                                      (format "%s %s"
-                                                              (propertize name 'face 'mu4e-contact-face)
-                                                              (aj/mu4e-mail-domain-symbol email)))
-                                                  email)))
-                                     (propertize
-                                      (if mu4e-view-show-addresses long short)
-                                      'long long
-                                      'short short
-                                      'email email
-                                      'keymap mu4e-view-contacts-header-keymap
-                                      (el-patch-remove 'face 'mu4e-contact-face)
-                                      'mouse-face 'highlight
-                                      'help-echo (format "<%s>\n%s" email
-                                                         "[mouse-2] or C to compose a mail for this recipient"))))
-                                 (mu4e-message-field msg field) ", ") t))
-  )
+    (mu4e~view-construct-header
+     field
+     (mapconcat
+      (lambda(c)
+        (let* ((name (when (car c)
 
+                       (replace-regexp-in-string "[[:cntrl:]]" "" (car c))))
+               (email (when (cdr c)
+                        (replace-regexp-in-string "[[:cntrl:]]" "" (cdr c))))
+               (short (el-patch-wrap 1 2
+                        (propertize
+                         (or name email)  ;; name may be nil
+                         'face 'mu4e-contact-face)))
+               (long (if name
+                         (el-patch-swap
+                           (format "%s <%s>" name email)
+                           (format "%s%s"
+                                   (propertize name 'face 'mu4e-contact-face)
+                                   (aj/mu4e-mail-domain-symbol email)))
+                       email)))
+          (propertize
+           (if mu4e-view-show-addresses long short)
+           'long long
+           'short short
+           'email email
+           'keymap mu4e-view-contacts-header-keymap
+           (el-patch-remove 'face 'mu4e-contact-face)
+           'mouse-face 'highlight
+           'help-echo (format "<%s>\n%s" email
+                              "[mouse-2] or C to compose a mail for this recipient"))))
+      (mu4e-message-field msg field) ", ") t))
+
+  (el-patch-defun mu4e~view-construct-header (field val &optional dont-propertize-val)
+    "Return header field FIELD (as in `mu4e-header-info') with value
+VAL if VAL is non-nil. If DONT-PROPERTIZE-VAL is non-nil, do not
+add text-properties to VAL."
+    (let* ((info (cdr (assoc field
+                             (append mu4e-header-info mu4e-header-info-custom))))
+           (key (plist-get info :name))
+           (val (if val (propertize val 'field 'mu4e-header-field-value
+                                    'front-sticky '(field))))
+           (help (plist-get info :help)))
+      (if (and val (> (length val) 0))
+          (with-temp-buffer
+            (insert (propertize (el-patch-swap
+                                  (concat key ":")
+                                  (concat (if (< 7 (length key))
+                                              (concat (substring key 0 6) ".")
+                                            key)
+                                          ":"))
+                                'field 'mu4e-header-field-key
+                                'front-sticky '(field)
+                                'keymap mu4e-view-header-field-keymap
+                                'face 'mu4e-header-key-face
+                                'help-echo help)
+                    (el-patch-swap " " (propertize " " 'display '(space :align-to 7)))
+                    (el-patch-wrap 1 2
+                      (propertize
+                       (if dont-propertize-val
+                           val
+                         (propertize val 'face (if (eq field :subject)
+                                                   'aj/mu4e-header-subject-face
+                                                 'mu4e-header-value-face)))
+                       'wrap-prefix '(space :align-to 7)))
+                    (el-patch-swap "\n" (propertize "\n" 'line-spacing 0.1)))
+            (when mu4e-view-fill-headers
+              ;; temporarily set the fill column <margin> positions to the right, so
+              ;; we can indent the following lines correctly
+              (let* ((margin 1)
+                     (fill-column (max (- fill-column margin) 0)))
+                (fill-region (point-min) (point-max))
+                (goto-char (point-min))
+                (while (and (zerop (forward-line 1)) (not (looking-at "^$")))
+                  (indent-to-column margin))))
+            (buffer-string))
+        ""))))
 
 (defun aj/mu4e-mail-domain-symbol (email)
-  (let ((maildomain (cadr (split-string email "@"))))
-    (propertize (concat "<" email ">")
-                'display
-                (cl-loop for (d . s) in aj/mail-domains
-                         when (string-match-p d maildomain)
-                         return (propertize s 'face 'aj/shadow-fringe)
-                         finally return (propertize (concat "(" maildomain ")") 'face 'shadow)))))
+  (let ((maildomain (cadr (split-string email "@")))
+        (mailstring (concat "<" email ">")))
+    (cl-loop for (d . s) in aj/mail-domains
+             when (string-match-p d maildomain)
+             return
+             (cond
+              ((null s) (propertize (concat " " mailstring) 'display ""))
+              ((stringp s)
+               (propertize (concat " " mailstring) 'display
+                           (concat " " (propertize s 'face 'aj/shadow-fringe))))
+              ((listp s)
+               (concat " "
+                       (propertize mailstring
+                                   'display
+                                   (create-image
+                                    (car s) nil nil
+                                    :height (round (* (or (cadr s) 0.8)
+                                                      (line-pixel-height)))
+                                    :ascent 'center)))
+               ))
+             finally return
+             (propertize
+              (concat " " mailstring)
+              'display
+              (propertize (concat " (" maildomain ")") 'face 'shadow)))))
+
+
+(let ((ll '(a)))
+  (cadr ll))
+
+;; (defun aj/mu4e-mail-domain-symbol (email)
+;;   (let ((maildomain (cadr (split-string email "@")))
+;;         (size (round (* 0.9 (line-pixel-height)))))
+;;     (propertize (concat "<" email ">")
+;;                 'display
+;;                 (cl-loop for (d . s) in aj/mail-domains
+;;                          when (string-match-p d maildomain)
+;;                          return
+;;                          (if (stringp s)
+;;                              (propertize s 'face 'aj/shadow-fringe)
+;;                            (create-image (car s) nil nil :height size :ascent 'center))
+;;                          finally return (propertize (concat "(" maildomain ")") 'face 'shadow)))))
 
 (defcustom aj/mail-domains nil
   "Alist of mappings between regexps for an email domain and display string.
 
 If found, the display string is shown instead of the full domain when displaying emails in mu4e.
+The display string can also be a list with a path to an image.
 Examples:
 ((\"chalmers.se$\" . \"🅒\")
  (\"uu.se$\" . \"🅤\")))
 "
   :group 'aj
-  :type '(alist :key-type regexp :value-type string))
-
-
-
+  :type '(alist :key-type regexp :value-type (choice string (const nil) (list file))))
 #+end_src
 
 ** Command for quick check of new mails
@@ -752,6 +842,36 @@ I often invoke a compose buffer in a window where I’m doing something else, an
 (advice-add 'mu4e~switch-back-to-mu4e-buffer :override #'ignore)
 #+end_src
 
+*** Mail greetings
+Quickly insert a "Hi NN" with correct name
+#+begin_src emacs-lisp
+(defun aj/mail-insert-greeting (&optional firstname)
+  "Insert a language dependent (informal) greeting when composing a mail.
+Recipient names are fetched from the To field. Prefix-argument
+FIRSTNAME greet only first recipient."
+  (interactive "P")
+  (require 'reftex-cite)
+  (when-let ((names
+              (save-excursion
+                (save-restriction
+                  (widen)
+                  (message-narrow-to-headers-or-head)
+                  (cl-loop for (name email) in (mail-extract-address-components
+                                                (message-fetch-field "To" t) t)
+                           collect (car (split-string name)))))))
+    (let* ((sv (eq 'sv (guess-language-buffer)))
+           (reftex-cite-punctuation (if sv '(", " " och " "") '(", " " and " ""))))
+      (insert
+       (if sv "Hej" "Hi")
+       " "
+       (if firstname
+           (car names)
+         (reftex-format-names names 100))
+       ",\n"))))
+
+(bind-key "C-c C-å" #'aj/mail-insert-greeting 'mu4e-compose-mode-map)
+#+end_src
+
 *** Customize cite string
 #+begin_src emacs-lisp
 ;; TODO, anropet till message-cite-original i mu4e-draft (vilken
@@ -1001,7 +1121,74 @@ attachment - should launch the no-attachment warning.")
 
 ** Headers settings
 
-*** Small stupid fix for first space in headers headline
+*** Variable pitch in mu4e-headers-mode
+#+begin_src emacs-lisp
+(setq mu4e-headers-precise-alignment t)
+(add-hook 'mu4e-headers-mode-hook #'variable-pitch-mode)
+
+(defun mu4e~header-line-format ()
+  "Get the format for the header line."
+  (let ((uparrow   (if mu4e-use-fancy-chars " ▲" " ^"))
+        (downarrow (if mu4e-use-fancy-chars " ▼" " V")))
+    (cons
+     (propertize " " 'display '(space :align-to 0))
+     ;; (make-string
+     ;;  (+ mu4e~mark-fringe-len (floor (fringe-columns 'left t))) ?\s)
+     (mapcar
+      (lambda (item)
+        (let* ((field (car item)) (width (cdr item))
+               (info (cdr (assoc field
+                                 (append mu4e-header-info mu4e-header-info-custom))))
+               (require-full (plist-get info :require-full))
+               (sortable (plist-get info :sortable))
+               ;; if sortable, it is either t (when field is sortable itself)
+               ;; or a symbol (if another field is used for sorting)
+               (sortfield (when sortable (if (booleanp sortable) field sortable)))
+               (help (plist-get info :help))
+               ;; triangle to mark the sorted-by column
+               (arrow
+                (when (and sortable (eq sortfield mu4e-headers-sort-field))
+                  (if (eq mu4e-headers-sort-direction 'descending) downarrow uparrow)))
+               (name (concat (plist-get info :shortname) arrow))
+               (map (make-sparse-keymap)))
+          (when require-full
+            (mu4e-error "Field %S is not supported in mu4e-headers-mode" field))
+          (when sortable
+            (define-key map [header-line mouse-1]
+              (lambda (&optional e)
+                ;; getting the field, inspired by `tabulated-list-col-sort'
+                (interactive "e")
+                (let* ((obj (posn-object (event-start e)))
+                       (field
+                        (and obj (get-text-property 0 'field (car obj)))))
+                  ;; "t": if we're already sorted by field, the sort-order is
+                  ;; changed
+                  (mu4e-headers-change-sorting field t)))))
+          (concat
+           (propertize
+            (if width
+                (mu4e~headers-truncate-field field name (- width 1))
+              name)
+            'face (if arrow '(:inherit (variable-pitch bold)) 'variable-pitch)
+            'help-echo help
+            'mouse-face (when sortable 'highlight)
+            'keymap (when sortable map)
+            'field field) " ")))
+      mu4e-headers-fields))))
+#+end_src
+
+*** Set face of subject field to variable-pitch :ARCHIVE:
+#+begin_src emacs-lisp
+(defun aj/mu4e-headers-field-set-subject-face (msg field)
+  "Set face of VAL to variable-pitch if FIELD is :subject."
+  (when (member field '(:thread-subject :subject))
+    '(:inherit variable-pitch)))
+
+(setq mu4e-headers-field-properties-function
+      #'aj/mu4e-headers-field-set-subject-face)
+#+end_src
+
+*** Small stupid fix for first space in headers headline :ARCHIVE:
 #+begin_src emacs-lisp
 (advice-add 'mu4e~header-line-format :around #'aj/mu4e-fix-header-space)
 
@@ -1009,6 +1196,7 @@ attachment - should launch the no-attachment warning.")
   (let ((mu4e~mark-fringe-len 3))
     (apply fn r)))
 #+end_src
+
 *** Headers fields
 **** Set headers fields to view depending on what maildir is viewed
 #+begin_src emacs-lisp
@@ -1115,10 +1303,9 @@ Returns the empty string if this is the \"current\" maildir."
           (if (string= smd mmd)
               ""
             (s-chop-prefix (s-shared-start mmd smd) mmd)))
-      (s-replace-all '(("/uu/" . "🅄 ")
-                       ("/chalmers/" . "🄲")
-                       ("/mejla/" . "🄶 ")
-                       ("/ajf/" . "🄰 ")) mmd))))
+      ;; only first letter of base maildir, in bold:
+      (replace-regexp-in-string
+       "^/[^/]+" (lambda (s) (propertize (substring s 1 2) 'face 'bold)) mmd))))
 
 (add-to-list 'mu4e-header-info-custom
              '(:aj-human-date .
@@ -1207,30 +1394,14 @@ Like ‘mu4e-user-mailing-lists’."
   "Show a mailing list"
   (if-let ((list (mu4e-msg-field msg :mailing-list)))
       (mu4e~headers-mailing-list list)
-    (mapconcat
-     #'identity
+    (string-join
      (cl-loop for (list . short) in aj/mu4e-mailing-lists
               when (mu4e-message-contact-field-matches
                     msg '(:to :from :cc :bcc) list)
               collect short)
      ", ")))
-
-
-
-
 #+end_src
 
-
-*** Set face of subject field to variable-pitch
-#+begin_src emacs-lisp
-(defun aj/mu4e-headers-field-set-subject-face (msg field)
-  "Set face of VAL to variable-pitch if FIELD is :subject."
-  (when (member field '(:thread-subject :subject))
-    '(:inherit variable-pitch)))
-
-(setq mu4e-headers-field-properties-function
-      #'aj/mu4e-headers-field-set-subeject-face)
-#+end_src
 
 *** Load next 500 messages
 #+begin_src emacs-lisp
