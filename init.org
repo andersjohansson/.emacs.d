@@ -1447,11 +1447,6 @@ Disable it for now.
 ;;         elfeed-show-entry-delete #'elfeed-goodies/delete-pane))
 
 #+end_src
-** TODO Unfixed dependencies
-#+begin_src emacs-lisp
-(use-package dash-functional)
-#+end_src
-
 ** News
 #+begin_src emacs-lisp
 (setq gnus-select-method '(nntp "news.gmane.io"))
