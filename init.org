@@ -2542,9 +2542,7 @@ A bit nicer than isearch. I also like to use fuzzy search (words separated by wh
    :map magit-section-mode-map
    ;; don’t steal C-TAB, which I use for ‘other-window’
    ("<C-tab>" . nil)
-   ;; do away with distinction between ‘magit-section-toggle’ and
-   ;; ‘magit-section-cycle’ and only use cycle on TAB:
-   ("<tab>" . magit-section-cycle))
+   ("C-c <C-tab>" . magit-section-cycle))
   :config
   (magit-auto-revert-mode -1) ;; I use global-auto-revert
   (setq magit-diff-refine-hunk t
