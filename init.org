@@ -1447,6 +1447,7 @@ Disable it for now.
 ;;         elfeed-show-entry-delete #'elfeed-goodies/delete-pane))
 
 #+end_src
+
 ** News
 #+begin_src emacs-lisp
 (setq gnus-select-method '(nntp "news.gmane.io"))
@@ -2373,7 +2374,7 @@ already narrowed."
                                (?A "Å") (?A "Ä") (?O "Ö"))))
 #+end_src
 
-*** CTRLF
+*** CTRLF :ARCHIVE:
 A bit nicer than isearch. I also like to use fuzzy search (words separated by whatever) by default. It is also helpful to use char-fold (é → e) by default, so I define functions for that.
 #+begin_src emacs-lisp
 (use-package ctrlf
