@@ -3426,12 +3426,15 @@ cperl instead of perl-mode
    (save-excursion (beginning-of-visual-line 2))))
 
 (use-package visual-fill-column
-  :init (add-hook 'visual-line-mode-hook #'visual-fill-column-mode)
+  :hook (visual-line-mode .  aj/visual-fill-column-mode-enable-disable)
   :config
+  (defun aj/visual-fill-column-mode-enable-disable ()
+    (if visual-line-mode
+        (visual-fill-column-mode)
+      (visual-fill-column-mode -1)))
   (setq-default visual-fill-column-width 100)
   (setq split-window-preferred-function #'visual-fill-column-split-window-sensibly)
   (advice-add 'text-scale-increase :after #'visual-fill-column-adjust))
-
 
 ;; use indicators, but dim them
 (defface aj/shadow-fringe '((nil (:foreground "#AAAAAA"))) "Face for dim fringe bitmaps")
