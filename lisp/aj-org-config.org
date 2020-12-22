@@ -27,7 +27,7 @@
 (defun aj/org-attach-id-ts-folder-format (id)
   "Translate an ID based on a timestamp to a folder-path.
 Avoid colons for syncing to windows systems (onedrive)"
-  (string-replace ":" "-" id)))
+  (string-replace ":" "-" id))
 #+end_src
 
 ** Cosmetics, early definitions
