@@ -2093,46 +2093,57 @@ List of prefix strings or regex."
               (delete el aj/org-annotate-name-history))))
     (helm-force-update))
 
-  ;; med author
+  ;; with author
   (defun aj/org-annotate-activate-note (start end _path _bracketp)
-    "Add text properties to display annotation links in a special way"
+    "Add text properties to display annotation links in a special way."
     (save-match-data
       (save-excursion
-        (goto-char start)
-        (when (looking-at org-link-bracket-re)
-          (let ((url-beg (match-beginning 1))
-                (url-end (match-end 1))
-                (desc-beg (match-beginning 2))
-                (desc-end (match-end 2)))
-            (goto-char url-beg)
-            (when (looking-at "\\(note:\\)\\({[^}]+}\\)?")
-              (add-text-properties start (+ 2 start) ; start bracket
-                                   `(invisible nil
-                                               face org-annotate-bracket-face
-                                               display ,(nth 0 org-annotate-special-brackets)))
-              (add-text-properties (- end 2) end ; end bracket
-                                   `(invisible nil
-                                               face org-annotate-bracket-face
-                                               display ,(nth 2 org-annotate-special-brackets)))
-              (add-text-properties (match-beginning 1) (match-end 1) ; hide "note:"
-                                   '(invisible t))
-              (when (match-end 2) ;; fontify author
-                (add-text-properties (match-beginning 2) (1+ (match-beginning 2)) ; hide first {
-                                     '(invisible t))
-                (add-text-properties (1+ (match-beginning 2)) (match-end 2) ; bold author
-                                     '(face bold invisible nil))
-                (add-text-properties (1- (match-end 2)) (match-end 2) ; display } as :
-                                     '(display ":")))
+        (let (aend descb desce)
+          ;; show first and last bracket, with custom face
+          (org-fold-region start (1+ start) t 'org-link-description)
+          (org-fold-region (1- end) end t 'org-link-description)
+          (add-text-properties start (1+ start)
+                               `(face org-annotate-bracket-face
+                                      display ,(nth 0 org-annotate-special-brackets)))
+          (add-text-properties (1- end) end
+                               `(face org-annotate-bracket-face
+                                      display ,(nth 2 org-annotate-special-brackets)))
 
-              (add-text-properties (match-end 0) url-end ; note
-                                   '(invisible nil face org-annotate-face))
-              (when desc-end ; with desc
-                (add-text-properties desc-beg desc-end
-                                     '(invisible nil face org-annotate-text-face))
-                (add-text-properties url-end desc-beg ; middle bracket
-                                     `(invisible nil
-                                                 face org-annotate-bracket-face
-                                                 display ,(nth 1 org-annotate-special-brackets))))))))))
+          ;; hide "note:"
+          (org-fold-region (1+ start) (+ start 7) nil)
+          (org-fold-region (1+ start) (+ start 7) t 'org-link)
+
+          (goto-char (+ 7 start))
+          ;; author?
+          (when-let ((ll (looking-at "{[^}]+}"))
+                     (amb (match-beginning 0))
+                     (ame (match-end 0)))
+            ;; hide first {
+            (org-fold-region amb (1+ amb) nil)
+            (org-fold-region amb (1+ amb) t 'org-link)
+            (add-text-properties (1+ amb) ame '(face (bold italic))) ; bold author
+            (add-text-properties (1- ame) ame '(display ":")) ; display } as :
+            (goto-char ame))
+          (setq aend (point))
+
+          (search-forward "]")
+
+          ;; show note (url) with correct face
+          (org-fold-region aend (1- (point)) t 'org-link-description)
+          (add-face-text-property aend (1- (point)) 'org-annotate-face)
+
+          (when (< (1+ (point)) end) ; with desc
+            (setq descb (1+ (point))
+                  desce (- end 2))
+
+            ;; description face (already folded correctly?):
+            (add-face-text-property descb desce 'org-annotate-text-face)
+
+            ;; middle brackets
+            (org-fold-region (1- (point)) (point) t 'org-link-description)
+            (add-text-properties (1- (point)) (point)
+                                 `(face org-annotate-bracket-face
+                                        display ,(nth 1 org-annotate-special-brackets))))))))
   )
 
 
@@ -2140,6 +2151,7 @@ List of prefix strings or regex."
 (define-minor-mode aj/org-annotate-in-margins-mode
   "Display ‘org-annotate’ notes in margin."
   :global t
+  :group 'aj
   (if aj/org-annotate-in-margins-mode
       (progn
         (advice-add 'org-annotate-add-note :after #'aj/org-annotate-add-right-margin)
@@ -2158,7 +2170,8 @@ List of prefix strings or regex."
 
 (defface aj/org-annotate-face-margin
   `((t (:inherit variable-pitch :height 0.7)))
-  "Face for note links in margin in org-mode.")
+  "Face for note links in margin in org-mode."
+  :group 'aj)
 
 (defun aj/org-annotate-add-right-margin (&rest _ignore)
   (when (< (or (cdr (window-margins)) 0) 50)
