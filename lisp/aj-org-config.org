@@ -20,6 +20,16 @@
 #+begin_src emacs-lisp
 ;; (run-at-time "00:59" 3600 'org-save-all-org-buffers)
 #+end_src
+** org-attach
+#+begin_src emacs-lisp
+(setq org-attach-id-to-path-function-list '(aj/org-attach-id-ts-folder-format))
+
+(defun aj/org-attach-id-ts-folder-format (id)
+  "Translate an ID based on a timestamp to a folder-path.
+Avoid colons for syncing to windows systems (onedrive)"
+  (string-replace ":" "-" id)))
+#+end_src
+
 ** Cosmetics, early definitions
 *** Prettify-symbols replacements
 **** Use prettify-symbols
