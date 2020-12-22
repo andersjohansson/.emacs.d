@@ -1081,10 +1081,8 @@ overriding it, but you should know before you do.
 *** Org init
 
 **** Load with org
-
-***** Stuff, orgqda, org-pomodoro, org-download
+***** orgqda
 #+begin_src emacs-lisp
-;; TODO, why here?
 (use-package orgqda
   :straight (:depth full :host gitlab :repo "andersjohansson/orgqda")
   :defer t
@@ -1557,9 +1555,10 @@ But show cursor in ~wdired-mode~
   :defer t
   :after dired
   :config (setq dired-subtree-use-backgrounds nil)
-  (bind-keys :map dired-mode-map
-             ("TAB" . dired-subtree-cycle)))
+  :bind (:map dired-mode-map
+              ("<tab>" . dired-subtree-cycle)))
 #+end_src
+
 **** Dired-narrow
 #+begin_src emacs-lisp
 (use-package dired-narrow
@@ -2555,6 +2554,7 @@ A bit nicer than isearch. I also like to use fuzzy search (words separated by wh
               (ispell-change-dictionary "en_GB,sv_SE"))
             t))
 #+end_src
+
 *** magit-todos
 #+begin_src emacs-lisp
 (use-package magit-todos
