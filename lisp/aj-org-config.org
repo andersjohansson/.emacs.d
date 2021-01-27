@@ -4337,11 +4337,10 @@ With my use of [[*\[\[https://github.com/integral-dw/org-superstar-mode/\]\[org-
                     (if (> n 0)
                         (concat
                          (make-string (+ n indentation -1) ?*)
-                         "▌"
+                         (char-to-string (car org-superstar-headline-bullets-list))
                          (char-to-string org-indent-boundary-char))
                       ""))
 		          nil 'face 'org-indent))))))
-
 #+end_src
 
 *** Fontify src blocks natively
@@ -4367,7 +4366,7 @@ With my use of [[*\[\[https://github.com/integral-dw/org-superstar-mode/\]\[org-
 (use-package org-superstar
   :hook (org-mode . org-superstar-mode)
   :custom
-  (org-superstar-headline-bullets-list '(?▌))
+  (org-superstar-headline-bullets-list '(?❖))
   (org-superstar-prettify-item-bullets nil)
   ;; when I would like to use plain bullets from time to time:
   (org-superstar-item-bullet-alist '((?- . ?•) (?+ . ?‣))))
