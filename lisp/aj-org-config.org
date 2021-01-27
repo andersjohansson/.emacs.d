@@ -3066,6 +3066,32 @@ should be relativized or not. Returns the possibly relativized filename"
                                      (3 'helm-buffer-process prepend))))
 #+end_src
 *** ODT-export
+**** noindent-style for odt paragraphs and spaced paragrahs in lists.
+#+begin_src emacs-lisp
+(defvar-local aj/org-export-odt-noindent nil
+  "Use noindent style for first paragraph after headline in odt export.
+Use spaced paragraphs in lists")
+
+(defun aj/org-odt-export-noindent (data backend info)
+  (when (and aj/org-export-odt-noindent
+             (org-export-derived-backend-p backend 'odt))
+    (org-element-map data 'paragraph
+      (lambda (p)
+        (let ((par (org-element-type (org-export-get-parent p)))
+              (prev (org-element-type (org-export-get-previous-element p info))))
+          (cond
+           ((eq par 'item)
+            (org-element-put-property p :style "spaced-paragraph"))
+           ((and
+             (eq par 'section)
+             (member prev '(nil table plain-list)))
+            (org-element-put-property p :style "noindent"))
+           (t p))))))
+  data)
+
+(add-to-list 'org-export-filter-parse-tree-functions #'aj/org-odt-export-noindent)
+
+#+end_src
 **** ODT has no problem including a pdf file, let it do that
 #+begin_src emacs-lisp
 (setq org-odt-inline-image-rules '(("file" . "\\.\\(jpeg\\|jpg\\|png\\|gif\\|svg\\|pdf\\)\\'")))
