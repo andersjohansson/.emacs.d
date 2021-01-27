@@ -310,11 +310,11 @@ Special faces for these states are also defined, but in [[file:~/.emacs.d/init.o
 (setq org-todo-keywords '((sequence "TODO(t)" "STARTAD(s)" "VÄNTAR(v)" "DONE(d)")
                           (sequence "|" "AVFÖRD(a)")))
 
-(dolist (kw '(("TODO" . ?❢)
-              ("DONE" . ?✔)
-              ("STARTAD" . ?➠)
-              ("VÄNTAR" . ?⌛)
-              ("AVFÖRD" . ?✘)))
+(dolist (kw '(("TODO" . ?!)
+              ("DONE" . ?✓)
+              ("STARTAD" . ?⇒)
+              ("VÄNTAR" . ?⇥)
+              ("AVFÖRD" . ?×)))
   (add-to-list 'aj/org-prettify-symbols kw))
 #+end_src
 
@@ -1197,9 +1197,9 @@ Uses CUSTOM_ID or `org-store-link' for linking."
            helm-org-headings-fontify
            t)))
 
-  (defun aj/helm-org-in-buffer-headings (&optional arg)
+  (defun aj/helm-org-in-buffer-headings ()
     "Preconfigured helm for org buffer headings."
-    (interactive "P")
+    (interactive)
     (helm :sources ;; (helm-org-build-sources files nil arg)
           (helm-build-sync-source "Org headings in buffer"
             :init #'aj/helm-org-in-buffer-init
@@ -1520,12 +1520,11 @@ Present a nicer-looking helm buffer for ~org-refile~
 #+end_src
 
 ** Columns view
-
 *** Cut field length in org-columns-view dblocks
 #+begin_src emacs-lisp
 (el-patch-feature org-colview)
 (with-eval-after-load 'org-colview
-  (el-patch-defun org-columns--capture-view ()
+  (el-patch-defun org-columns--capture-view (maxlevel match skip-empty exclude-tags format local)
     "Cut down fields to field format length"
 
     (org-columns (not local) format)
