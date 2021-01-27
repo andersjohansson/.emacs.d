@@ -386,6 +386,7 @@ all children are done, you can use the following setup:
      (1+ (point-at-eol))
      (save-excursion (progn (org-end-of-subtree) (point))))))
 #+end_src
+
 *** Agenda
 **** Extra keybindings for agenda
 #+begin_src emacs-lisp
@@ -1910,12 +1911,12 @@ I keep some notes for papers in org-mode, but sort my papers in Zotero. With thi
    (org-make-tags-matcher tag)
    nil))
 
-
 (defun aj/org-tangle-computer-config ()
   "Tangle config tagged with current ‘system-name’"
   (interactive)
   (aj/org-babel-tangle-tagged (system-name)))
 #+end_src
+
 ** Copy region as html or ascii
 #+begin_src emacs-lisp
 (defun aj/org-export-copy-region-as (&optional backend)
