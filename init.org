@@ -2168,7 +2168,7 @@ https://github.com/andersjohansson/tex-fold-linebreaks
 
 ~other-window~ with ~<C-tab>~ and ~<C-S-tab>~ (like switching tabs in firefox).
 
-~next/previous-buffer~ with ~C-§~.
+Swich to  ~other-buffer~ with ~C-§~.
 
 #+begin_src emacs-lisp
 (unbind-key "C-x o") ; to get out of that habit
@@ -2176,8 +2176,12 @@ https://github.com/andersjohansson/tex-fold-linebreaks
 (bind-keys
  ("<C-tab>" . other-window)
  ("<C-iso-lefttab>" . aj/back-window) ;; really C-S-tab ...
- ("C-§" . previous-buffer)
- ("C-½" . next-buffer))
+ ("C-§" . aj/switch-to-other-buffer)
+ ("C-½" . previous-buffer))
+
+(defun aj/switch-to-other-buffer ()
+  (interactive)
+  (switch-to-buffer nil))
 
 (defun aj/back-window ()
   (interactive)
