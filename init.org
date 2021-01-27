@@ -3057,14 +3057,6 @@ Only works with XDG trash dir."
            (dired-remove-file file)))
 #+end_src
 
-*** Fix ediff locale
-ediff expects diff to return results in C-locale, I’ve made a wrapper script
-(it’s: ~LANG=C diff "$1" "$2"~) to solve this.
-#+begin_src emacs-lisp
-(setq ediff-diff-program "aj-diff-no-locale")
-#+end_src
-
-
 *** y-or-n instead of yes-or-no
 #+begin_src emacs-lisp
 (defalias 'yes-or-no-p 'y-or-n-p)
@@ -3138,7 +3130,12 @@ This is the new thing, and it is good, because it knows a lot about the code and
 *** Ediff
 #+begin_src emacs-lisp
 (use-package ediff
-  :custom (ediff-window-setup-function #'ediff-setup-windows-plain))
+  :custom
+  (ediff-window-setup-function #'ediff-setup-windows-plain)
+  (ediff-split-window-function #'split-window-sensibly)
+  ;;ediff expects diff to return results in C-locale, I’ve made a
+  ;;wrapper script to solve this (script is: LANG=C diff "$1" "$2")
+  (ediff-diff-program "aj-diff-no-locale"))
 #+end_src
 
 *** paren-face
