@@ -1084,7 +1084,8 @@ overriding it, but you should know before you do.
 ***** orgqda
 #+begin_src emacs-lisp
 (use-package orgqda
-  :straight (:depth full :host gitlab :repo "andersjohansson/orgqda")
+  :straight (:depth full :host gitlab :repo "andersjohansson/orgqda"
+                    :files ("orgqda.el" "orgqda-transcript.el ""orgqda-helm-tags.el"))
   :defer t
   :after org
   :init (put 'orgqda-csv-dir 'safe-local-variable #'file-directory-p)
