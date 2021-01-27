@@ -957,7 +957,7 @@ Use ~fd~ for searching instead of ~find~. Faster and easier.
       (delete-frame)))
   )
 #+end_src
-**** TODO Utvärdera om vi borde använda helm-multi-files istället för att lägga allt i helm-mini
+
 **** Favourite files (to mark files which should be prioritized in helm matches)
 #+begin_src emacs-lisp
 (defvar aj/favourite-files nil)
