@@ -3197,8 +3197,6 @@ Argument SYM-NAME is the thing to find."
 
   (define-key elisp-slime-nav-mode-map (kbd "C-M-.")
     #'aj/find-elisp-thing-at-point-other-window))
-
-
 #+end_src
 
 **** Timestamps
@@ -3221,6 +3219,7 @@ Argument SYM-NAME is the thing to find."
   (setq nameless-private-prefix t
         nameless-affect-indentation-and-filling nil))
 #+end_src
+
 **** Electric-quote-mode
 #+begin_src emacs-lisp
 (add-hook 'emacs-lisp-mode-hook #'electric-quote-local-mode)
@@ -3235,8 +3234,6 @@ Argument SYM-NAME is the thing to find."
   :config (add-hook 'reb-mode-hook (lambda () (aggressive-indent-mode -1))) ;; meaningless and shadows the important keybinding C-c C-q
   )
 #+end_src
-
-
 
 *** Outline
 **** outline-magic
