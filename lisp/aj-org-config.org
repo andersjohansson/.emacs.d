@@ -3461,10 +3461,10 @@ Add as a filter in ‘org-export-filter-parse-tree-functions’."
 #+end_src
 ****** Convert ref to cref (from cleverref)
 #+begin_src emacs-lisp
+(defvar aj/org-latex-export-cleverref nil)
 (defun aj/org-latex-ref-to-autoref (string backend _info)
-  (if (and
-       (org-export-derived-backend-p backend 'latex)
-       (string-match-p "avhandling" default-directory))
+  (if (and (org-export-derived-backend-p backend 'latex)
+           aj/org-latex-export-cleverref)
       (zotxt-extra--replace-consecutive
        (replace-regexp-in-string "\\\\ref{" "\\cref{" string t t)
        "\\\\cref{\\([^}]+\\)}"
