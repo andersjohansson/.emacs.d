@@ -3966,7 +3966,7 @@ I’m trying out ox-reveal, but they have different ways of adding notes (subtre
 ;; (bind-key "C-M-c C-M-e" #'aj/org-export-no-sections org-mode-map)
 #+end_src
 
-*** TODO Export parent subtree :ARCHIVE:
+*** Export parent subtree :ARCHIVE:
 :PROPERTIES:
 :CUSTOM_ID: parent-subtree
 :END:
