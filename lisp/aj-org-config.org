@@ -192,6 +192,24 @@ Org emphasize: _b_old  _i_talic _u_nderline _c_ode _v_erbatim _s_trikethrough  _
           (sp-wrap-with-pair wrap))))))
 #+end_src
 
+*** Insert org macro
+#+begin_src emacs-lisp
+(defun aj/org-insert-macro ()
+  (interactive)
+  (insert
+   (format
+    "{{{%s}}}"
+    (helm-comp-read
+     "Macro: "
+     (cl-loop for (m . e) in org-macro-templates
+              collect
+              (cons
+               (concat m (propertize (concat " (" e ")") 'face 'shadow))
+               m))
+     :multiline t))))
+
+
+#+end_src
 *** Template inserting (hydra)
 If before headline, insert options template with completion.
 
