@@ -292,17 +292,30 @@ Some variables are not suitable to keep in the init-file, I add these via custom
       (goto-char (point-max))
       (eval-print-last-sexp)))
   (load bootstrap-file nil 'nomessage))
-
-;; Define how to build org already here, so that dependencies work out
-(straight-use-package '(org :host github :repo "yantar92/org" :branch "weekday-repeats-new"))
 #+end_src
 
+*** Fix recipes and stuff for loading some packages
+
+#+begin_src emacs-lisp
+;; Define how to build org and mu4e already here, so that dependencies work out
+(straight-use-package '(org :host github :repo "yantar92/org" :branch "weekday-repeats-new"
+                            :pre-build (list "make" "autoloads" (concat "EMACS=" invocation-directory invocation-name))
+                            :build (:not autoloads)
+                            :files (:defaults "lisp/*.el" "etc/styles/*" "etc/schema/*")))
+(straight-use-package '(mu4e :type built-in))
+
+;; Don’t do any stupid options saving for eudc, my options are defined in mail-config.org
+(setq eudc-options-file "nonononononononono.el") ;; see eudc.el::1157
+(with-eval-after-load 'eudc
+  (advice-add 'eudc-save-options :override #'ignore))
+#+end_src
 
 *** Bootstrap ~use-package~ :org_async:
 #+begin_src emacs-lisp
 ;; (setq use-package-compute-statistics t)
 
 (straight-use-package 'use-package)
+(require 'use-package) ;; because of the theme stuff https://github.com/jwiegley/use-package/issues/902
 
 (use-package validate
   :demand t)
@@ -1370,9 +1383,11 @@ behavior added."
             "Quit is ignored during macro defintion, use \\[kmacro-end-macro] if you want to stop macro definition"))
           (cancel-kbd-macro-events))
         ((active-minibuffer-window)
-         (if ctrlf--active-p
-             (ctrlf-cancel)
-           (abort-recursive-edit)))
+         (abort-recursive-edit)
+         ;; (if ctrlf--active-p
+         ;;     (ctrlf-cancel)
+         ;;   (abort-recursive-edit))
+         )
         (t
          ;; if we got this far just use the default so we don't miss
          ;; any upstream changes
@@ -4354,7 +4369,8 @@ Sometimes I feel the need for a generally bigger font in all emacs frames. Espec
 
 (use-package mini-modeline
   :straight (mini-modeline :fork (:host github :repo "andersjohansson/mini-modeline" :branch "buffer-local-formats"))
-  :after doom-modeline
+  ;; :after doom-modeline
+  :demand t
   :hook (window-setup . mini-modeline-mode)
   :config
   (doom-modeline-def-modeline 'minibuffer-line
@@ -4365,11 +4381,16 @@ Sometimes I feel the need for a generally bigger font in all emacs frames. Espec
   (setq mini-modeline-right-padding 1
         mini-modeline-enhance-visual nil)
 
-  (set-face-attribute 'mode-line nil :box t)
-  (set-face-attribute 'mini-modeline-mode-line nil
-                      :background (face-background 'modus-theme-intense-blue) :height 0.2)
-  (set-face-attribute 'mini-modeline-mode-line-inactive nil
-                      :background (face-background 'fringe) :height 0.2)
+  (add-hook 'aj/face-definitions-hook #'aj/mini-modeline-faces)
+  (defun aj/mini-modeline-faces (theme)
+    (set-face-attribute 'mode-line nil :box t)
+    (when (member theme '(modus-operandi modus-vivendi))
+      (set-face-attribute 'mini-modeline-mode-line nil
+                          :background (modus-themes-color 'blue-fringe-bg) :height 0.14))
+    (set-face-attribute 'mini-modeline-mode-line-inactive nil
+                        :background (face-background 'fringe) :height 0.14))
+
+
 
   (defun doom-modeline-segment--bar ()
     "Don’t show the bar when using mini-modeline"
@@ -4414,109 +4435,71 @@ Sometimes I feel the need for a generally bigger font in all emacs frames. Espec
   (defun aj/visible-helm-modeline (&rest _)
     (with-helm-buffer
       (setq-local face-remapping-alist
-                  (cl-delete 'mode-line face-remapping-alist :key #'car))
-
-      (setq-local face-remapping-alist
                   (cons '(doom-modeline . mode-line)
-                        (cl-delete 'doom-modeline face-remapping-alist
-                                   :key #'car)))))
+                        (cl-delete
+                         'doom-modeline
+                         (cl-delete
+                          'mode-line
+                          face-remapping-alist
+                          :key #'car)
+                         :key #'car)))))
 
 
   ;; show modeline for some other special buffers. Currently
   ;; ispell-choices-buffer is one good candidate.
-  (defvar aj/buffers-with-modeline nil)
-  (with-eval-after-load 'ispell
-    (add-to-list 'aj/buffers-with-modeline ispell-choices-buffer))
+  ;; (defvar aj/buffers-with-modeline nil)
+  ;; (with-eval-after-load 'ispell
+  ;;   (add-to-list 'aj/buffers-with-modeline ispell-choices-buffer))
 
-  (advice-add #'get-buffer-create :after #'aj/local-visible-modeline)
-  (defun aj/local-visible-modeline (buffer)
-    (when (member buffer aj/buffers-with-modeline)
-      (with-current-buffer buffer
-        (setq-local face-remapping-alist
-                    '((mode-line . mode-line)
-                      (doom-modeline . mode-line))))))
+  ;; (advice-add #'get-buffer-create :after #'aj/local-visible-modeline)
+  ;; (defun aj/local-visible-modeline (buffer)
+  ;;   (when (member buffer aj/buffers-with-modeline)
+  ;;     (with-current-buffer buffer
+  ;;       (setq-local face-remapping-alist
+  ;;                   '((mode-line . mode-line)
+  ;;                     (doom-modeline . mode-line))))))
 
   ;; fix eldoc minibuffer display
-  (with-eval-after-load 'eldoc
-    (defvar aj/eldoc-modeline-buffer nil)
+  ;; (with-eval-after-load 'eldoc
+  ;;     (defvar aj/eldoc-modeline-buffer nil)
 
-    (setq eldoc-message-function #'aj/eldoc-minibuffer-message)
+  ;;     (setq eldoc-message-function #'aj/eldoc-minibuffer-message)
 
-    (defun aj/eldoc-minibuffer-message (format-string &rest args)
-      "Display messages in the mode-line when in the minibuffer.
-Otherwise work like `message'."
-      (if (minibufferp)
-          (progn
-            (setq aj/eldoc-modeline-buffer
-                  (window-buffer
-	               (or (window-in-direction 'above (minibuffer-window))
-		               (minibuffer-selected-window)
-		               (get-largest-window))))
-	        (add-hook 'minibuffer-exit-hook
-		              (lambda () (setq eldoc-mode-line-string nil
-			                           ;; https://debbugs.gnu.org/16920
-			                           eldoc-last-message nil)
-                        (with-current-buffer aj/eldoc-modeline-buffer
-                          (setf (alist-get 'mode-line face-remapping-alist)
-                                'mini-modeline-mode-line)))
-		              nil t)
-	        (with-current-buffer aj/eldoc-modeline-buffer
-              (setf (alist-get 'mode-line face-remapping-alist)
-                    'mode-line-inactive)
-              (when (and mode-line-format
-                         (not (and (listp mode-line-format)
-                                   (assq 'eldoc-mode-line-string mode-line-format))))
-	            (setq mode-line-format
-		              (list "" '(eldoc-mode-line-string
-			                     (" " eldoc-mode-line-string " "))
-			                mode-line-format)))
-              (setq eldoc-mode-line-string
-                    (when (stringp format-string)
-                      (apply #'format-message format-string args)))
-              (force-mode-line-update)))
-        (apply #'message format-string args))))
+  ;;     (defun aj/eldoc-minibuffer-message (format-string &rest args)
+  ;;       "Display messages in the mode-line when in the minibuffer.
+  ;; Otherwise work like `message'."
+  ;;       (if (minibufferp)
+  ;;           (progn
+  ;;             (setq aj/eldoc-modeline-buffer
+  ;;                   (window-buffer
+  ;; 	               (or (window-in-direction 'above (minibuffer-window))
+  ;; 		               (minibuffer-selected-window)
+  ;; 		               (get-largest-window))))
+  ;; 	        (add-hook 'minibuffer-exit-hook
+  ;; 		              (lambda () (setq eldoc-mode-line-string nil
+  ;; 			                           ;; https://debbugs.gnu.org/16920
+  ;; 			                           eldoc-last-message nil)
+  ;;                         (with-current-buffer aj/eldoc-modeline-buffer
+  ;;                           (setf (alist-get 'mode-line face-remapping-alist)
+  ;;                                 'mini-modeline-mode-line)))
+  ;; 		              nil t)
+  ;; 	        (with-current-buffer aj/eldoc-modeline-buffer
+  ;;               (setf (alist-get 'mode-line face-remapping-alist)
+  ;;                     'mode-line-inactive)
+  ;;               (when (and mode-line-format
+  ;;                          (not (and (listp mode-line-format)
+  ;;                                    (assq 'eldoc-mode-line-string mode-line-format))))
+  ;; 	            (setq mode-line-format
+  ;; 		              (list "" '(eldoc-mode-line-string
+  ;; 			                     (" " eldoc-mode-line-string " "))
+  ;; 			                mode-line-format)))
+  ;;               (setq eldoc-mode-line-string
+  ;;                     (when (stringp format-string)
+  ;;                       (apply #'format-message format-string args)))
+  ;;               (force-mode-line-update)))
+  ;;         (apply #'message format-string args))))
 
   )
-
-
-
-
-;; (use-package doom-modeline
-;;   :defer t
-;;   ;; :hook (after-init . doom-modeline-mode)
-;;   :custom
-;;   (doom-modeline-buffer-file-name-style 'truncate-all)
-;;   (doom-modeline-bar-width (frame-parameter nil 'left-fringe))
-;;   (doom-modeline-height 32)
-;;   :config
-;;   ;; shorten filenames when the window is narrow
-;;   ;; (defun aj/doom-modeline-shorten-file-name (name)
-;;   ;;   (let ((limit (/ (window-text-width) 3)))
-;;   ;;     (if (< limit (length name))
-;;   ;;         (concat (substring name 0 (1- limit)) " ⋯")
-;;   ;;       name)))
-
-;;   ;; (advice-add 'doom-modeline-update-buffer-file-name :override #'aj/doom-modeline-update-buffer-file-name)
-;;   ;; (add-hook 'window-configuration-change-hook #'doom-modeline-update-buffer-file-name)
-
-;;   ;; (defun aj/doom-modeline-update-buffer-file-name (&rest _)
-;;   ;;     "Update buffer file name in mode-line."
-;;   ;;     (setq doom-modeline--buffer-file-name
-;;   ;;           (ignore-errors
-;;   ;;             (save-match-data
-;;   ;;               (if buffer-file-name
-;;   ;;                   (aj/doom-modeline-shorten-file-name (doom-modeline-buffer-file-name))
-;;   ;;                 (propertize (aj/doom-modeline-shorten-file-name (buffer-name))
-;;   ;;                             'face (if (doom-modeline--active)
-;;   ;;                                       'doom-modeline-buffer-file
-;;   ;;                                     'mode-line-inactive)
-;;   ;;                             'help-echo "Buffer name
-;;   ;; mouse-1: Previous buffer\nmouse-3: Next buffer"
-;;   ;;                             'local-map mode-line-buffer-identification-keymap))))))
-
-
-
-;;   )
 #+end_src
 
 *** Themes
@@ -4529,7 +4512,7 @@ Load my own face customizations after enabling a theme.
 (defun aj/apply-face-definitions (&optional theme)
   "Do face definition stuff after loading theme.
 Also runs hook aj/face-definitions-hook."
-  (unless (eq theme 'user) ;enable theme calls itself with user theme.
+  (unless (member theme '(use-package user)) ;enable theme calls itself with user theme.
 
     ;; (set-face-attribute 'scroll-bar nil :foreground (face-attribute
     ;; 'widget-field :background))

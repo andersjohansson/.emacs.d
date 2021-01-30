@@ -13,7 +13,7 @@
 Mu4e should be available, I install it with emacs, and this should prevent other packages below from trying to install it via straight.
 #+begin_src emacs-lisp
 (use-package mu4e
-  :straight (mu4e :type built-in)
+  ;; :straight (mu4e :type built-in)
   :custom ((mu4e-confirm-quit nil)
            (mu4e-context-policy 'pick-first)
            (mu4e-compose-context-policy 'ask-if-none)
@@ -257,11 +257,6 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
       '(("ldap://localhost:1389" . ldap)))
 (eudc-set-server "ldap://localhost:1389" 'ldap)
 (setq eudc-expansion-overwrites-query t)
-
-;; Don’t do any stupid options saving, my options are above!
-(setq eudc-options-file "nonononononononono.el") ;; see eudc.el::1157
-(with-eval-after-load 'eudc
-  (advice-add 'eudc-save-options :override #'ignore))
 
 (defun aj/display-eudc-info-at-point ()
   (interactive)
