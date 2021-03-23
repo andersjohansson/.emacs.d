@@ -43,7 +43,6 @@ Define a variable where symbols can be added for use later and enable prettify-s
 
 (add-hook 'org-mode-hook #'aj/org-enable-prettify)
 
-
 ;; helper macro to replace with longer string
 ;;from: https://emacs.stackexchange.com/a/34882
 (defmacro aj/add-visual-replacement (from to alist)
@@ -60,8 +59,6 @@ for more information."
                          (push char composition)
                          (push '(Br . Bl) composition))))
          ,alist))
-
-
 #+end_src
 
 **** Prettify quote-blocks
@@ -328,12 +325,23 @@ Special faces for these states are also defined, but in [[file:~/.emacs.d/init.o
 (setq org-todo-keywords '((sequence "TODO(t)" "STARTAD(s)" "VÄNTAR(v)" "DONE(d)")
                           (sequence "|" "AVFÖRD(a)")))
 
-(dolist (kw '(("TODO" . ?!)
-              ("DONE" . ?✓)
-              ("STARTAD" . ?⇒)
-              ("VÄNTAR" . ?⇥)
-              ("AVFÖRD" . ?×)))
-  (add-to-list 'aj/org-prettify-symbols kw))
+;; (dolist (kw '(("AVFÖRD" . " ☒")
+;;               ("VÄNTAR" . " ◫")
+;;               ("STARTAD" . " ◧")
+;;               ("DONE" . " ☑")
+;;               ("TODO" . " ☐")
+;;               ;; ("AVFÖRD" . ?☒)
+;;               ;; ("VÄNTAR" . ?◫)
+;;               ;; ("STARTAD" . ?◧)
+;;               ;; ("DONE" . ?☑)
+;;               ;; ("TODO" . ?☐)
+;;               ;; ("TODO" . ?!)
+;;               ;; ("DONE" . ?✓)
+;;               ;; ("STARTAD" . ?⇒)
+;;               ;; ("VÄNTAR" . ?⇥)
+;;               ;; ("AVFÖRD" . ?×)
+;;               ))
+;;   (add-to-list 'aj/org-prettify-symbols kw))
 #+end_src
 
 **** Todo tree
@@ -452,7 +460,7 @@ all children are done, you can use the following setup:
   (add-hook 'org-agenda-mode-hook #'variable-pitch-mode)
   (add-hook 'org-agenda-mode-hook #'aj/org-agenda-line-spacing)
   (defun aj/org-agenda-line-spacing ()
-    (setq line-spacing 0.15))
+    (setq line-spacing 0.2))
 
   (setf (alist-get 'agenda org-agenda-prefix-format)
         (concat "  %-14c"
@@ -482,6 +490,8 @@ all children are done, you can use the following setup:
 
   (advice-add 'org-habit-build-graph :filter-return #'aj/org-agenda-habit-align-right))
 
+
+
 (defun aj/org-agenda-fix-faces (&rest _ignore)
   (with-eval-after-load 'org-habit
     (cl-loop for f in '(org-habit-alert-face
@@ -498,10 +508,11 @@ all children are done, you can use the following setup:
                                            (if (listp fa)
                                                fa
                                              (list fa)))
-                                         '(fixed-pitch)))))
-  (with-eval-after-load 'org-faces
-    (set-face-attribute 'org-agenda-date nil :overline "#CCCCCC")
-    (set-face-attribute 'org-agenda-date-weekend nil :overline "#CCCCCC")))
+                                         '(fixed-pitch))))))
+
+(with-eval-after-load 'org-faces
+  (set-face-attribute 'org-agenda-date nil :overline "#CCCCCC")
+  (set-face-attribute 'org-agenda-date-weekend nil :overline "#CCCCCC"))
 
 (aj/org-agenda-fix-faces)
 
@@ -926,7 +937,7 @@ STATE should be one of the symbols listed in the docstring of
         (when (equal "folded" (org-entry-get (point) "visibility"))
           (message "%s" (substitute-command-keys
                          "Subtree has VISIBILITY: folded, and stays closed.  Use \
-`\\[org-force-cycle-archived]' to cycle it anyway.")))))))
+`\\[org-cycle-force-archived]' to cycle it anyway.")))))))
 
 (defun aj/org-hide-folded-trees (beg end)
   "Re-hide all subtrees with visibility folded after a visibility state change."
@@ -936,7 +947,7 @@ STATE should be one of the symbols listed in the docstring of
      (goto-char beg)
      (beginning-of-line) ; Include headline point is currently on.
      (while (and (< (point) end) (search-forward re end t))
-       (org-set-visibility-according-to-property)))))
+       (org-cycle-set-visibility-according-to-property)))))
 #+end_src
 
 *** Read-only-trees
@@ -1124,7 +1135,29 @@ A local variables comment block that is placed at the end of the file may be los
                                   (org-show-entry))))))))
 #+end_src
 
-** Editing
+** Structure editing
+*** Sorting by last name
+I often have lists of names for headlines. Nice to be able to sort them by last name. Here is a function to be used for creating a sort key that sorts on last name for ~org-sort-entries~ or ~org-sort-list~.
+#+begin_src emacs-lisp
+(defun aj/org-sort-last-names-headings ()
+  "Create sort key for sorting by last names in headings"
+  (let ((line (org-sort-remove-invisible (org-get-heading t t t t))))
+    (if (string-match "^[[:space:]]*\\([^[:space:]]+\\) *\\(.*\\)$" line)
+        (concat (match-string 2 line)
+                (match-string 1 line))
+      line)))
+
+
+(defun aj/org-sort-last-names-list-entries ()
+  "Create sort key for sorting by last names in plain lists"
+  (let ((line (org-sort-remove-invisible
+		       (buffer-substring (match-end 0) (point-at-eol)))))
+    (if (string-match "^[[:space:]]*\\([^[:space:]]+\\) *\\(.*\\)$" line)
+        (concat (match-string 2 line)
+                (match-string 1 line))
+      line)))
+#+end_src
+
 *** Even levels
 Sometimes (especially importing from html) we get trees where a level 4 heading is beneath a level 2 heading. Not pretty. This promotes all such subtrees to the correct level (one level below parent).
 
@@ -1542,6 +1575,12 @@ Present a nicer-looking helm buffer for ~org-refile~
 *** Cut field length in org-columns-view dblocks
 #+begin_src emacs-lisp
 (el-patch-feature org-colview)
+
+;; silence byte-compiler warnings
+(declare-function org-columns-quit "org-colview")
+(defvar org-columns-top-level-marker)
+(defvar org-columns-current-fmt-compiled)
+
 (with-eval-after-load 'org-colview
   (el-patch-defun org-columns--capture-view (maxlevel match skip-empty exclude-tags format local)
     "Cut down fields to field format length"
@@ -2268,7 +2307,10 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
   :config
   (defconst zotxt-url-base
 	"http://127.0.0.1:23200/zotxt"
-	"Base URL to contact."))
+	"Base URL to contact.")
+  ;; funkar det inte med custom?
+  ;; (setq zotxt-default-bibliography-style "apa")
+  )
 
 
 (use-package org-pdcite
@@ -2373,6 +2415,16 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
     (org-fold-region (1- end) end t 'org-link-description)
     ;; but we also want this activation from zotxt-extra
     (zotxt-extra--activate-links-full-citation start end path bracketp))
+
+
+  (advice-add 'org-zotxt-insert-reference-links-to-items :override
+              #'aj/org-zotxt-insert-reference-links-to-items)
+  (defun aj/org-zotxt-insert-reference-links-to-items (items)
+    "Insert links to Zotero ITEMS in buffer.
+Just insert space between multiple links."
+    (cl-loop for i in items do
+             (org-zotxt-insert-reference-link-to-item i)
+             (insert " ")))
   )
 #+end_src
 
@@ -2503,7 +2555,7 @@ Mostly for html and reveal
   (aj/org-complete-link "video:"))
 #+end_src
 
-*** Html-export
+*** Html-export cleanup
 An option for "cleaning up" exported html from some org markup. Good for generating clean html for pasting into systems.
 #+begin_src emacs-lisp
 (defcustom aj/org-export-html-cleanup nil
@@ -4311,13 +4363,45 @@ and :select-tags in org export."
 #+end_src
 
 ** Cosmetics, display, faces
+*** Pretty display of todo keywords
+#+begin_src emacs-lisp
+(add-hook 'org-font-lock-set-keywords-hook #'aj/org-prettify-todos)
+
+(defun aj/org-prettify-todos ()
+  (add-to-list 'font-lock-extra-managed-props 'display)
+  (setq org-font-lock-extra-keywords
+        (append org-font-lock-extra-keywords
+                (list
+                 (list
+                  (format "^\\(\\*+\\)\\( +%s\\)\\(?: +\\(.*?\\)\\)?[ 	]*$"
+			              org-todo-regexp)
+		          '(2 (list 'face
+                            (org-get-todo-face 3)
+                            'display
+                            (aj/org-prettify-todos-display (match-string 3)))
+                      prepend))))))
+
+(defun aj/org-prettify-todos-display (kw)
+  (when kw (alist-get kw
+                      '(("AVFÖRD" . "☒")
+                        ("VÄNTAR" . "◫")
+                        ("STARTAD" . "◧")
+                        ("DONE" . "☑")
+                        ("TODO" . "☐"))
+                      nil kw #'equal)))
+
+
+#+end_src
+
 *** [[https://github.com/integral-dw/org-superstar-mode/][org-superstar]] (successor to org-bullets)
 #+begin_src emacs-lisp
 (use-package org-superstar
   :demand t
   :hook (org-mode . org-superstar-mode)
   :custom
-  (org-superstar-headline-bullets-list '(?❖))
+  (org-superstar-headline-bullets-list '(?♦))
+  (org-superstar-special-todo-items 'hide)
+  ;; (org-superstar-todo-bullet-alist '((default . ? )))
   (org-superstar-prettify-item-bullets nil)
   ;; when I would like to use plain bullets from time to time:
   (org-superstar-item-bullet-alist '((?- . ?•) (?+ . ?‣))))
@@ -4367,6 +4451,7 @@ With my use of [[*\[\[https://github.com/integral-dw/org-superstar-mode/\]\[org-
                     (if (> n 0)
                         (concat
                          (make-string (+ n indentation -1) ?*)
+                         ;; "  " ;; a space + an em-space
                          (char-to-string (car org-superstar-headline-bullets-list))
                          (char-to-string org-indent-boundary-char))
                       ""))
@@ -4560,14 +4645,19 @@ Add special tag faces, add for file-local select/exclude-tags. Highlight the ent
 #+begin_src emacs-lisp
 (setq org-list-demote-modify-bullet '(("+" . "-") ("-" . "+")))
 #+end_src
+
 *** Tags column at 0
 I use variable-width fonts, so trying to align tags to the right is useless. But in the agenda we want them right aligned and setting it in the hook means we can adapt to the current window.
 #+begin_src emacs-lisp
 (setq org-tags-column 0
       org-auto-align-tags nil)
-(add-hook 'org-agenda-mode-hook '(lambda ()
-                                  (setq org-agenda-tags-column (- (window-width)))))
+
+(add-hook 'org-agenda-mode-hook #'aj/org-set-agenda-tags-column)
+
+(defun aj/org-set-agenda-tags-column ()
+  (setq org-agenda-tags-column (- (window-width))))
 #+end_src
+
 *** org-fold-linebreaks-mode
 Experimental mode for folding together paragraphs with one sentence per line (good for version control) to make them look nicer when displaying. Works with an overlay per line, so perhaps not so efficient.
 
