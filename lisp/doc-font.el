@@ -47,7 +47,7 @@
     ;;(org-block (:background ,base02))
     (org-link . (:underline t :weight normal))
     (org-special-keyword . (:height 0.9)))
-  "Faces to remap, with attributes to remap"
+  "Faces to remap, with attributes to remap."
   :type '(alist :key-type face :value-type (plist :value-type sexp)))
 
 (defcustom doc-font-keep-default
@@ -126,7 +126,8 @@ Old value is stored in ‘doc-font-variable-cookies’."
           (org-indent-mode -1)
           (when (bound-and-true-p org-superstar-mode)
             (doc-font--set-and-store-old-val 'org-superstar-remove-leading-stars t)
-            (doc-font--set-and-store-old-val 'org-superstar-headline-bullets-list '(""))
+            (doc-font--set-and-store-old-val 'org-superstar-headline-bullets-list
+                                             '(?\N{ZERO WIDTH SPACE}))
             (doc-font--set-and-store-old-val 'org-superstar-prettify-item-bullets t)
             (org-superstar-restart))))
     ;; DISABLE:
