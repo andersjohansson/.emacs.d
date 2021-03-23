@@ -295,13 +295,14 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 #+end_src
 
 *** Fix recipes and stuff for loading some packages
-
 #+begin_src emacs-lisp
 ;; Define how to build org and mu4e already here, so that dependencies work out
 (straight-use-package '(org :host github :repo "yantar92/org" :branch "weekday-repeats-new"
                             :pre-build (list "make" "autoloads" (concat "EMACS=" invocation-directory invocation-name))
                             :build (:not autoloads)
-                            :files (:defaults "lisp/*.el" "etc/styles/*" "etc/schema/*")))
+                            :files (:defaults
+                                    "lisp/*.el"
+                                    ("etc/styles/" "etc/styles/*"))))
 (straight-use-package '(mu4e :type built-in))
 
 ;; Don’t do any stupid options saving for eudc, my options are defined in mail-config.org
@@ -428,6 +429,7 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 #+begin_src emacs-lisp
 (use-package all-the-icons-dired
   :init (add-hook 'dired-mode-hook #'all-the-icons-dired-mode)
+  :custom (all-the-icons-dired-monochrome nil)
   :config
   (add-hook 'dired-subtree-after-insert-hook #'all-the-icons-dired--refresh)
   (add-hook 'dired-subtree-after-remove-hook #'all-the-icons-dired--refresh))
@@ -456,14 +458,28 @@ Example of alist entry:
   :config
   (setq-default helm-command-prefix-key "C-c h")
   (helm-mode)
-  (define-key helm-find-files-map (kbd "C-i") 'helm-ff-TAB)
-  (define-key helm-read-file-map (kbd "C-i") 'helm-ff-TAB)
-  ;; We want to be able to sort when completing filenames is invoked
-  ;; by ‘read-file-name’ etc. This seems to work flawlessly, so I wonder
-  ;; why it’s not bound by default (these keys are bound in ‘helm-find-files-map’)
-  (define-key helm-read-file-map (kbd "S-<f1>") 'helm-ff-sort-alpha)
-  (define-key helm-read-file-map (kbd "S-<f2>") 'helm-ff-sort-by-newest)
-  (define-key helm-read-file-map (kbd "S-<f3>") 'helm-ff-sort-by-size)
+
+  (bind-keys :map 'helm-find-files-map
+             ("C-i" . helm-ff-TAB)
+             ("C-<dead-diaeresis>" . aj/helm-ff-home-dir)
+             ("C-å" . aj/helm-ff-jobb-dir))
+  (bind-keys :map 'helm-read-file-map
+             ("C-i" . helm-ff-TAB)
+             ("C-<dead-diaeresis>" . aj/helm-ff-home-dir)
+             ("C-å" . aj/helm-ff-jobb-dir)
+             ;; We want to be able to sort when completing filenames is invoked
+             ;; by ‘read-file-name’ etc. This seems to work flawlessly, so I wonder
+             ;; why it’s not bound by default (these keys are bound in ‘helm-find-files-map’)
+             ("S-<f1>" . helm-ff-sort-alpha)
+             ("S-<f2>" . helm-ff-sort-by-newest)
+             ("S-<f3>" . helm-ff-sort-by-size))
+
+  (defun aj/helm-ff-home-dir ()
+    (interactive)
+    (helm-set-pattern (expand-file-name "~/")))
+  (defun aj/helm-ff-jobb-dir ()
+    (interactive)
+    (helm-set-pattern (expand-file-name "~/jobb/")))
 
   (when (executable-find "curl")
     (setq helm-net-prefer-curl-p t))
@@ -504,53 +520,53 @@ Example of alist entry:
       (setq helm-persistent-action-window-buffer (window-buffer win))
       win))
 
-  ;; (setq ;;helm-display-function
-  ;;  ;;#'aj/helm-display-child-frame
-  ;;  ;; #'helm-default-display-buffer
-  ;;  ;; helm-display-buffer-reuse-frame nil
-  ;;  ;; helm-display-buffer-width 120
-  ;;  ;; helm-display-buffer-height 35
-  ;;  )
+  ;; (setq helm-display-function
+  ;;       ;; #'aj/helm-display-child-frame
+  ;;       #'helm-default-display-buffer
+  ;;       helm-display-buffer-reuse-frame nil
+  ;;       helm-display-buffer-width 120
+  ;;       helm-display-buffer-height 35
+  ;;       )
 
 
   ;; (defun aj/helm-display-child-frame (buffer &optional resume)
-  ;;     "Display `helm-buffer' in a separate frame.
+  ;;   "Display `helm-buffer' in a separate frame.
   ;; Function suitable for `helm-display-function',
   ;; `helm-completion-in-region-display-function'
   ;; and/or `helm-show-completion-default-display-function'.
   ;; See `helm-display-buffer-height' and `helm-display-buffer-width' to
   ;; configure frame size."
-  ;;     (if (not (display-graphic-p))
-  ;;         ;; Fallback to default when frames are not usable.
-  ;;         (helm-default-display-buffer buffer)
-  ;;       (setq helm--buffer-in-new-frame-p t)
-  ;;       (let ((default-frame-alist
-  ;;               `((parent . ,(selected-frame))
-  ;;                 (width . ,helm-display-buffer-width)
-  ;;                 (height . ,helm-display-buffer-height)
-  ;;                 (undecorated . t)
-  ;;                 (left-fringe . 2)
-  ;;                 (right-fringe . 2)
-  ;;                 (tool-bar-lines . 0)
-  ;;                 (line-spacing . 0)
-  ;;                 (desktop-dont-save . t)
-  ;;                 (no-special-glyphs . t)
-  ;;                 (tool-bar-lines . 0)
-  ;;                 (left . 0)
-  ;;                 (top . 0)
-  ;;                 (title . "Helm")
-  ;;                 (vertical-scroll-bars . nil)
-  ;;                 (menu-bar-lines . 0)
-  ;;                 (fullscreen . nil)
-  ;;                 (visibility . ,(null helm-display-buffer-reuse-frame))
-  ;;                 (minibuffer . nil)))
-  ;;             display-buffer-alist)
-  ;;         (helm-display-buffer-popup-frame buffer default-frame-alist)
-  ;;         (set-face-attribute 'header-line (selected-frame)
-  ;;                             :background nil :foreground 'unspecified :height 1.15
-  ;;                             :inherit 'default)
-  ;;         (aj/center-frame))
-  ;;       (helm-log-run-hook 'helm-window-configuration-hook)))
+  ;;   (if (not (display-graphic-p))
+  ;;       ;; Fallback to default when frames are not usable.
+  ;;       (helm-default-display-buffer buffer)
+  ;;     (setq helm--buffer-in-new-frame-p t)
+  ;;     (let ((default-frame-alist
+  ;;             `((parent . ,(selected-frame))
+  ;;               (width . ,helm-display-buffer-width)
+  ;;               (height . ,helm-display-buffer-height)
+  ;;               (undecorated . t)
+  ;;               (left-fringe . 2)
+  ;;               (right-fringe . 2)
+  ;;               (tool-bar-lines . 0)
+  ;;               (line-spacing . 0)
+  ;;               (desktop-dont-save . t)
+  ;;               (no-special-glyphs . t)
+  ;;               (tool-bar-lines . 0)
+  ;;               (left . 0)
+  ;;               (top . 0)
+  ;;               (title . "Helm")
+  ;;               (vertical-scroll-bars . nil)
+  ;;               (menu-bar-lines . 0)
+  ;;               (fullscreen . nil)
+  ;;               (visibility . ,(null helm-display-buffer-reuse-frame))
+  ;;               (minibuffer . nil)))
+  ;;           display-buffer-alist)
+  ;;       (helm-display-buffer-popup-frame buffer default-frame-alist)
+  ;;       (set-face-attribute 'header-line (selected-frame)
+  ;;                           :background nil :foreground 'unspecified :height 1.15
+  ;;                           :inherit 'default)
+  ;;       (aj/center-frame))
+  ;;     (helm-log-run-hook 'helm-window-configuration-hook)))
 
   ;; Only show headers if several sources
   ;; https://www.reddit.com/r/emacs/comments/2z7nbv/lean_helm_window/
@@ -571,42 +587,41 @@ Example of alist entry:
 
   ;; Redefine ‘helm-highlight-buffers’ for alignment with variable-pitch
   ;; (use ‘display’ ‘space’ and ‘:align-to’)
-  (setq-default helm-buffer-max-length 28)
-  (with-eval-after-load 'helm-buffers
 
-    (defun helm-highlight-buffers (buffers _source)
-      "Transformer function to highlight BUFFERS list.
+  (setq-default helm-buffer-max-length 28)
+  (advice-add 'helm-highlight-buffers :override #'aj/helm-highlight-buffers)
+  (defun aj/helm-highlight-buffers (buffers _source)
+    "Transformer function to highlight BUFFERS list.
 Should be called after others transformers i.e. (boring
 buffers)."
-      (cl-assert helm-fuzzy-matching-highlight-fn nil "Wrong type argument functionp: nil")
-      (let ((s1 (propertize " " 'display
-                            `(space :align-to ,helm-buffer-max-length)))
-            (s2 (propertize " " 'display
-                            `(space :align-to ,(+ helm-buffer-max-length 7))))
-            (s3 (propertize " " 'display
-                            `(space :align-to ,(+ helm-buffer-max-length 9 helm-buffer-max-len-mode))))
-            (helm-pattern (helm-buffers--pattern-sans-filters
-                           (and helm-buffers-fuzzy-matching ""))))
-        (cl-loop for i in buffers
-                 for (name size mode meta) = (if helm-buffer-details-flag
-                                                 (helm-buffer--details i 'details)
-                                               (helm-buffer--details i))
-                 for truncbuf = (if (> (string-width name) helm-buffer-max-length)
-                                    (helm-substring-by-width
-                                     name helm-buffer-max-length
-                                     helm-buffers-end-truncated-string)
-                                  name)
-                 for len = (length mode)
-                 when (> len helm-buffer-max-len-mode)
-                 do (setq helm-buffer-max-len-mode len)
-                 collect (cons (if helm-buffer-details-flag
-                                   (concat
-                                    (funcall helm-fuzzy-matching-highlight-fn
-                                             truncbuf)
-                                    s1 size s2 mode s3 meta)
-                                 (funcall helm-fuzzy-matching-highlight-fn name))
-                               (get-buffer i)))))
-    )
+    (cl-assert helm-fuzzy-matching-highlight-fn nil "Wrong type argument functionp: nil")
+    (let ((s1 (propertize " " 'display
+                          `(space :align-to ,helm-buffer-max-length)))
+          (s2 (propertize " " 'display
+                          `(space :align-to ,(+ helm-buffer-max-length 7))))
+          (s3 (propertize " " 'display
+                          `(space :align-to ,(+ helm-buffer-max-length 9 helm-buffer-max-len-mode))))
+          (helm-pattern (helm-buffers--pattern-sans-filters
+                         (and helm-buffers-fuzzy-matching ""))))
+      (cl-loop for i in buffers
+               for (name size mode meta) = (if helm-buffer-details-flag
+                                               (helm-buffer--details i 'details)
+                                             (helm-buffer--details i))
+               for truncbuf = (if (> (string-width name) helm-buffer-max-length)
+                                  (helm-substring-by-width
+                                   name helm-buffer-max-length
+                                   helm-buffers-end-truncated-string)
+                                name)
+               for len = (length mode)
+               when (> len helm-buffer-max-len-mode)
+               do (setq helm-buffer-max-len-mode len)
+               collect (cons (if helm-buffer-details-flag
+                                 (concat
+                                  (funcall helm-fuzzy-matching-highlight-fn
+                                           truncbuf)
+                                  s1 size s2 mode s3 meta)
+                               (funcall helm-fuzzy-matching-highlight-fn name))
+                             (get-buffer i)))))
 
   ;;; bindings
   (define-key global-map [remap execute-extended-command] #'helm-M-x)
@@ -650,8 +665,9 @@ buffers)."
   (helm-add-action-to-source "Delete file(s) from dired-recent-directories"
                              #'aj/remove-dired-recent-dir aj/helm-source-dired-recent)
 
-  (setf (helm-attr 'filtered-candidate-transformer aj/helm-source-dired-recent)
-        '(helm-fuzzy-matching-default-sort-fn helm-fuzzy-highlight-matches aj/helm-recentf-filtered-candidates-shorten))
+  ;; why does this give bug?
+  ;; (setf (helm-attr 'filtered-candidate-transformer aj/helm-source-dired-recent)
+  ;;       '(helm-fuzzy-matching-default-sort-fn helm-fuzzy-highlight-matches aj/helm-recentf-filtered-candidates-shorten))
 
 
   (defun aj/shorten-helm-path (path)
@@ -834,6 +850,7 @@ Use ~fd~ for searching instead of ~find~. Faster and easier.
   :commands (helm-all-the-icons-enable)
   :init (helm-all-the-icons-enable))
 #+end_src
+
 **** Launch in small frame
 #+begin_src emacs-lisp
 (with-eval-after-load 'helm
@@ -985,7 +1002,7 @@ Use ~fd~ for searching instead of ~find~. Faster and easier.
       (cl-pushnew name aj/favourite-files :test #'string=)
     (user-error "Not in a file- or dired-buffer")))
 
-(with-eval-after-load  'helm-for-files
+(with-eval-after-load 'helm-for-files
   (defun aj/remove-favourite-file (_candidate)
     ;; to be run from helm
     (cl-loop for file in (helm-marked-candidates)
@@ -1008,17 +1025,21 @@ Use ~fd~ for searching instead of ~find~. Faster and easier.
                      aj/remove-favourite-file)))
           (slot-value source 'filtered-candidate-transformer)
           (append (slot-value source 'filtered-candidate-transformer)
-                  '(aj/helm-recentf-filtered-candidates-shorten))
-          ))
+                  '(aj/helm-recentf-filtered-candidates-shorten))))
 
   (defvar aj/helm-source-favourite-files
-    (helm-make-source "Favourite files" 'aj/helm-favourite-files-source)))
+    (helm-make-source "Favourite files" 'aj/helm-favourite-files-source))
+
+  (setq helm-mini-default-sources
+        (-insert-at 1 'aj/helm-source-favourite-files helm-mini-default-sources))
+
+  )
 #+end_src
 
-**** Favorite directories
+**** Favourite directories
 http://endlessparentheses.com/visit-directory-inside-a-set-of-directories.html
 #+begin_src emacs-lisp
-(defcustom aj/favorite-directories nil
+(defcustom aj/favourite-directories nil
   "List of favorite directories.
 Used in `aj/visit-favorite-dir'. The order here affects the order
 that completions will be offered. Each element is a list of
@@ -1030,7 +1051,7 @@ directory, search depth, and whether to include files."
 
 (defvar aj/fav-dir-history nil)
 
-(defun aj/visit-favorite-dir (files-too)
+(defun aj/visit-favourite-dir (files-too)
   "Offer all directories inside a set of directories.
 Compile a list of all directories inside each element of
 `aj/favorite-directories', and visit one of them with
@@ -1041,7 +1062,7 @@ With prefix argument FILES-TOO also offer to find files."
          (apply #'append
                 (mapcar (lambda (x)
                           (aj/get-dir-list (car x) (cadr x) (or files-too (nth 2 x))))
-                        aj/favorite-directories)))
+                        aj/favourite-directories)))
         (helm-candidate-number-limit nil))
     (dired
      (helm-comp-read "Open directory: " completions
@@ -1092,7 +1113,6 @@ overriding it, but you should know before you do.
 
 
 *** Org init
-
 **** Load with org
 ***** orgqda
 #+begin_src emacs-lisp
@@ -1103,10 +1123,13 @@ overriding it, but you should know before you do.
   :after org
   :init (put 'orgqda-csv-dir 'safe-local-variable #'file-directory-p)
   :custom
-  orgqda-keep-tags-sorted 'a-z
+  (orgqda-keep-tags-sorted 'a-z)
+  (orgqda-tagcount-show-files t)
   :config (setq orgqda-exclude-tags
                 (append (mapcar #'car org-tag-persistent-alist)
                         '("ARCHIVE" "Reflektion" "Observation" "Forskningsdagbok")))
+
+
 
   (defhydra aj/orgqda-hydra (:color blue :hint t)
 	("m" #'orgqda-mode "Toggle mode")
@@ -1119,7 +1142,19 @@ overriding it, but you should know before you do.
 	("v" #'orgqda-collect-tagged-csv "Collect csv")
 	("V" #'orgqda-collect-tagged-csv-save "Collect csv save")
 	("b" #'orgqda-collect-tagged-csv-save-all "Save all as csv"))
-  (bind-key "C-c C-ö" 'aj/orgqda-hydra/body orgqda-mode-map))
+  (bind-key "C-c C-ö" 'aj/orgqda-hydra/body orgqda-mode-map)
+
+  (with-eval-after-load 'orgqda-helm-tags
+    (define-key orgqda-helm-tags-mode-map [remap org-set-tags-command]
+      #'aj/orgqda-tag-or-code))
+
+  (defun aj/orgqda-tag-or-code (arg)
+    "Insert inlinetask and tag, except if on headline, then add tag
+ARG is passed through."
+    (interactive "P")
+    (if (org-at-heading-p)
+        (orgqda-helm-tags-set-tags arg)
+      (orgqda-insert-inlinetask-coding arg))))
 #+end_src
 
 ***** Org-pomodoro
@@ -1132,13 +1167,6 @@ overriding it, but you should know before you do.
 #+begin_src emacs-lisp
 (use-package org-download
   :after org)
-#+end_src
-
-***** org-pdfview
-#+begin_src emacs-lisp
-(use-package org-pdfview
-  :after org
-  :defer t)
 #+end_src
 
 **** org init
@@ -1186,6 +1214,7 @@ overriding it, but you should know before you do.
   (org-pretty-entities t)
   (org-pretty-entities-include-sub-superscripts nil)
   (org-hide-emphasis-markers t)
+  (org-image-actual-width 600)
   ;; (org-fontify-whole-heading-line t)
   ;; (org-level-color-stars-only t)
 
@@ -1215,6 +1244,10 @@ overriding it, but you should know before you do.
 
   ;; org-agenda
   (org-agenda-window-setup 'current-window)
+  (org-agenda-skip-scheduled-if-done t)
+  (org-agenda-skip-scheduled-if-deadline-is-shown t)
+  (org-agenda-scheduled-leaders '("Planerad: " "Planerad %2d×"))
+  (org-agenda-deadline-leaders '("Deadline:  " "Om %3d d.: " "%2d d. sen: "))
   ;;org-capture
   (org-capture-use-agenda-date t)
 
@@ -1788,7 +1821,6 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
      :sources
      (list (helm-build-sync-source "Pass dirs"
              :candidates #'aj/password-store-list-dirs
-             :action #'identity
              :persistent-action #'aj/password-helm-complete-persistent)
            (helm-build-dummy-source "Insert"))))
 
@@ -1796,9 +1828,7 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
     (with-selected-window (or (active-minibuffer-window)
                               (minibuffer-window))
       (delete-minibuffer-contents)
-      (set-text-properties 0 (length candidate)
-                           nil candidate)
-      (insert candidate)))
+      (insert (substring-no-properties candidate))))
 
   (defun aj/password-store-list-dirs (&optional subdir)
     "List password entries under SUBDIR."
@@ -2224,6 +2254,12 @@ Swich to  ~other-buffer~ with ~C-§~.
 (setq split-width-threshold 140)
 #+end_src
 
+*** Window dividers :ARCHIVE:
+#+begin_src emacs-lisp
+(setq window-divider-default-right-width) 2
+(add-hook 'window-setup-hook #'window-divider-mode)
+#+end_src
+
 *** Window management hydra
 #+begin_src emacs-lisp
 (bind-key "C-'" #'hydra-window/body)
@@ -2295,12 +2331,14 @@ _F_ollow _q_ cancel
       (shrink-window arg)
     (enlarge-window arg)))
 #+end_src
+
 *** Transpose-frame
 #+begin_src emacs-lisp
   (use-package transpose-frame
     :commands (transpose-frame flip-frame flop-frame rotate-frame
                               rotate-frame-clockwise rotate-frame-anti-clockwise))
 #+end_src
+
 *** swap window buffers by drag and drop
 #+begin_src emacs-lisp
 (defun th/swap-window-buffers-by-dnd (drag-event)
@@ -2322,6 +2360,7 @@ window."
 
 (bind-key "<C-S-drag-mouse-1>" #'th/swap-window-buffers-by-dnd)
 #+end_src
+
 *** Narrowing
 Do everything with ~C-x n~.
 http://endlessparentheses.com/emacs-narrow-or-widen-dwim.html
@@ -3301,7 +3340,7 @@ _d_: subtree     _<tab>_: toggle
   (bind-key "C-c #" 'hydra-outline/body outline-minor-mode-map)) ; by example
 #+end_src
 
-*** Origami folding
+*** Origami folding :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package origami
   :commands origami-mode
@@ -3492,6 +3531,7 @@ That’s a stupid convention from the days of the typewriter (and in Swedish we 
 #+begin_src emacs-lisp
 (setq sentence-end-double-space nil)
 #+end_src
+
 *** Fill-paragraph fixes + ~aj/one-sentence-per-line-mode~
 I generally don’t want hard line breaks in my text-mode paragraphs, so a very wide fill-column allows me to use ~M-q~ to remove all line breaks in a paragraph.
 
@@ -3856,7 +3896,7 @@ Enable it for buffers in ‘aj/flyspell-modes’ with defined
                 (replace-regexp-in-string "\_" "-" ispell-local-dictionary))))
 #+end_src
 
-**** Extra flyspell bindings
+**** Extra flyspell bindings :ARCHIVE:
 #+begin_src emacs-lisp
 (with-eval-after-load 'flyspell
   (bind-keys :map flyspell-mode-map
@@ -3864,22 +3904,34 @@ Enable it for buffers in ‘aj/flyspell-modes’ with defined
              ("C-;"   . flyspell-check-previous-highlighted-word)
              ("C-M-," . flyspell-goto-next-error)))
 #+end_src
-**** Helm flyspell, on C-ö
+
+**** Flyspell-correct with helm.
 #+begin_src emacs-lisp
-(use-package helm-flyspell
-  :commands helm-flyspell-correct
-  :init (with-eval-after-load 'flyspell
-          (bind-key "C-ö" 'helm-flyspell-correct flyspell-mode-map)))
+(use-package flyspell-correct
+  :after flyspell
+  :bind (:map flyspell-mode-map
+              ("C-," . flyspell-auto-correct-previous-word)
+              ("C-." . flyspell-correct-wrapper)))
+
+(use-package flyspell-correct-helm
+  :after flyspell-correct)
 #+end_src
 
 **** Extra words and areas to avoid spellchecking in various modes.
 #+begin_src emacs-lisp
-(require 'thingatpt)
+(defun aj/flyspell-only-pure-words-predicate ()
+  "Don’t spellcheck words containing non-alpha characters."
+  (save-excursion
+    (save-match-data
+      (skip-chars-forward "^[:space:]")
+      (let* ((limit (1- (point))))
+        (skip-chars-backward "^[:space:]")
+        (if (> 2 (- limit (point)))
+            t
+          (forward-char)
+          (not (search-forward-regexp "[^[:alpha:]]" limit t)))))))
 
-(defun aj/flyspell-not-url-predicate ()
-  (not (thing-at-point 'url)))
-
-(put 'text-mode 'flyspell-mode-predicate #'aj/flyspell-not-url-predicate)
+(put 'text-mode 'flyspell-mode-predicate #'aj/flyspell-only-pure-words-predicate)
 
 (cl-loop for m in
          '(tex-mode-flyspell-verify
@@ -3890,7 +3942,7 @@ Enable it for buffers in ‘aj/flyspell-modes’ with defined
            texinfo-mode-flyspell-verify
            flyspell-generic-progmode-verify)
          do
-         (advice-add m :after-while #'aj/flyspell-not-url-predicate))
+         (advice-add m :after-while #'aj/flyspell-only-pure-words-predicate))
 
 
 (defun aj/flyspell-org-not-link-predicate ()
@@ -3994,11 +4046,11 @@ https://gist.github.com/imarko/ec8f39550662fcd16908b7ec9d100e7e
   (pandoc-view-mode-revert-buffer))
 
 (defun pandoc-view-mode-revert-buffer (&rest _ignore)
-  (let ((inhibit-read-only t)))
-  (erase-buffer)
-  (save-excursion
-    (call-process "pandoc" nil t nil "-torg" "--lua-filter=/home/aj/kodat/000-egna-skript/pandoc-remove-header-attributes.lua" (buffer-file-name)))
-  (not-modified)
+  (let ((inhibit-read-only t))
+    (erase-buffer)
+    (save-excursion
+      (call-process "pandoc" nil t nil "-torg" "--lua-filter=/home/aj/kodat/000-egna-skript/pandoc-remove-header-attributes.lua" (buffer-file-name)))
+    (not-modified))
   (read-only-mode t)
 
   ;; some stuff for making it pretty:
@@ -4094,7 +4146,7 @@ DIR."
 pdf-loader handles deferred loading. Then settings are applied after loading pdf-view.
 #+begin_src emacs-lisp
 (use-package pdf-tools
-  ;; :straight (pdf-tools :fork (:host github :repo "flatwatson/pdf-tools" :branch "fix-macros"))
+  :straight (pdf-tools :fork (:host github :repo "vedang/pdf-tools"))
   :commands pdf-loader-install ;; TODO (fel?)
   :init (pdf-loader-install)
   :config
@@ -4207,7 +4259,9 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
                     (get-window-with-predicate #'pdf-util-pdf-window-p nil 'visible))))
       (with-selected-window other-pdf-window
         (with-demoted-errors "%s"
-          (pdf-view-next-page n)))))
+          (if pdf-view-multipage-mode
+              (pdf-view-multipage-next-page n)
+            (pdf-view-next-page n))))))
   (defun aj/other-window-pdf-previous-page (n)
     (interactive "p")
     (aj/other-window-pdf-next-page (- (or n 1))))
@@ -4228,7 +4282,17 @@ https://github.com/politza/pdf-tools/issues/74#issuecomment-90224020
 https://gist.github.com/politza/a3339a4f3b3901fcce4c
 #+begin_src emacs-lisp
 (use-package pdf-view-multipage
-  :straight (:host gitlab :repo "andersjohansson/pdf-view-multipage"))
+  :straight (:host gitlab :repo "andersjohansson/pdf-view-multipage")
+  :custom
+  (pdf-view-multipage-odd-pages-left t)
+  (pdf-view-multipage-remap-all t))
+#+end_src
+
+**** org-pdfview
+#+begin_src emacs-lisp
+(use-package org-pdfview
+  :after org
+  :defer t)
 #+end_src
 
 **** pdf-zotxt-quote
@@ -4391,10 +4455,13 @@ Sometimes I feel the need for a generally bigger font in all emacs frames. Espec
                         :background (face-background 'fringe) :height 0.14))
 
 
-
+  ;; no need for bars
   (defun doom-modeline-segment--bar ()
     "Don’t show the bar when using mini-modeline"
     "")
+  (remove-hook 'after-setting-font-hook #'doom-modeline-refresh-bars)
+  (remove-hook 'window-configuration-change-hook #'doom-modeline-refresh-bars)
+
 
   (defsubst doom-modeline-vspc ()
     "Text style with icons in mode-line."
@@ -4520,7 +4587,8 @@ Also runs hook aj/face-definitions-hook."
     (setq goto-address-mail-face 'aj/goto-address-mail-face)
 
     (with-eval-after-load 'org-indent
-      ;; modus-operandi sets it to inherit fixed-pitch, but that is bad!
+      ;; modus-operandi sets it to inherit fixed-pitch, but that is
+      ;; bad with the detailed space matching I do!
       (set-face-attribute 'org-indent nil :inherit 'org-hide)
       )
 
@@ -4555,7 +4623,7 @@ Also runs hook aj/face-definitions-hook."
 
         (defface aj/org-todo `((t :foreground ,(modus-themes-color 'red) :bold t)) "Face for todo org-state" :group 'org-faces)
         (defface aj/org-waiting `((t :foreground ,(modus-themes-color 'yellow) :bold t)) "Face for waiting org-state" :group 'org-faces)
-        (defface aj/org-started `((t :foreground ,(modus-themes-color 'blue) :bold t :underline nil)) "Face for started org-state" :group 'org-faces)
+        (defface aj/org-started `((t :foreground ,(modus-themes-color 'blue) :bold t :underline nil :inherit 'fixed-pitch)) "Face for started org-state" :group 'org-faces)
         (defface aj/org-done `((t :foreground ,(modus-themes-color 'green) :bold t)) "Face for done org-state" :group 'org-faces)
 
 
@@ -4922,7 +4990,7 @@ Also at: https://gitlab.com/andersjohansson/orgqda
   (bind-key "C-+" #'aj/repeat-last-words orgqda-transcript-mode-map))
 #+end_src
 
-*** Org data handling
+*** Org data handling :ARCHIVE:
 A few functions and settings for database functionality in org.
 #+begin_src emacs-lisp
 (setq org-property-set-functions-alist
