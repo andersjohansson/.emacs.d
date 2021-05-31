@@ -64,21 +64,25 @@ org mode async exports, using only trees tagged with “org_async”."
       (find-file-noselect origin-file)
     (let* ((todo-only nil)
            (trees (string-join
-                             (org-scan-tags #'aj/org-return-entry
-                                            (cdr (org-make-tags-matcher match))
-                                            todo-only) "\n\n"))
+                   (org-scan-tags #'aj/org-return-entry
+                                  (cdr (org-make-tags-matcher match))
+                                  todo-only) "\n\n"))
            (ofile (make-temp-file "org-init-tangle" nil ".org"))
            (ofb (find-file-noselect ofile t))
            (byte-compile-warnings '(not free-vars)))
 	  (with-current-buffer ofb
-        (insert trees)
-        (let ((text-mode-hook nil)
-              (outline-mode-hook nil)
-              (org-mode-hook nil)
-              (org-agenda-inhibit-startup t)
-              (org-inhibit-startup t))
-          (org-mode)
-          (org-babel-tangle nil target-file "emacs-lisp")))
+        (with-silent-modifications ;; TODO, could we do it in a
+          ;; temp-buffer? org-babel-tangle expects a file for
+          ;; reporting, but only there.
+          (insert trees)
+          (let ((text-mode-hook nil)
+                (outline-mode-hook nil)
+                (org-mode-hook nil)
+                (org-startup-indented nil)
+                (org-agenda-inhibit-startup t)
+                (org-inhibit-startup t))
+            (org-mode)
+            (org-babel-tangle nil target-file "emacs-lisp"))))
       (kill-buffer ofb)
       (when (and (file-exists-p target-file) (file-writable-p target-file))
         (chmod target-file 333)
@@ -297,7 +301,7 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 *** Fix recipes and stuff for loading some packages
 #+begin_src emacs-lisp
 ;; Define how to build org and mu4e already here, so that dependencies work out
-(straight-use-package '(org :host github :repo "yantar92/org" :branch "weekday-repeats-new"
+(straight-use-package '(org :host github :repo "yantar92/org" :branch "weekday-repeats"
                             :pre-build (list "make" "autoloads" (concat "EMACS=" invocation-directory invocation-name))
                             :build (:not autoloads)
                             :files (:defaults
@@ -458,6 +462,16 @@ Example of alist entry:
   :config
   (setq-default helm-command-prefix-key "C-c h")
   (helm-mode)
+
+  (define-key global-map [remap execute-extended-command] #'helm-M-x)
+  (bind-keys
+   ("<f1> a" . helm-apropos)
+   ("M-y" . helm-show-kill-ring)
+   ("C-x C-b" . helm-mini)
+   ("C-x b" . helm-mini)
+   ("C-x C-f" . helm-find-files))
+
+  ;; (global-set-key (kbd "C-c h g") 'helm-google-suggest)
 
   (bind-keys :map 'helm-find-files-map
              ("C-i" . helm-ff-TAB)
@@ -623,17 +637,6 @@ buffers)."
                                (funcall helm-fuzzy-matching-highlight-fn name))
                              (get-buffer i)))))
 
-  ;;; bindings
-  (define-key global-map [remap execute-extended-command] #'helm-M-x)
-  (global-set-key (kbd "M-y") 'helm-show-kill-ring)
-
-  (bind-key "<f1> a" #'helm-apropos)
-
-  (global-set-key (kbd "C-x b") 'helm-mini)
-  (global-set-key (kbd "C-x B") 'helm-mini)
-
-  (global-set-key (kbd "C-x C-f") 'helm-find-files)
-  (global-set-key (kbd "C-c h g") 'helm-google-suggest)
 
 ;;; Helm mini:
 
@@ -814,6 +817,48 @@ buffers)."
 	      helm-def-source--emacs-faces))
   )
 #+end_src
+**** Custom sort defaults for helm-list-directory :ARCHIVE:
+#+begin_src emacs-lisp
+
+(defcustom aj/helm-sort-method-for-dir '()
+  "Alist of dirs and sort methods"
+  :group 'aj
+  :type '(repeat
+          (cons (directory :tag "Dir")
+                (choice
+                 (const :tag "Newest" newest)
+                 (const :tag "Size" size)
+                 (const :tag "Default" t)))))
+
+(advice-add 'helm-list-directory :override #'aj/helm-list-directory)
+(defun aj/helm-list-directory (directory)
+  "List directory DIRECTORY.
+
+If DIRECTORY is remote use `helm-list-directory-function',
+otherwise use `directory-files'."
+  (let* ((remote (file-remote-p directory 'method))
+         (helm-list-directory-function
+          (if (and remote (not (string= remote "ftp")))
+              helm-list-directory-function
+            #'helm-list-dir-lisp))
+         (remote-fn-p (eq helm-list-directory-function
+                          'helm-list-dir-external))
+         (helm-ff-initial-sort-method (alist-get directory aj/helm-sort-method-for-dir t))
+         (sort-method (cl-case helm-ff-initial-sort-method
+                        (newest (if (and remote remote-fn-p)
+                                    "-t" #'file-newer-than-file-p))
+                        (size (if (and remote remote-fn-p)
+                                  "-S" #'helm-ff-file-larger-that-file-p))
+                        (t nil))))
+    (if remote
+        (funcall helm-list-directory-function directory sort-method)
+      (if sort-method
+          (sort (directory-files directory t directory-files-no-dot-files-regexp)
+                sort-method)
+        (directory-files directory t directory-files-no-dot-files-regexp)))))
+
+
+#+end_src
 
 **** Helm-fuz
 For modern fuzzy matching with a binary module built on Rust libraries.
@@ -840,7 +885,7 @@ Use ~fd~ for searching instead of ~find~. Faster and easier.
 **** helm-all-the-icons
 #+begin_src emacs-lisp
 (use-package helm-all-the-icons
-  :straight (helm-all-the-icons :type git :repo "/home/aj/kodat/elisp/helm-all-the-icons/")
+  :straight (:type git :host gitlab :repo "andersjohansson/helm-all-the-icons")
   :custom (helm-all-the-icons-files-sources
            '(helm-source-recentf
              helm-source-find-files
@@ -861,7 +906,7 @@ Use ~fd~ for searching instead of ~find~. Faster and easier.
            (make-frame
             `(,@frame-params
               (width . ,width) (height . ,height) (name . ,name)
-              (undecorated . t) (window-system . x) (fullscreen . nil))))
+              (undecorated . t) (fullscreen . nil))))
           (helm-full-frame t)
           (aj/running-cmd-in-small-frame t))
       (select-frame-set-input-focus ocframe)
@@ -877,8 +922,7 @@ Use ~fd~ for searching instead of ~find~. Faster and easier.
 **** helm-launcher
 #+begin_src emacs-lisp
 (use-package helm-launcher
-  :straight nil
-  :load-path "/home/aj/kodat/elisp/helm-launcher/"
+  :straight (:depth full :host gitlab :repo "andersjohansson/helm-launcher")
   :commands helm-launcher
   :custom (helm-launcher-sources
            '(helm-launcher-desktop-applications-source
@@ -1117,8 +1161,7 @@ overriding it, but you should know before you do.
 ***** orgqda
 #+begin_src emacs-lisp
 (use-package orgqda
-  :straight (:depth full :host gitlab :repo "andersjohansson/orgqda"
-                    :files ("orgqda.el" "orgqda-transcript.el ""orgqda-helm-tags.el"))
+  :straight (:depth full :host gitlab :repo "andersjohansson/orgqda" :files ("orgqda.el"))
   :defer t
   :after org
   :init (put 'orgqda-csv-dir 'safe-local-variable #'file-directory-p)
@@ -1130,19 +1173,25 @@ overriding it, but you should know before you do.
                         '("ARCHIVE" "Reflektion" "Observation" "Forskningsdagbok")))
 
 
+  (defun aj/orgqda-remove-filename-num (filename)
+    (replace-regexp-in-string "^[0-9]+-" "" filename))
+  (add-to-list 'orgqda-tagcount-files-transform-functions
+               #'aj/orgqda-remove-filename-num
+               t)
 
-  (defhydra aj/orgqda-hydra (:color blue :hint t)
-	("m" #'orgqda-mode "Toggle mode")
-	("ö" #'orgqda-list-tags "List tags")
-	("C-ö" #'orgqda-list-tags nil)
-	("ä" #'normal-mode "Normal mode")
-	("Ö" #'orgqda-list-tags-full "List and extract")
-	("c" #'orgqda-collect-tagged "Collect tagged")
-	("C-c" #'orgqda-collect-tagged "Collect tagged")
-	("v" #'orgqda-collect-tagged-csv "Collect csv")
-	("V" #'orgqda-collect-tagged-csv-save "Collect csv save")
-	("b" #'orgqda-collect-tagged-csv-save-all "Save all as csv"))
-  (bind-key "C-c C-ö" 'aj/orgqda-hydra/body orgqda-mode-map)
+  (org-link-set-parameters "otag" :face 'mu4e-header-key-face)
+
+  ;; (defhydra aj/orgqda-hydra (:color blue :hint t)
+  ;;   ("m" #'orgqda-mode "Toggle mode")
+  ;;   ("ö" #'orgqda-list-tags "List tags")
+  ;;   ("C-ö" #'orgqda-list-tags nil)
+  ;;   ("ä" #'normal-mode "Normal mode")
+  ;;   ("Ö" #'orgqda-list-tags-full "List and extract")
+  ;;   ("c" #'orgqda-collect-tagged "Collect tagged")
+  ;;   ("C-c" #'orgqda-collect-tagged "Collect tagged")
+  ;;   ("v" #'orgqda-collect-tagged-csv "Collect csv")
+  ;;   ("V" #'orgqda-collect-tagged-csv-save "Collect csv save")
+  ;;   ("b" #'orgqda-collect-tagged-csv-save-all "Save all as csv"))
 
   (with-eval-after-load 'orgqda-helm-tags
     (define-key orgqda-helm-tags-mode-map [remap org-set-tags-command]
@@ -1152,9 +1201,24 @@ overriding it, but you should know before you do.
     "Insert inlinetask and tag, except if on headline, then add tag
 ARG is passed through."
     (interactive "P")
-    (if (org-at-heading-p)
-        (orgqda-helm-tags-set-tags arg)
-      (orgqda-insert-inlinetask-coding arg))))
+    (let ((inhibit-read-only t))
+      (if (org-at-heading-p)
+          (orgqda-helm-tags-set-tags arg)
+        (orgqda-insert-inlinetask-coding arg))))
+
+  (add-hook 'orgqda-mode-hook #'aj/word-wrap-colons)
+  (defun aj/word-wrap-colons ()
+    (setq word-wrap-by-category t)
+    (modify-category-entry ?: ?|)))
+
+(use-package orgqda-transient
+  :straight (:depth full :host gitlab :repo "andersjohansson/orgqda"
+                    :files ( "orgqda-transient.el"))
+  :after orgqda
+  :bind (:map orgqda-mode-map
+              ("C-c C-ö" . #'orgqda-transient)
+              :map orgqda-codebook-mode-map
+              ("C-c C-ö" . #'orgqda-transient-codebook)))
 #+end_src
 
 ***** Org-pomodoro
@@ -1253,6 +1317,10 @@ ARG is passed through."
 
   :config
   (load-library "aj-org-config")
+
+  (setq org-agenda-text-search-extra-files
+        (let ((org-agenda-files (expand-file-name "kodningsfiler" org-directory)))
+          (org-read-agenda-file-list)))
   )
 #+end_src
 **** org init async                             :org_async:no_default_tangle:
@@ -1373,6 +1441,18 @@ ARG is passed through."
 (load custom-file)
 #+end_src
 
+*** Calendar setup
+#+begin_src emacs-lisp
+(setq holiday-christian-holidays nil
+      holiday-general-holidays nil
+      holiday-hebrew-holidays nil
+      holiday-islamic-holidays nil
+      holiday-bahai-holidays nil
+      holiday-oriental-holidays nil)
+
+(load "swedish-holidays.el")
+#+end_src
+
 ** Some optimizations for long lines
 https://200ok.ch/posts/2020-09-29_comprehensive_guide_on_handling_long_lines_in_emacs.html
 I very seldom happen upon right-to-left text in Emacs, and couldn’t read it in any case. We can avoid some scanning work by forcing left-to-right. Then there’s also ~so-long-mode~.
@@ -1416,10 +1496,10 @@ behavior added."
             "Quit is ignored during macro defintion, use \\[kmacro-end-macro] if you want to stop macro definition"))
           (cancel-kbd-macro-events))
         ((active-minibuffer-window)
-         (abort-recursive-edit)
-         ;; (if ctrlf--active-p
-         ;;     (ctrlf-cancel)
-         ;;   (abort-recursive-edit))
+         ;; (abort-recursive-edit)
+         (if (bound-and-true-p ctrlf--active-p)
+             (ctrlf-cancel)
+           (abort-recursive-edit))
          )
         (t
          ;; if we got this far just use the default so we don't miss
@@ -1642,6 +1722,8 @@ https://gitlab.com/andersjohansson/dired-quick-sort/tree/dir-save
 (setq dired-listing-switches "-lhA")
 (use-package dired-quick-sort
   :straight nil ; TODO fork
+  (:depth full :host gitlab :repo "xuhdev/dired-quick-sort"
+          :fork (:host gitlab :repo "andersjohansson/dired-quick-sort" :branch "dir-save"))
   :load-path "~/kodat/elisp/dired-quick-sort"
   :after dired
   :custom
@@ -2142,6 +2224,8 @@ Filnamnet måste skickas med till "processen" emacsclient, hur inline en emacsva
 *** Latexmk-command for normal export
 #+begin_src emacs-lisp
 (declare-function TeX-run-TeX "tex-buf")
+(defvar TeX-save-query)
+
 (with-eval-after-load 'tex-buf
   (defun aj/TeX-run-latexmk (name command file)
     (interactive)
@@ -2164,6 +2248,7 @@ Filnamnet måste skickas med till "processen" emacsclient, hur inline en emacsva
       (TeX-run-TeX name command file)
       (with-current-buffer TeX-command-buffer (TeX-view)))))
 #+end_src
+
 *** Customize Tex-commands :org_async:
 #+begin_src emacs-lisp
 (with-eval-after-load 'tex-buf
@@ -2177,6 +2262,7 @@ Filnamnet måste skickas med till "processen" emacsclient, hur inline en emacsva
 
 (setq-default TeX-command-default "latexmk")
 #+end_src
+
 *** Reftex
 Add biblatex formats
 #+begin_src emacs-lisp
@@ -2222,17 +2308,31 @@ Swich to  ~other-buffer~ with ~C-§~.
 (bind-keys
  ("<C-tab>" . other-window)
  ("<C-iso-lefttab>" . aj/back-window) ;; really C-S-tab ...
- ("C-§" . aj/switch-to-other-buffer)
- ("C-½" . previous-buffer))
+ )
 
-(defun aj/switch-to-other-buffer ()
-  (interactive)
-  (switch-to-buffer nil))
+(use-package buffer-flip
+  :bind  (("C-§" . buffer-flip)
+          :map buffer-flip-map
+          ( "C-§" . buffer-flip-forward)
+          ( "C-½" . buffer-flip-backward)
+          ( "C-g" . buffer-flip-abort))
+  :config
+  (setq buffer-flip-skip-patterns
+        '("^\\*helm\\b")))
+
+;; (defun aj/switch-to-other-buffer ()
+;;   (interactive)
+;;   (switch-to-buffer nil))
+;; ("C-§" . aj/switch-to-other-buffer)
+;; ("C-½" . previous-buffer)
+
+;; (bind-keys
+;;  ("C-§" . iflipb-next-buffer)
+;;  ("C-½" . iflipb-previous-buffer))
 
 (defun aj/back-window ()
   (interactive)
   (other-window -1))
-
 
 (defun aj/select-minibuffer-window ()
   (interactive)
@@ -2264,30 +2364,38 @@ Swich to  ~other-buffer~ with ~C-§~.
 #+begin_src emacs-lisp
 (bind-key "C-'" #'hydra-window/body)
 
-(defhydra hydra-window (:hint nil)
+(defhydra hydra-window (:hint nil :idle 1.0)
   "
 Split^^            ^Switch^       ^Resize^
-_2_ vertical       _r_otate CW    _<left>_ ←
-_3_ horizontal     _R_otate CCW   _<down>_ ↓
-_1_ only this      _t_ranspose    _<up>_ ↑
-_0_ delete                      _<right>_ →
+_2_ vertical       _r_otate CW    _<left>_  ←
+_3_ horizontal     _e_ rotate CCW _<down>_  ↓
+_1_ only this      _R_otate 180°  _<up>_    ↑
+_0_ delete         _t_ranspose    _<right>_ →
 _z_ undo                        _=_ balance
 _Z_ redo
-_F_ollow _q_ cancel
+_F_ollow
 "
   ("<left>" aj/hydra-move-splitter-left)
   ("<down>" aj/hydra-move-splitter-down)
   ("<up>" aj/hydra-move-splitter-up)
   ("<right>" aj/hydra-move-splitter-right)
-  ("=" balance-windows)
-  ("2" split-window-below)
-  ("3" split-window-right)
+  ("=" balance-windows :color blue)
+
+  ("2" split-window-below :color blue)
+  ("3" split-window-right :color blue)
+  ("0" delete-window :color blue)
+  ("1" delete-other-windows :color blue)
+
+  ("C-2" split-window-below :color blue)
+  ("C-3" split-window-right :color blue)
+  ("C-0" delete-window :color blue)
+  ("C-1" delete-other-windows :color blue)
+
   ("r" rotate-frame-clockwise)
-  ("R" rotate-frame-anti-clockwise)
+  ("e" rotate-frame-anti-clockwise)
+  ("R" rotate-frame)
   ("t" transpose-frame)
-  ("F" follow-mode)
-  ("0" delete-window)
-  ("1" delete-other-windows)
+  ("F" follow-mode :color blue)
   ("z" (progn
          (winner-undo)
          (setq this-command 'winner-undo)))
@@ -2295,6 +2403,11 @@ _F_ollow _q_ cancel
   ("q" nil))
 
 (winner-mode)
+
+(use-package transpose-frame
+  :commands (transpose-frame flip-frame flop-frame rotate-frame
+                             rotate-frame-clockwise
+                             rotate-frame-anti-clockwise))
 
 (use-package windmove
   :commands windmove-find-other-window)
@@ -2332,11 +2445,15 @@ _F_ollow _q_ cancel
     (enlarge-window arg)))
 #+end_src
 
-*** Transpose-frame
+*** Frame managment hydra (~C-x 5~ alternative)
 #+begin_src emacs-lisp
-  (use-package transpose-frame
-    :commands (transpose-frame flip-frame flop-frame rotate-frame
-                              rotate-frame-clockwise rotate-frame-anti-clockwise))
+(defhydra hydra-frame (:idle 1.0 :color blue)
+  ("0" delete-frame "Delete frame")
+  ("2" make-frame-command "New frame")
+  ("M-0" delete-frame "Delete frame")
+  ("M-2" make-frame-command "New frame"))
+
+(bind-key "M-'" #'hydra-frame/body)
 #+end_src
 
 *** swap window buffers by drag and drop
@@ -2420,6 +2537,12 @@ already narrowed."
 (define-key ctl-x-map "N" #'aj/narrow-clone)
 #+end_src
 
+*** Centered-cursor-mode
+#+begin_src emacs-lisp
+(use-package centered-cursor-mode
+  :straight (:host github :repo "andre-r/centered-cursor-mode.el" :branch "dev"))
+#+end_src
+
 ** Searching, file-management, completion (helm and others)
 *** Smarter default search with char-folding
 #+begin_src emacs-lisp
@@ -2432,40 +2555,50 @@ already narrowed."
                                (?A "Å") (?A "Ä") (?O "Ö"))))
 #+end_src
 
-*** CTRLF :ARCHIVE:
+*** CTRLF
 A bit nicer than isearch. I also like to use fuzzy search (words separated by whatever) by default. It is also helpful to use char-fold (é → e) by default, so I define functions for that.
 #+begin_src emacs-lisp
 (use-package ctrlf
-  :custom (ctrlf-mode-bindings
-           '(("C-s" . aj/ctrlf-forward-fuzzy-char-fold)
-             ("C-r" . aj/ctrlf-backward-fuzzy-char-fold)
-             ("C-M-s" . ctrlf-forward-regexp)
-             ("C-M-r" . ctrlf-backward-regexp)
-             ("M-s _" . ctrlf-forward-symbol)
-             ("M-s ." . ctrlf-forward-symbol-at-point)))
-
+  :custom (ctrlf-default-search-style 'fuzzy-char-fold)
   :config
   (ctrlf-mode t)
 
   (defun aj/ctrlf-translate-fuzzy-char-fold (input)
     (ctrlf-translate-fuzzy-regexp (char-fold-to-regexp input)))
 
-  (add-to-list 'ctrlf-style-alist
-               '(fuzzy-char-fold
-                 . (:prompt "fuzzy CF"
-                            :translator aj/ctrlf-translate-fuzzy-char-fold
-                            :case-fold ctrlf-no-uppercase-literal-p)))
+  (add-to-list
+   'ctrlf-style-alist
+   '(fuzzy-char-fold
+     . (:prompt "fuzzy CF"
+                :translator aj/ctrlf-translate-fuzzy-char-fold
+                :case-fold ctrlf-no-uppercase-literal-p
+                :fallback (isearch-forward . isearch-backward))))
 
-  (defun aj/ctrlf-forward-fuzzy-char-fold ()
-    (interactive)
-    (ctrlf-forward 'fuzzy-char-fold))
-  (defun aj/ctrlf-backward-fuzzy-char-fold ()
-    (interactive)
-    (ctrlf-backward 'fuzzy-char-fold))
+  ;; (defun aj/ctrlf-forward-fuzzy-char-fold ()
+  ;;   (interactive)
+  ;;   (ctrlf-forward 'fuzzy-char-fold))
+  ;; (defun aj/ctrlf-backward-fuzzy-char-fold ()
+  ;;   (interactive)
+  ;;   (ctrlf-backward 'fuzzy-char-fold))
 
   (add-hook 'pdf-isearch-minor-mode-hook (lambda () (ctrlf-local-mode -1)))
   (add-hook 'Info-mode-hook (lambda () (ctrlf-local-mode -1)))
   )
+
+
+;; (defun ctrlf-disable-local-mode ()
+;;   "Unconditionally disable ‘ctrlf-local-mode’."
+;;   (ctrlf-local-mode -1))
+
+;; (defcustom ctrlf-deny-mode-hooks
+;;   '(pdf-isearch-minor-mode-hook
+;;     Info-mode-hook)
+;;   "List of mode hooks where ctrlf should be disabled."
+;;   :type '(repeat variable))
+
+;; ;; where should this be done?
+;; (dolist (hook ctrlf-deny-mode-hooks)
+;;   (add-hook hook #'ctrlf-disable-local-mode))
 #+end_src
 
 *** Anzu: Shows number of search matches in modeline, replacements inline etc.
@@ -2621,6 +2754,7 @@ A bit nicer than isearch. I also like to use fuzzy search (words separated by wh
   :commands magit-todos-mode
   :config (magit-todos-mode t))
 #+end_src
+
 *** Display tracked files
 Sometimes I want to see what is tracked in a repository.
 Define this as a global minor mode which adds a section in the magit status buffer (global because it seemed buggy to modify local value of ~magit-status-sections-hook~).  Inspired by magit-todos mode definition.
@@ -2629,7 +2763,6 @@ Define this as a global minor mode which adds a section in the magit status buff
 #+begin_src emacs-lisp
 (define-minor-mode magit-tracked-files-mode
   "Show list of tracked files in magit status buffer"
-  nil
   :global t
   (if magit-tracked-files-mode
       (magit-add-section-hook 'magit-status-sections-hook
@@ -2639,11 +2772,13 @@ Define this as a global minor mode which adds a section in the magit status buff
     (remove-hook 'magit-status-sections-hook #'magit-insert-tracked-files))
   (magit-refresh))
 #+end_src
+
 *** forge
 #+begin_src emacs-lisp
 (use-package forge
   :after magit)
 #+end_src
+
 *** Use visual-line-mode in magit for repositories with mostly prose text
 This can be enabled with a local variable ~aj/magit-visual-line-mode~ (set it as dir-local) or automatically if all the checked in files are org- or text-mode-based.
 #+begin_src emacs-lisp
@@ -2753,6 +2888,44 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
 
 ** Editing. Marking, killing, yanking, etc.
 
+*** Selected: a custom keymap when the region is active
+Some bindings both for acting and extending the region.
+#+begin_src emacs-lisp
+(use-package selected
+  :ensure t
+  :commands selected-minor-mode
+  :init
+  (setq selected-org-mode-map (make-sparse-keymap))
+  :bind (:map selected-keymap
+              ("q" . selected-off)
+			  ("u" . upcase-dwim)
+			  ("d" . downcase-dwim)
+			  ("w" . kill-ring-save)
+			  ("n" . next-line)
+			  ("p" . previous-line)
+			  ("f" . forward-char)
+			  ("b" . backward-char)
+			  ("F" . forward-word)
+			  ("B" . backward-word)
+			  ("a" . beginning-of-visual-line)
+			  ("e" . end-of-visual-line)
+			  ("{" . backward-paragraph)
+			  ("}" . forward-paragraph)
+			  ;; ("(" . backward-sentence)
+			  ;; (")" . forward-sentence)
+			  ("s" . isearch-forward)
+			  ("r" . isearch-backward)
+			  ("[" . scroll-down-line)
+			  ("]" . scroll-up-line)
+			  ("M" . rectangle-mark-mode)
+			  ("R" . replace-rectangle)
+			  ("x" . exchange-point-and-mark)
+              :map selected-org-mode-map
+              ("t" . org-table-convert-region)
+              ("*" . org-toggle-heading))
+  :config (selected-global-mode))
+#+end_src
+
 *** Delete-selection-mode
 #+begin_src emacs-lisp
 (delete-selection-mode)
@@ -2818,11 +2991,13 @@ Becuase I often mistype and let go of my ctrl button before pressing s.
   :commands (goto-address-prog-mode
              goto-address-mode))
 #+end_src
+
 *** Kill emacs instead of terminal
 I often have more use for killing emacs (including all GUI-windows).
 #+begin_src emacs-lisp
 (global-set-key [remap save-buffers-kill-terminal] #'save-buffers-kill-emacs)
 #+end_src
+
 *** No shift select
 #+begin_src emacs-lisp
 (setq shift-select-mode nil)
@@ -2890,7 +3065,7 @@ When called in the minibuffer, get out of the minibuffer using
 (global-set-key (kbd "C-=") #'count-words)
 #+end_src
 
-*** Emacs-which-key
+*** which-key
 #+begin_src emacs-lisp
 (use-package which-key
   :defer 4
@@ -2900,29 +3075,10 @@ When called in the minibuffer, get out of the minibuffer using
   (setq which-key-paging-key "<f2>"))
 #+end_src
 
-*** Hydra for launch
-#+begin_src emacs-lisp
-(defhydra aj/hydra-launch (:color blue)
-  "Launch"
-  ("z" aj/helm-open-zoterofile "Öppna zoterofil")
-  ;;("c" calc "calc")
-  ("d" ediff-buffers "ediff buffers")
-  ;;("f" 'find-dired "")
-  ;;("g" 'lgrep)
-  ;;("G" 'rgrep)
-  ;;("h" 'man) ; Help
-  ("l" list-processes "List processes")
-  ("p" paradox-list-packages "paradox")
-  ("e" eshell "eshell")
-  ("t" proced "proced") ; top
-  ("q" nil "quit"))
-
-(bind-key "C-x L" #'aj/hydra-launch/body)
-#+end_src
 *** Hydra for toggle
 #+begin_src emacs-lisp
-(defvar whitespace-mode nil)
-(defhydra hydra-toggle (:color pink)
+(defvar whitespace-mode)
+(defhydra hydra-toggle (:color blue)
   "
 _a_ abbrev-mode:       %`abbrev-mode
 _d_ debug-on-error:    %`debug-on-error
@@ -3194,7 +3350,7 @@ This is the new thing, and it is good, because it knows a lot about the code and
 #+end_src
 
 *** paren-face
-Dims parantheses in lisp modes.
+Dims parentheses in lisp modes.
 #+begin_src emacs-lisp
 (use-package paren-face
   :init (global-paren-face-mode))
@@ -3491,7 +3647,8 @@ cperl instead of perl-mode
   (advice-add 'text-scale-increase :after #'visual-fill-column-adjust))
 
 ;; use indicators, but dim them
-(defface aj/shadow-fringe '((nil (:foreground "#AAAAAA"))) "Face for dim fringe bitmaps")
+(defface aj/shadow-fringe
+  '((nil (:foreground "#cccccc"))) "Face for dim fringe bitmaps")
 
 (set-fringe-bitmap-face 'right-curly-arrow 'aj/shadow-fringe)
 (set-fringe-bitmap-face 'left-curly-arrow 'aj/shadow-fringe)
@@ -3544,7 +3701,8 @@ The minor mode defined below takes care of this. I advice ~fill-region-as-paragr
 
 (define-minor-mode aj/one-sentence-per-line-mode
   "Minor mode that overrides `fill-region-as-paragraph' to
-  arrange every sentence on its own line")
+  arrange every sentence on its own line"
+  :lighter nil)
 
 (defun aj/one-sentence-fill-override (fun from to &rest args)
   (if aj/one-sentence-per-line-mode
@@ -3600,7 +3758,7 @@ should be kept together."
 (define-minor-mode aj/one-sentence-per-line-highlight-mode
   "Minor mode that marks missing end of senptence characters when
   writing one sentence per line"
-  nil nil nil
+  :lighter nil
   (if aj/one-sentence-per-line-highlight-mode
       (font-lock-add-keywords nil aj/missing-eol-period-fl-keywords)
     (font-lock-remove-keywords nil aj/missing-eol-period-fl-keywords)))
@@ -4049,7 +4207,7 @@ https://gist.github.com/imarko/ec8f39550662fcd16908b7ec9d100e7e
   (let ((inhibit-read-only t))
     (erase-buffer)
     (save-excursion
-      (call-process "pandoc" nil t nil "-torg" "--lua-filter=/home/aj/kodat/000-egna-skript/pandoc-remove-header-attributes.lua" (buffer-file-name)))
+      (call-process "pandoc" nil t nil "-torg" "--wrap=none" "--lua-filter=/home/aj/kodat/000-egna-skript/pandoc-remove-header-attributes.lua" (buffer-file-name)))
     (not-modified))
   (read-only-mode t)
 
@@ -4149,6 +4307,7 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
   :straight (pdf-tools :fork (:host github :repo "vedang/pdf-tools"))
   :commands pdf-loader-install ;; TODO (fel?)
   :init (pdf-loader-install)
+  :custom (pdf-annot-tweak-tooltips . nil)
   :config
   ;; I almost never have use for synctex:
   (setq pdf-tools-enabled-modes
@@ -4188,6 +4347,9 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
           (popup-is-open . nil)
           ;; (subject . "Comment")
           ))
+
+  (defvar pdf-annot-activate-created-annotations)
+
   (defun aj/pdf-hl (edit) (interactive "P")
          (let ((pdf-annot-activate-created-annotations edit))
            (pdf-annot-add-markup-annotation (pdf-view-active-region t) 'highlight aj/pdf-hl-color)))
@@ -4300,8 +4462,8 @@ Copying from a pdf with correct org-zotxt references and page numbers
 https://gitlab.com/andersjohansson/pdf-zotxt-quote
 #+begin_src emacs-lisp
 (use-package pdf-zotxt-quote
-  :straight nil
-  :load-path ("~/kodat/elisp/pdf-zotxt-quote/" "~/kodat/elisp/zotxt-emacs/")
+  :straight (:depth full :host gitlab :repo "andersjohansson/pdf-zotxt-quote")
+  ;; :load-path ("~/kodat/elisp/pdf-zotxt-quote/" "~/kodat/elisp/zotxt-emacs/")
   :commands (pdf-zotxt-quote-mode pdf-zotxt-quote-cleanup-mode pdf-zotxt-quote-activate)
   :custom
   (pdf-zotxt-quote-fill-column 999999)
@@ -4323,6 +4485,29 @@ Save viewed page, like saveplace
   :custom (pdf-view-restore-filename "~/.emacs.data/pdf-view-restore.el")
   :config
   (add-hook 'pdf-view-mode-hook 'pdf-view-restore-mode))
+#+end_src
+
+**** Functions for clearing annotations in pdfs
+#+begin_src emacs-lisp
+(defun aj/dired-pdf-delete-all-annotations-in-files ()
+  (interactive)
+  (cl-loop for f in (dired-get-marked-files)
+           do
+           (find-file f)
+           (aj/pdf-delete-all-annotations-in-buffer)
+           (save-buffer)
+           (kill-buffer)))
+
+(defun aj/pdf-delete-all-annotations-in-buffer ()
+  (interactive)
+  (cl-loop for a in (pdf-annot-getannots) do
+           (pdf-annot-delete a)))
+#+end_src
+
+**** Get annotations from Sony PRS e-reader
+#+begin_src emacs-lisp
+(use-package prs-pdf-annotations
+  :straight (:host 'gitlab :repo "andersjohansson/prs-pdf-annotations"))
 #+end_src
 
 ** Display customizations: theme, modeline, etc.
@@ -4360,22 +4545,41 @@ But also with some inspiration from here: https://lepisma.github.io/2017/10/28/r
 Sometimes I feel the need for a generally bigger font in all emacs frames. Especially when switching between my 13 inch 1920*1080-screen and my 24 inch 1920*1080-screen (systemwide screenwise fractional scaling is still not an option on linux). On the small screen I sometimes toogle text-scaling in gnome, and if emacs is started with that setting it is kept so the font is to large when switching to the large screen. Then I can also cycle to a smaller size.
 #+begin_src emacs-lisp
 (defvar aj/orig-font-size nil)
+(defvar aj/orig-gnome-font-size nil)
 
-(add-hook 'after-init-hook (lambda () (setq aj/orig-font-size (face-attribute 'default :height))))
+(add-hook 'window-setup-hook
+          (lambda () (setq aj/orig-font-size
+                      (face-attribute 'default :height)
+                      aj/orig-gnome-font-size
+                      (string-to-number
+                       (shell-command-to-string
+                        "gsettings get org.gnome.desktop.interface text-scaling-factor")))))
 
-(defun aj/cycle-font-size ()
-  (interactive)
-  (cond ((< 7 (- aj/orig-font-size (face-attribute 'default :height)))
-         ;; we are smaller
-         (set-face-attribute 'default nil :height aj/orig-font-size))
-        ((< 7 (- (face-attribute 'default :height) aj/orig-font-size))
-         ;; we are larger
-         (set-face-attribute 'default nil :height 90))
-        ((> 7 (abs (- aj/orig-font-size (face-attribute 'default :height))))
-         ;; we are approximately at default
-         (set-face-attribute 'default nil :height 140))))
+(defun aj/set-font-size-following-gnome (scaling-factor)
+  (let ((height (round (* aj/orig-font-size (/ scaling-factor aj/orig-gnome-font-size)))))
+    (set-face-attribute 'default nil :height height))
+  (run-hooks 'aj/cycle-font-size-hook))
 
-(bind-key "C-s-T" #'aj/cycle-font-size)
+(defvar aj/cycle-font-size-hook nil
+  "Hooks run after global cycling of font-size.")
+
+;; (defun aj/cycle-font-size ()
+;;   (interactive)
+;;   (cond ((< 7 (- aj/orig-font-size (face-attribute 'default :height)))
+;;          ;; we are smaller
+;;          (set-face-attribute 'default nil :height aj/orig-font-size))
+;;         ((< 7 (- (face-attribute 'default :height) aj/orig-font-size))
+;;          ;; we are larger
+;;          (set-face-attribute 'default nil :height 90))
+;;         ((> 7 (abs (- aj/orig-font-size (face-attribute 'default :height))))
+;;          ;; we are approximately at default
+;;          (set-face-attribute 'default nil :height 140)))
+;;   (run-hooks 'aj/cycle-font-size-hook))
+
+;;This is ctrl-win-shift-t (win normally is Super, but in pgtk apperently Hyper-super.. weird)
+;; (bind-key "C-H-s-T" #'aj/cycle-font-size)
+;; this is fn-T
+;; (bind-key "<269025091>" #'aj/cycle-font-size)
 #+end_src
 
 *** Modeline
@@ -4586,11 +4790,14 @@ Also runs hook aj/face-definitions-hook."
 
     (setq goto-address-mail-face 'aj/goto-address-mail-face)
 
+
+    (set-face-attribute 'internal-border nil :background "#CCCCCC")
+
+
     (with-eval-after-load 'org-indent
       ;; modus-operandi sets it to inherit fixed-pitch, but that is
       ;; bad with the detailed space matching I do!
-      (set-face-attribute 'org-indent nil :inherit 'org-hide)
-      )
+      (set-face-attribute 'org-indent nil :inherit 'org-hide))
 
     (with-eval-after-load 'org-faces
 
@@ -4601,11 +4808,11 @@ Also runs hook aj/face-definitions-hook."
       (set-face-attribute 'org-block-end-line nil :underline (modus-themes-color 'bg-active) :overline nil)
 
 
-      ;; (set-face-attribute 'org-block-begin-line nil :height 0.9 :extend t)
-      ;; (set-face-attribute 'org-block-end-line nil :height 0.9 :extend t)
+      (set-face-attribute 'org-block-begin-line nil :height 0.9)
+      (set-face-attribute 'org-block-end-line nil :height 0.9)
       ;; (set-face-attribute 'org-block nil :extend nil)
 
-      (set-face-attribute 'org-quote nil :weight 'light :height 0.95 :inherit nil)
+      (set-face-attribute 'org-quote nil :weight 'light :height 0.95 :background nil)
 
       ;; ;; (set-face-attribute 'org-special-keyword nil :weight 'normal :inherit 'shadow)
 
@@ -4619,7 +4826,8 @@ Also runs hook aj/face-definitions-hook."
           (set-face-attribute (intern (concat "org-level-" n)) nil :weight 'light))
 
         ;; avoid tags inheriting headline color, make them bold but subdued.
-        (set-face-attribute 'org-tag nil :foreground 'unspecified :inherit 'shadow :weight 'normal)
+        ;; (set-face-attribute 'org-tag nil :foreground (modus-themes-color 'magenta-nuanced-fg)
+        ;;                     :weight 'light)
 
         (defface aj/org-todo `((t :foreground ,(modus-themes-color 'red) :bold t)) "Face for todo org-state" :group 'org-faces)
         (defface aj/org-waiting `((t :foreground ,(modus-themes-color 'yellow) :bold t)) "Face for waiting org-state" :group 'org-faces)
@@ -4684,6 +4892,7 @@ Also runs hook aj/face-definitions-hook."
 
 (advice-add 'enable-theme :after #'aj/apply-face-definitions)
 #+end_src
+
 **** Gruvbox
 #+begin_src emacs-lisp
 (use-package gruvbox
@@ -4705,6 +4914,17 @@ Also runs hook aj/face-definitions-hook."
   (modus-themes-completions 'opinionated)
   :config
   (setq org-fontify-whole-heading-line t))
+#+end_src
+
+**** Pdf background for modus themes
+From modus-themes manual
+#+begin_src emacs-lisp
+(defun aj/pdf-tools-backdrop ()
+  (face-remap-add-relative
+   'default
+   `(:background ,(modus-themes-color 'bg-alt))))
+
+(add-hook 'pdf-tools-enabled-hook #'aj/pdf-tools-backdrop)
 #+end_src
 
 **** Define themes to use for dark and light and load light theme
@@ -4757,23 +4977,6 @@ Also runs hook aj/face-definitions-hook."
 (setq-default cursor-in-non-selected-windows 'hollow)
 (blink-cursor-mode -1)
 (setq blink-cursor-alist '((bar . (bar . 1))))
-#+end_src
-
-*** Fullscreen toggling
-#+begin_src emacs-lisp
-(defvar aj/last-fullscreen-param nil)
-
-(defun aj/toggle-fullscreen ()
-  (interactive)
-  (let ((current-value (frame-parameter nil 'fullscreen)))
-    (set-frame-parameter nil 'fullscreen
-                         (if (equal 'fullboth current-value)
-                             aj/last-fullscreen-param
-
-                           (setq aj/last-fullscreen-param current-value)
-                           'fullboth))))
-
-(bind-key "<f11>" #'aj/toggle-fullscreen)
 #+end_src
 
 *** Writeroom
@@ -4851,8 +5054,6 @@ Some special functions for managing my data files.
 ;; 	  (add-to-list 'org-font-lock-extra-keywords el t)))
 
 ;;   (add-hook 'org-font-lock-set-keywords-hook #'ajf/font-lock-brackets))
-
-
 #+end_src
 
 *** mplayer-mode
@@ -4870,7 +5071,7 @@ I use my fork, available here: https://github.com/andersjohansson/mplayer-mode/t
 Available at: https://gitlab.com/andersjohansson/orgqda
 #+begin_src emacs-lisp
 (use-package orgqda-helm-tags
-  :straight nil
+  :straight (:depth full :host gitlab :repo "andersjohansson/orgqda" :files ("orgqda-helm-tags.el"))
   :after orgqda
   :hook (org-mode . orgqda-helm-tags-mode)
   :custom
@@ -4878,6 +5079,7 @@ Available at: https://gitlab.com/andersjohansson/orgqda
   ;; projects I use dir-local variables to customize
   (orgqda-helm-tags-include-excluded t)
   (orgqda-helm-tags-include-persistent t)
+  (orgqda-helm-tags-fuzzy-sort-fn #'helm-fuz-fuzzy-matching-sort-fn-preserve-ties-order!)
 
   ;; since I use a variable-width font in helm:
   (orgqda-helm-tags-display-align t)
@@ -4888,7 +5090,7 @@ Available at: https://gitlab.com/andersjohansson/orgqda
 Also at: https://gitlab.com/andersjohansson/orgqda
 #+begin_src emacs-lisp
 (use-package orgqda-transcript
-  :straight nil ;; in orgqda
+  :straight   :straight (:depth full :host gitlab :repo "andersjohansson/orgqda" :files ("orgqda-transcript.el"))
   :defer t
   :custom
   (orgqda-transcript-bind-fn-keys t)
@@ -5008,6 +5210,40 @@ A few functions and settings for database functionality in org.
                " "))
 #+end_src
 
+
+*** Edit only whitespace
+A mode that enables editing of only whitespace. Useful in my transcript files for avoiding accidental edits while adding codes with orgqda.
+#+begin_src emacs-lisp
+(defvar edit-only-whitespace-keywords
+   '(("[^[:space:]]" (0 '(face nil read-only t eow-readonly t)))))
+
+(define-minor-mode edit-only-whitespace-mode
+  "Allows only editing whitespace in buffer."
+  :lighter nil
+  (if edit-only-whitespace-mode
+      (progn
+        (setq-local font-lock-extra-managed-props (append '(read-only eow-readonly) font-lock-extra-managed-props))
+        (font-lock-add-keywords
+         nil
+         edit-only-whitespace-keywords))
+    (setq-local font-lock-extra-managed-props
+                (thread-last font-lock-extra-managed-props
+                  (remove 'read-only)
+                  (remove 'eow-readonly)))
+    (font-lock-remove-keywords nil edit-only-whitespace-keywords)
+    (save-excursion
+      (save-restriction
+        (widen)
+        (goto-char (point-min))
+        (let ((inhibit-read-only t)
+              prop)
+          (while (setq prop (text-property-search-forward 'eow-readonly))
+            (remove-text-properties
+             (prop-match-beginning prop)
+             (prop-match-end prop)
+             '(read-only t eow-readonly t))))))))
+#+end_src
+
 ** Standard frame parameters
 I want my windows to launch at half screen width, to the left. But on my narrow laptop screen probably a little wider (90 chars).
 #+begin_src emacs-lisp
@@ -5026,26 +5262,35 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
   ;; brute-force:
   ;; (add-hook 'window-configuration-change-hook #'aj/no-minibuffer-scrollbar-or-fringe)
 
-  (add-to-list 'default-frame-alist '(top . 0))
-  (add-to-list 'default-frame-alist '(left . (+ -9)))
-  (add-to-list 'default-frame-alist '(fullscreen . fullheight))
   ;; this is a bit narrower for arc-gtk-theme:
   (add-to-list 'default-frame-alist '(scroll-bar-width . 12))
 
-  (defun aj/frame-to-left ()
-    (interactive)
-    (if (> (x-display-pixel-width) aj/large-screen-min-width)
-        (let ((hw (/ (/ (x-display-pixel-width) 2 ) (frame-char-width))))
-          (add-to-list 'default-frame-alist (cons 'width hw))
-          (set-frame-parameter nil 'width hw))
-      (set-frame-parameter nil 'width 90)
-      (add-to-list 'default-frame-alist (cons 'width 90)) ;small
-      )
-    (set-frame-parameter nil 'fullscreen 'fullheight)
-    (set-frame-parameter nil 'left '(+ -0))
-    (set-frame-parameter nil 'top 0))
+  (if (eq 'pgtk (framep-on-display))
+      ;; because the native wayland pgtk frame can’t otherwise get rid of title bar.
+      (progn
+        (add-to-list 'default-frame-alist '(undecorated . t))
+        (add-to-list 'default-frame-alist '(internal-border-width . 1)))
 
-  (add-hook 'after-init-hook #'aj/frame-to-left))
+    ;; doesn’t work with pgtk
+    (add-to-list 'default-frame-alist '(top . 0))
+    (add-to-list 'default-frame-alist '(left . (+ -9)))
+    (add-to-list 'default-frame-alist '(fullscreen . fullheight))
+
+    (defun aj/frame-to-left ()
+      (interactive)
+      (if (> (x-display-pixel-width) aj/large-screen-min-width)
+          (let ((hw (/ (/ (x-display-pixel-width) 2 ) (frame-char-width))))
+            (add-to-list 'default-frame-alist (cons 'width hw))
+            (set-frame-parameter nil 'width hw))
+        (set-frame-parameter nil 'width 90)
+        (add-to-list 'default-frame-alist (cons 'width 90)) ;small
+        )
+      (set-frame-parameter nil 'fullscreen 'fullheight)
+      (set-frame-parameter nil 'left '(+ -0))
+      (set-frame-parameter nil 'top 0))
+
+    (add-hook 'after-init-hook #'aj/frame-to-left))
+  )
 
 #+end_src
 
