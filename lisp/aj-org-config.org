@@ -61,26 +61,400 @@ for more information."
          ,alist))
 #+end_src
 
-**** Prettify quote-blocks
-#+begin_src emacs-lisp
-;; (aj/add-visual-replacement "#+BEGIN_QUOTE" "▄▁▁▁▁▁▁▁▁▁▁▁▁▁▁" aj/org-prettify-symbols)
-;; (aj/add-visual-replacement "#+begin_quote" "▄▁▁▁▁▁▁▁▁▁▁▁▁▁▁" aj/org-prettify-symbols)
-;; (aj/add-visual-replacement "#+END_QUOTE"   "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▀" aj/org-prettify-symbols)
-;; (aj/add-visual-replacement "#+end_quote"   "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▀" aj/org-prettify-symbols)
-
-(dolist (kw '(("#+BEGIN_QUOTE" . ?❝)
-              ("#+begin_quote" . ?❝)
-              ("#+END_QUOTE" . ?❞)
-              ("#+end_quote" . ?❞)))
-  (add-to-list 'aj/org-prettify-symbols kw))
-#+end_src
-
 **** Prettify dashes
 #+begin_src emacs-lisp
 (dolist (kw '(("--" . ?–)
               ("---" . ?—)))
   (add-to-list 'aj/org-prettify-symbols kw))
 #+end_src
+
+*** Do org-indent indentation with display spaces and indent quote blocks.
+With a special "thin" space for org-indent, we can have lines with low line-height even when we have indent. But the indent then has to be set with a space ~:align-to~ property. For this we do some patching of the org-indent machinery
+
+#+begin_src emacs-lisp
+(defface aj/org-quote-beg-end-face `((t . (:height 0.1 :foreground "#f0e0d4" :background "#f0e0d4" :extend t)))
+  "Face for begin and end line of org quotes"
+  :group 'aj)
+
+(add-hook 'org-font-lock-set-keywords-hook #'aj/org-prettify-blockquotes)
+(defun aj/org-prettify-blockquotes ()
+  (setq org-font-lock-extra-keywords
+        (append
+         org-font-lock-extra-keywords
+         '(( "#\\+\\(begin\\|end\\)_quote\n" . (0 'aj/org-quote-beg-end-face t))))))
+
+(with-eval-after-load 'org-indent
+  (defface aj/org-indent-thin '((t . (:inherit org-indent :height 0.1)))
+    "Thin org-indent"
+    :group 'aj)
+
+  (defvar-local aj/org-indent--heading-wrap-prefixes nil)
+  (defvar-local aj/org-indent--text-wrap-prefixes nil)
+  (defvar-local aj/org-indent--inlinetask-wrap-prefixes nil)
+
+  (advice-add 'org-indent--compute-prefixes :override #'aj/org-indent--compute-prefixes)
+
+  ;; (defun aj/org-indent--compute-prefixes ()
+  ;;   "Compute prefix strings for regular text and headlines."
+  ;;   (setq org-indent--heading-line-prefixes
+  ;;         (make-vector org-indent--deepest-level nil))
+  ;;   (setq aj/org-indent--heading-wrap-prefixes
+  ;;         (make-vector org-indent--deepest-level nil))
+  ;;   (setq org-indent--inlinetask-line-prefixes
+  ;;         (make-vector org-indent--deepest-level nil))
+  ;;   (setq org-indent--text-line-prefixes
+  ;;         (make-vector org-indent--deepest-level nil))
+  ;;   (dotimes (n org-indent--deepest-level)
+  ;;     (let* ((indentation (if (<= n 1) 0
+  ;;   		                (* (1- org-indent-indentation-per-level)
+  ;;   		                   (1- n))))
+  ;;            (headerstring (if (< 0 n)
+  ;;                              (concat
+  ;;                               (make-string (+ n indentation -1) ?*)
+  ;;                               (char-to-string (car org-superstar-headline-bullets-list))
+  ;;                               (char-to-string org-indent-boundary-char))
+  ;;                            "")))
+  ;;       ;; Headlines line prefixes.
+  ;;       (aset org-indent--heading-line-prefixes
+  ;;             n
+  ;;             (propertize (make-string indentation ?*) 'face 'org-indent))
+  ;;       ;; and wrap prefixes
+  ;;       (aset aj/org-indent--heading-wrap-prefixes
+  ;;             n
+  ;;             (propertize (concat headerstring "   ") 'face 'org-indent))
+  ;;       ;; Inline tasks line prefixes (no indent needed I think)
+  ;;       (aset org-indent--inlinetask-line-prefixes n "")
+  ;;       ;; Text line prefixes.
+  ;;       (aset org-indent--text-line-prefixes
+  ;;             n
+  ;;             (if (> n 0)
+  ;;                 (aj/org-make-indent-string headerstring)
+  ;;               ""))
+  ;;       )))
+
+  (defun aj/org-indent--compute-prefixes ()
+    "Compute prefix strings for regular text and headlines."
+    (setq org-indent--heading-line-prefixes
+	      (make-vector org-indent--deepest-level nil))
+    (setq aj/org-indent--heading-wrap-prefixes
+	      (make-vector org-indent--deepest-level nil))
+    (setq org-indent--inlinetask-line-prefixes
+	      (make-vector org-indent--deepest-level nil))
+    (setq aj/org-indent--inlinetask-wrap-prefixes
+	      (make-vector org-indent--deepest-level nil))
+    (setq org-indent--text-line-prefixes
+	      (make-vector org-indent--deepest-level nil))
+    (setq aj/org-indent--text-wrap-prefixes
+          (make-vector org-indent--deepest-level nil))
+    (let* ((pbuf (aj/string-pixel-width-setup-buf))
+           (spacewidth (aj/string-pixel-width-line pbuf " ")))
+      (dotimes (n org-indent--deepest-level)
+        (let* ((indentation (if (<= n 1) 0
+			                  (* (1- org-indent-indentation-per-level)
+			                     (1- n))))
+               (headerstring (if (< 0 n)
+                                 (concat
+                                  (make-string (+ n indentation -1) ?*)
+                                  (char-to-string (car org-superstar-headline-bullets-list))
+                                  (char-to-string org-indent-boundary-char))
+                               ""))
+               (headerstringwidth (aj/string-pixel-width-line pbuf headerstring)))
+          ;; Headlines line prefixes.
+          (aset org-indent--heading-line-prefixes
+                n
+                (propertize (make-string indentation ?*) 'face 'org-indent))
+          ;; and wrap prefixes
+          (aset aj/org-indent--heading-wrap-prefixes
+                n
+                (propertize (concat headerstring "   ") 'face 'org-indent))
+	      ;; Inline tasks line prefixes (no indent needed I think)
+	      (aset org-indent--inlinetask-line-prefixes n "")
+          (aset aj/org-indent--inlinetask-wrap-prefixes n
+                (if (<= org-inlinetask-min-level n)
+                    (aj/org-make-indent-string
+                     (concat (make-string (- n 2) ?*)
+                             (make-string 2 (car org-superstar-headline-bullets-list))
+                             " ")
+                     nil pbuf)
+                  ""))
+          ;; Text line prefixes.
+          (aset org-indent--text-line-prefixes
+	            n
+                (if (> n 0)
+                    (aj/org-make-indent-string headerstring headerstringwidth)
+                  ""))
+          ;; Indent can be up to 100 here...
+          (aset aj/org-indent--text-wrap-prefixes n (make-vector 100 nil))
+          (dotimes (j 100)
+            (aset (aref aj/org-indent--text-wrap-prefixes n)
+                  j
+                  (aj/org-make-indent-string
+                   (concat headerstring (make-string j ?\s))
+                   (+ headerstringwidth (* j spacewidth)))))))
+      (kill-buffer pbuf)))
+
+  (defun aj/string-pixel-width-setup-buf (&optional mode)
+    (let ((fra face-remapping-alist)
+          (pbuf (generate-new-buffer " *aj-string-pixel-width*")))
+      (with-current-buffer pbuf
+        (when (fboundp mode)
+          (funcall mode)
+          (font-lock-ensure))
+        (setq-local face-remapping-alist fra))
+      pbuf))
+
+  (defun aj/string-pixel-width-line (pbuf string)
+    (with-current-buffer pbuf
+      (with-silent-modifications
+        (setf (buffer-string) string))
+      (if (get-buffer-window (current-buffer))
+	      (car (window-text-pixel-size nil (line-beginning-position) (point)))
+        (set-window-buffer nil (current-buffer))
+        (car (window-text-pixel-size nil (line-beginning-position) (point))))))
+
+  (defun aj/org-make-indent-string (string &optional width pbuf)
+    (propertize
+     string
+     'display `(space :width ,(list (or width (aj/string-pixel-width-line pbuf string))))
+     'face 'aj/org-indent-thin))
+
+
+  ;; if we have different text-scale in main and indirect buffer, the
+  ;; indentation will be off in one of them
+
+  (add-hook 'text-scale-mode-hook #'aj/org-indent-recalculate)
+
+  (defun aj/org-indent-recalculate ()
+    (when (derived-mode-p 'org-mode)
+      (org-indent--compute-prefixes)
+      (org-indent-refresh-maybe (point-min) (point-max) t)))
+
+  (defun aj/org-indent-recalculate-all-org-buffers ()
+    (cl-loop for buf being the buffers do
+             (with-current-buffer buf
+               (aj/org-indent-recalculate))))
+
+  (add-hook 'aj/cycle-font-size-hook #'aj/org-indent-recalculate-all-org-buffers)
+
+
+  (advice-add 'org-indent-set-line-properties :override #'aj/org-indent-set-line-properties)
+  (defun aj/org-indent-set-line-properties (level indentation &optional heading)
+    "Set prefix properties on current line and move to next one.
+
+LEVEL is the current level of heading.  INDENTATION is the
+expected indentation when wrapping line.
+
+When optional argument HEADING is non-nil, assume line is at
+a heading.  Moreover, if it is `inlinetask', the first star will
+have `org-warning' face."
+    (let* ((line (aref (pcase heading
+		                 (`nil org-indent--text-line-prefixes)
+		                 (`inlinetask org-indent--inlinetask-line-prefixes)
+		                 (_ org-indent--heading-line-prefixes))
+		               level))
+	       (wrap
+            (pcase heading
+              (`nil
+               (aref
+                (aref aj/org-indent--text-wrap-prefixes level)
+                (if (eq 0 indentation) 0 (min (1+ indentation) 20))))
+              (`inlinetask (aref aj/org-indent--inlinetask-wrap-prefixes level))
+              (_ (aref aj/org-indent--heading-wrap-prefixes level)))))
+      ;; Add properties down to the next line to indent empty lines.
+      (add-text-properties (line-beginning-position) (line-beginning-position 2)
+			               `(line-prefix ,line wrap-prefix ,wrap)))
+    (forward-line))
+
+  ;; (el-patch-defun
+  ;;     org-indent-set-line-properties (level indentation &optional heading)
+  ;;     "Set prefix properties on current line an move to next one.
+
+  ;; LEVEL is the current level of heading.  INDENTATION is the
+  ;; expected indentation when wrapping line.
+
+  ;; When optional argument HEADING is non-nil, assume line is at
+  ;; a heading.  Moreover, if it is `inlinetask', the first star will
+  ;; have `org-warning' face."
+  ;;     (let* ((line (aref (pcase heading
+  ;; 		                 (`nil org-indent--text-line-prefixes)y
+  ;; 		                 (`inlinetask org-indent--inlinetask-line-prefixes)
+  ;; 		                 (_ org-indent--heading-line-prefixes))
+  ;; 		               level))
+  ;; 	       (wrap
+  ;; 	        (el-patch-swap
+  ;;               (org-add-props
+  ;; 	              (concat line
+  ;; 		                  (if heading (concat (make-string level ?*) " ")
+  ;; 			                (make-string indentation ?\s)))
+  ;; 	              nil 'face 'org-indent)
+  ;;               (pcase heading
+  ;;                 (`nil (let ((wl (+ (length line) indentation)))
+  ;;                         (aj/org-indent-make-space wl ?\s wl)))
+  ;;                 (`inlinetask (aj/org-indent-make-space level ?\s level))
+  ;;                 (_ (aref aj/org-indent--heading-wrap-prefixes level))))))
+  ;;       ;; Add properties down to the next line to indent empty lines.
+  ;;       (add-text-properties (line-beginning-position) (line-beginning-position 2)
+  ;; 			               `(line-prefix ,line wrap-prefix ,wrap)))
+  ;;     (forward-line))
+
+  (advice-add 'org-indent-add-properties :override #'aj/org-indent-add-properties)
+  (defun aj/org-indent-add-properties (beg end &optional delay)
+    "Add indentation properties between BEG and END.
+
+When DELAY is non-nil, it must be a time value.  In that case,
+the process is asynchronous and can be interrupted, either by
+user request, or after DELAY.  This is done by throwing the
+`interrupt' tag along with the buffer position where the process
+stopped."
+    (save-match-data
+      (org-with-wide-buffer
+       (goto-char beg)
+       (beginning-of-line)
+       ;; Initialize prefix at BEG, according to current entry's level.
+       (let* ((case-fold-search t)
+	          (limited-re (org-get-limited-outline-regexp))
+	          (level (or (org-current-level) 0))
+	          (time-limit (and delay (org-time-add nil delay))))
+         ;; For each line, set `line-prefix' and `wrap-prefix'
+         ;; properties depending on the type of line (headline, inline
+         ;; task, item or other).
+         (with-silent-modifications
+	       (while (and (<= (point) end) (not (eobp)))
+	         (cond
+	          ;; When in asynchronous mode, check if interrupt is
+	          ;; required.
+	          ((and delay (input-pending-p)) (throw 'interrupt (point)))
+	          ;; In asynchronous mode, take a break of
+	          ;; `org-indent-agent-resume-delay' every DELAY to avoid
+	          ;; blocking any other idle timer or process output.
+	          ((and delay (org-time-less-p time-limit nil))
+	           (setq org-indent-agent-resume-timer
+		             (run-with-idle-timer
+		              (time-add (current-idle-time) org-indent-agent-resume-delay)
+		              nil #'org-indent-initialize-agent))
+	           (throw 'interrupt (point)))
+	          ;; Headline or inline task.
+	          ((looking-at org-outline-regexp)
+	           (let* ((nstars (- (match-end 0) (match-beginning 0) 1))
+		              (type (or (looking-at-p limited-re) 'inlinetask)))
+	             (org-indent-set-line-properties nstars 0 type)
+	             ;; At an headline, define new value for LEVEL.
+	             (unless (eq type 'inlinetask) (setq level nstars))))
+	          ;; List item: `wrap-prefix' is set where body starts.
+	          ((org-at-item-p)
+	           (org-indent-set-line-properties
+	            level
+                (length (match-string 0))
+                ;; (org-list-item-body-column (point))
+                ))
+              ;; indent quotes
+              ((org-in-block-p '("quote"))
+               ;; (org-element-lineage (org-element-at-point) '(quote-block) t)
+               ;; (cl-intersection (face-at-point nil t)
+               ;;                  '(aj/org-quote-beg-end-face org-quote))
+               (org-indent-set-line-properties
+                (+ 1 level)
+                (current-indentation)))
+	          ;; Regular line.
+	          (t
+	           (org-indent-set-line-properties
+	            level
+	            (current-indentation)
+	            ;; When adapt indentation is 'headline-data, use
+	            ;; `org-indent--heading-line-prefixes' for setting
+	            ;; headline data indentation.
+	            (and (eq org-adapt-indentation 'headline-data)
+		             (or (org-at-planning-p)
+		                 (org-at-clock-log-p)
+		                 (looking-at-p org-property-start-re)
+		                 (looking-at-p org-property-end-re)
+		                 (looking-at-p org-property-re))))))))))))
+
+  ;; (el-patch-defun org-indent-add-properties (beg end &optional delay)
+  ;;     "Add indentation properties between BEG and END.
+
+  ;; When DELAY is non-nil, it must be a time value.  In that case,
+  ;; the process is asynchronous and can be interrupted, either by
+  ;; user request, or after DELAY.  This is done by throwing the
+  ;; `interrupt' tag along with the buffer position where the process
+  ;; stopped."
+  ;;     (save-match-data
+  ;;       (org-with-wide-buffer
+  ;;        (goto-char beg)
+  ;;        (beginning-of-line)
+  ;;        ;; Initialize prefix at BEG, according to current entry's level.
+  ;;        (let* ((case-fold-search t)
+  ;; 	          (limited-re (org-get-limited-outline-regexp))
+  ;; 	          (level (or (org-current-level) 0))
+  ;; 	          (time-limit (and delay (org-time-add nil delay))))
+  ;;          ;; For each line, set `line-prefix' and `wrap-prefix'
+  ;;          ;; properties depending on the type of line (headline, inline
+  ;;          ;; task, item or other).
+  ;;          (with-silent-modifications
+  ;; 	       (while (and (<= (point) end) (not (eobp)))
+  ;; 	         (cond
+  ;; 	          ;; When in asynchronous mode, check if interrupt is
+  ;; 	          ;; required.
+  ;; 	          ((and delay (input-pending-p)) (throw 'interrupt (point)))
+  ;; 	          ;; In asynchronous mode, take a break of
+  ;; 	          ;; `org-indent-agent-resume-delay' every DELAY to avoid
+  ;; 	          ;; blocking any other idle timer or process output.
+  ;; 	          ((and delay (org-time-less-p time-limit nil))
+  ;; 	           (setq org-indent-agent-resume-timer
+  ;; 		             (run-with-idle-timer
+  ;; 		              (time-add (current-idle-time) org-indent-agent-resume-delay)
+  ;; 		              nil #'org-indent-initialize-agent))
+  ;; 	           (throw 'interrupt (point)))
+  ;; 	          ;; Headline or inline task.
+  ;; 	          ((looking-at org-outline-regexp)
+  ;; 	           (let* ((nstars (- (match-end 0) (match-beginning 0) 1))
+  ;; 		              (type (or (looking-at-p limited-re) 'inlinetask)))
+  ;; 	             (org-indent-set-line-properties nstars 0 type)
+  ;; 	             ;; At an headline, define new value for LEVEL.
+  ;; 	             (unless (eq type 'inlinetask) (setq level nstars))))
+  ;; 	          ;; List item: `wrap-prefix' is set where body starts.
+  ;; 	          ((org-at-item-p)
+  ;; 	           (org-indent-set-line-properties
+  ;; 	            level (org-list-item-body-column (point))))
+  ;;               (el-patch-add
+  ;;                 ;; indent quotes
+  ;;                 ((cl-intersection (face-at-point nil t)
+  ;;                                   '(aj/org-quote-beg-end-face org-quote))
+  ;;                  (org-indent-set-line-properties
+  ;;                   (+ 1 level)
+  ;;                   (current-indentation))))
+  ;; 	          ;; Regular line.
+  ;; 	          (t
+  ;; 	           (org-indent-set-line-properties
+  ;; 	            level
+  ;; 	            (current-indentation)
+  ;; 	            ;; When adapt indentation is 'headline-data, use
+  ;; 	            ;; `org-indent--heading-line-prefixes' for setting
+  ;; 	            ;; headline data indentation.
+  ;; 	            (and (eq org-adapt-indentation 'headline-data)
+  ;; 		             (or (org-at-planning-p)
+  ;; 		                 (org-at-clock-log-p)
+  ;; 		                 (looking-at-p org-property-start-re)
+  ;; 		                 (looking-at-p org-property-end-re)
+  ;; 		                 (looking-at-p org-property-re))))))))))))
+  )
+
+
+;; (aj/add-visual-replacement "#+BEGIN_QUOTE" "▄▁▁▁▁▁▁▁▁▁▁▁▁▁▁" aj/org-prettify-symbols)
+;; (aj/add-visual-replacement "#+begin_quote" "▄▁▁▁▁▁▁▁▁▁▁▁▁▁▁" aj/org-prettify-symbols)
+;; (aj/add-visual-replacement "#+END_QUOTE"   "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▀" aj/org-prettify-symbols)
+;; (aj/add-visual-replacement "#+end_quote"   "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▀" aj/org-prettify-symbols)
+
+;; (dolist (kw '(("#+BEGIN_QUOTE" . ?❝)
+;;               ("#+begin_quote" . ?❝)
+;;               ("#+END_QUOTE" . ?❞)
+;;               ("#+end_quote" . ?❞)))
+;;   (add-to-list 'aj/org-prettify-symbols kw))
+
+
+
+#+end_src
+
 
 ** Don’t activate mouse-behaviour for tags (I often just accidentally click them)
 #+begin_src emacs-lisp
@@ -122,7 +496,7 @@ I never use this.
 *** Speed commands on all stars
 *** Speed command for "DONE"
 #+begin_src emacs-lisp
-(add-to-list 'org-speed-commands-user
+(add-to-list 'org-speed-commands
              '("T" . aj/org-done))
 
 (defun aj/org-done ()
@@ -132,7 +506,7 @@ I never use this.
 
 *** Speed command for adding property
 #+begin_src emacs-lisp
-(add-to-list 'org-speed-commands-user '("P" . org-set-property))
+(add-to-list 'org-speed-commands '("P" . org-set-property))
 #+end_src
 
 *** Add extra wrappers for smartparens
@@ -414,6 +788,23 @@ all children are done, you can use the following setup:
 #+end_src
 
 *** Agenda
+**** Functions for sunrise and sunset
+#+begin_src emacs-lisp
+(require 'solar)
+
+(setq calendar-location-name "GBG"
+      calendar-latitude 57.7
+      calendar-longitude 11.9
+      calendar-time-display-form '(24-hours ":" minutes))
+
+(defun aj/diary-sun-rise-set (&optional set?)
+  "Local time of sunrise or SET? as a diary entry. But only for today."
+  (with-no-warnings (defvar date)) ; hack for the dynamically bound date
+  (when (equal date (calendar-current-date))
+    (cl-destructuring-bind (rise set _dur) (solar-sunrise-sunset date)
+      (apply #'solar-time-string (if set? set rise)))))
+#+end_src
+
 **** Extra keybindings for agenda
 #+begin_src emacs-lisp
 (with-eval-after-load 'org-agenda
@@ -508,11 +899,12 @@ all children are done, you can use the following setup:
                                            (if (listp fa)
                                                fa
                                              (list fa)))
-                                         '(fixed-pitch))))))
+                                         '(fixed-pitch)))))
+  (with-eval-after-load 'org-faces
+    (set-face-attribute 'org-agenda-date nil :overline "#CCCCCC")
+    (set-face-attribute 'org-agenda-date-weekend nil :overline "#CCCCCC")))
 
-(with-eval-after-load 'org-faces
-  (set-face-attribute 'org-agenda-date nil :overline "#CCCCCC")
-  (set-face-attribute 'org-agenda-date-weekend nil :overline "#CCCCCC"))
+
 
 (aj/org-agenda-fix-faces)
 
@@ -917,6 +1309,43 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
 #+end_src
 
 ** Visibility, folding, display etc.
+*** Patch initial display of trees with folded visibility property
+When outline visibility is set so that these trees wouldn’t be shown (for example with ~show2levels~) we don’t want them to be shown just because they bave a visibility property set to ~folded~. This patch fixes that problem.
+#+begin_src emacs-lisp
+(el-patch-feature org-cycle)
+(with-eval-after-load 'org-cycle
+  (el-patch-defun org-cycle-set-visibility-according-to-property ()
+    "Switch subtree visibility according to VISIBILITY property."
+    (interactive)
+    (let ((regexp (org-re-property "VISIBILITY")))
+      (org-with-point-at 1
+        (while (re-search-forward regexp nil t)
+	      (let ((state (match-string 3)))
+	        (if (not (org-at-property-p)) (outline-next-heading)
+	          (save-excursion
+	            (org-back-to-heading t)
+                (el-patch-wrap 2
+                  (unless (and (equal "folded" state)
+                               (org-fold-folded-p (point-at-eol)))
+	                (org-fold-subtree t)
+	                (org-fold-reveal)
+	                (pcase state
+		              ("folded"
+		               (org-fold-subtree t))
+		              ("children"
+		               (org-fold-show-hidden-entry)
+		               (org-fold-show-children))
+		              ("content"
+		               (save-excursion
+		                 (save-restriction
+		                   (org-narrow-to-subtree)
+		                   (org-cycle-content))))
+		              ((or "all" "showall")
+		               (org-fold-show-subtree))
+		              (_ nil)))))
+	          (org-end-of-subtree))))))))
+#+end_src
+
 *** Make visibility property "folded" behave as if subtree was archived, i.e. always hidden after visibility cycling
 This is based on ~org-cycle-hide-archived-trees~.
 #+begin_src emacs-lisp
@@ -1249,30 +1678,26 @@ Uses CUSTOM_ID or `org-store-link' for linking."
            helm-org-headings-fontify
            t)))
 
-  (defun aj/helm-org-in-buffer-headings ()
-    "Preconfigured helm for org buffer headings."
-    (interactive)
-    (helm :sources ;; (helm-org-build-sources files nil arg)
-          (helm-build-sync-source "Org headings in buffer"
-            :init #'aj/helm-org-in-buffer-init
-            :candidates 'aj/helm-org-candidates
-            ;; :match-dynamic t
-            ;; :filtered-candidate-transformer
-            ;; #'helm-org-indent-headings
-            :action 'helm-org-headings-actions
-            :help-message 'helm-org-headings-help-message
-            :keymap helm-org-headings-map
-            :group 'helm-org)
+  ;; (defun aj/helm-org-in-buffer-headings ()
+  ;;   "Preconfigured helm for org buffer headings."
+  ;;   (interactive)
+  ;;   (helm :sources ;; (helm-org-build-sources files nil arg)
+  ;;         j(helm-build-sync-source "Org headings in buffer"
+  ;;           :init #'aj/helm-org-in-buffer-init
+  ;;           :candidates 'aj/helm-org-candidates
+  ;;           ;; :match-dynamic t
+  ;;           ;; :filtered-candidate-transformer
+  ;;           ;; #'helm-org-indent-headings
+  ;;           :action 'helm-org-headings-actions
+  ;;           :help-message 'helm-org-headings-help-message
+  ;;           :keymap helm-org-headings-map
+  ;;           :group 'helm-org)
 
-          :preselect (helm-org-in-buffer-preselect)
-          :truncate-lines helm-org-truncate-lines
-          :buffer "*helm org inbuffer*"))
+  ;;         :preselect (helm-org-in-buffer-preselect)
+  ;;         :truncate-lines helm-org-truncate-lines
+  ;;         :buffer "*helm org inbuffer*"))
 
   )
-
-
-
-
 #+end_src
 
 *** Redefine ~helm-org--get-candidates-in-file~
@@ -1300,7 +1725,8 @@ Should check if it’s less efficient doing this than the homegrown mapping in h
             (matcher (or matcher aj/helm-org-candidates-matcher))
             (file (unless nofname
                     (concat (helm-basename filename) ":")))
-            (width (window-width (helm-window))))
+            (width (window-width (helm-window)))
+            (org-agenda-skip-archived-trees nil))
         (save-excursion
           (save-restriction
             (when (and
@@ -1702,11 +2128,10 @@ I want my archive files to retain some structure, placing archived entries in a 
 Adapted from code by Florian Adamsky, now here:
 https://gitlab.com/andersjohansson/org-archive-hierarchically
 #+begin_src emacs-lisp
-  (use-package org-archive-hierarchically
-	:straight nil ; TODO fix
-	:load-path "~/kodat/elisp/org-archive-hierarchically"
-	:commands org-archive-hierarchically
-	:init (setq org-archive-default-command #'org-archive-hierarchically))
+(use-package org-archive-hierarchically
+  :straight (:depth full :host github :repo "andersjohansson/org-archive-hierarchically")
+  :commands org-archive-hierarchically
+  :init (setq org-archive-default-command #'org-archive-hierarchically))
 #+end_src
 
 ** Org capture
@@ -2299,28 +2724,28 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 *** Zotxt configuration :org_async:
 #+begin_src emacs-lisp
 (use-package zotxt
-  :straight (zotxt :host gitlab :repo "egh/zotxt-emacs" :depth 'full
+  :straight (:host gitlab :repo "egh/zotxt-emacs" :depth 'full
                    ;; :local-repo "zotxt"
                    :fork (:host gitlab :repo "andersjohansson/zotxt-emacs" :branch "ajfixes"))
   :custom (zotxt-default-bibliography-style "apa")
+  (zotxt-default-search-method :title-creator-year)
   :commands zotxt--json-read
   :config
+
   (defconst zotxt-url-base
 	"http://127.0.0.1:23200/zotxt"
 	"Base URL to contact.")
   ;; funkar det inte med custom?
-  ;; (setq zotxt-default-bibliography-style "apa")
+  (setq zotxt-default-bibliography-style "apa")
   )
 
-
 (use-package org-pdcite
-  :straight nil
-  :load-path "~/kodat/elisp/org-pdcite"
+  :straight (:depth full :host gitlab :repo "andersjohansson/org-pdcite"
+                    :branch "extend-regexes")
   :commands 'org-pdcite-full-cite-parser)
 
 (use-package zotxt-extra
-  :straight nil
-  :load-path "~/kodat/elisp/zotxt-extra"
+  :straight (:depth full :host gitlab :repo "andersjohansson/emacs-zotxt-extra" :files ("zotxt-extra.el"))
   :after zotxt
   :demand t
   :commands zotxt-extra-maybe-edit-description
@@ -2331,7 +2756,7 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 (put 'zotxt-helm-citation-files 'safe-local-variable
 	 #'orgqda--string-or-list-of-strings-p)
 (use-package zotxt-helm
-  :straight nil
+  :straight (:depth full :host gitlab :repo "andersjohansson/emacs-zotxt-extra" :files ("zotxt-helm.el"))
   :after zotxt
   :demand t
   :init (setq zotxt-helm-method 'async)
@@ -2391,7 +2816,6 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
   :demand t
   :init (setq org-zotxt-link-description-style :betterbibtexkey)
   :commands org-zotxt-extract-link-id-at-point org-zotxt-choose-path
-  :custom (org-zotxt-default-search-method :title-creator-year)
   :config
   ;;prompt to add page references in quotes
   (advice-add 'org-zotxt-insert-reference-link-to-item
@@ -2412,9 +2836,7 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
     (org-fold-region start (1+ start) t 'org-link-description)
     (org-fold-region (1+ start) (+ start 36) t 'org-link)
     (org-fold-region (- end 2) (1- end)  t 'org-link)
-    (org-fold-region (1- end) end t 'org-link-description)
-    ;; but we also want this activation from zotxt-extra
-    (zotxt-extra--activate-links-full-citation start end path bracketp))
+    (org-fold-region (1- end) end t 'org-link-description))
 
 
   (advice-add 'org-zotxt-insert-reference-links-to-items :override
@@ -2600,43 +3022,35 @@ An option for "cleaning up" exported html from some org markup. Good for generat
 #+begin_src emacs-lisp
 (use-package org-re-reveal
   :straight (org-re-reveal
-             :depth nil
-             :fork (:host gitlab :repo "andersjohansson/org-re-reveal" :branch "ajfixes"))
-  :custom (org-re-reveal-revealjs-version "4")
-  :demand t)
-#+end_src
+             :fork (:host gitlab :repo "andersjohansson/org-re-reveal" :branch "preferred-id-fix"))
+  :demand t
+  :custom
+  (org-re-reveal-revealjs-version "4")
+  (org-re-reveal-root "../")
+  ;; org-re-reveal-mathjax-url "https://cdnjs.cloudflare.com/ajax/libs/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
+  (org-re-reveal-plugins '(zoom notes))
+  (org-re-reveal-theme "white")
+  (org-re-reveal-transition "slide")
+  (org-re-reveal-transition-speed "fast")
+  (org-re-reveal-default-frag-style "appear")
+  (org-re-reveal-center nil)
+  (org-re-reveal-progress nil)
+  (org-re-reveal-history nil)
+  (org-re-reveal-control nil)
+  (org-re-reveal-rolling-links nil)
+  (org-re-reveal-keyboard t)
+  (org-re-reveal-overview nil)
+  (org-re-reveal-hlevel 2)
+  (org-re-reveal-hashonebasedindex t)
+  (org-re-reveal-extra-options "hash: true, navigationMode: 'linear'")
 
-**** Settings
-#+begin_src emacs-lisp
-(defvar aj/path-to-revealjs "~/lib/reveal.js/")
-
-;; loaded with org in init.org
-(with-eval-after-load 'org-re-reveal
-  (setq
-   org-re-reveal-root "../"
-   ;; org-re-reveal-mathjax-url "https://cdnjs.cloudflare.com/ajax/libs/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
-   org-re-reveal-plugins '(zoom notes)
-   org-re-reveal-theme "white"
-   org-re-reveal-transition "slide"
-   org-re-reveal-transition-speed "fast"
-   org-re-reveal-default-frag-style "appear"
-   org-re-reveal-center nil
-   org-re-reveal-progress nil
-   org-re-reveal-history nil
-   org-re-reveal-control nil
-   org-re-reveal-rolling-links nil
-   org-re-reveal-keyboard t
-   org-re-reveal-overview nil
-   org-re-reveal-hlevel 2
-   org-re-reveal-hashonebasedindex t
-   org-re-reveal-extra-options "hash: true, navigationMode: 'linear'")
-
-  ;; these can now be enabled.
-  ;; TODO, make them real plugins for this to work
-  ;; (cl-loop for l in '((ajfixes "ajFixes" "assets/aj-fixes.js")
-  ;;                     (ajfixbubbles "ajFixBubbles" "assets/aj-fix-bubbles.js"))
-  ;;          do (add-to-list 'org-re-reveal-plugin-config l))
   )
+
+;; these can now be enabled.
+;; TODO, make them real plugins for this to work
+;; (cl-loop for l in '((ajfixes "ajFixes" "assets/aj-fixes.js")
+;;                     (ajfixbubbles "ajFixBubbles" "assets/aj-fix-bubbles.js"))
+;;          do (add-to-list 'org-re-reveal-plugin-config l))
 #+end_src
 
 **** reveal - org-annotate-style
@@ -2650,8 +3064,10 @@ An option for "cleaning up" exported html from some org markup. Good for generat
     (format "<span style=\"font-size:.5em;font-style:italic;color:#a00\">[%s]</span> %s" path (or desc ""))))
 #+end_src
 
-**** reveaL: Commands for exporting, starting server, and displaying presentations via server
+**** reveal: Commands for exporting, starting server, and displaying presentations via server
 #+begin_src emacs-lisp
+(defvar aj/path-to-revealjs "~/lib/reveal.js/")
+
 (org-export-define-derived-backend
     'reveallink 're-reveal
   :menu-entry
@@ -2676,6 +3092,7 @@ An option for "cleaning up" exported html from some org markup. Good for generat
 		 (newfile (concat linkeddir "/" fnnd)))
 	(make-symbolic-link dir linkeddir t)
 	newfile))
+
 
 (defvar aj/org-reveal-current-url nil)
 (defvar aj/org-reveal-last-url nil)
@@ -4368,6 +4785,7 @@ and :select-tags in org export."
 (add-hook 'org-font-lock-set-keywords-hook #'aj/org-prettify-todos)
 
 (defun aj/org-prettify-todos ()
+  (make-local-variable 'font-lock-extra-managed-props)
   (add-to-list 'font-lock-extra-managed-props 'display)
   (setq org-font-lock-extra-keywords
         (append org-font-lock-extra-keywords
@@ -4407,7 +4825,7 @@ and :select-tags in org export."
   (org-superstar-item-bullet-alist '((?- . ?•) (?+ . ?‣))))
 #+end_src
 
-*** Fix org-indent
+*** Fix org-indent :ARCHIVE:
 Redefine ~org-indent--compute-prefixes~ for better alignment in ~variable-pitch-mode~
 See discussion here: https://lists.gnu.org/archive/html/emacs-orgmode/2019-01/msg00235.html
 
@@ -4646,8 +5064,11 @@ Add special tag faces, add for file-local select/exclude-tags. Highlight the ent
 (setq org-list-demote-modify-bullet '(("+" . "-") ("-" . "+")))
 #+end_src
 
-*** Tags column at 0
-I use variable-width fonts, so trying to align tags to the right is useless. But in the agenda we want them right aligned and setting it in the hook means we can adapt to the current window.
+*** Tags column at 0, align tags with display property
+I use variable-width fonts, so trying to align tags to the right using spaces is useless. But in the agenda we want them right aligned and setting it in the hook means we can adapt to the current window.
+
+However, we can also use the display text property to align tags to the right.
+
 #+begin_src emacs-lisp
 (setq org-tags-column 0
       org-auto-align-tags nil)
@@ -4656,6 +5077,61 @@ I use variable-width fonts, so trying to align tags to the right is useless. But
 
 (defun aj/org-set-agenda-tags-column ()
   (setq org-agenda-tags-column (- (window-width))))
+
+
+;; Inspired by: https://orgmode.org/list/87lfh745ch.fsf@localhost/
+
+(add-hook 'org-font-lock-set-keywords-hook #'aj/org-set-tag-align-keywords)
+
+(defun aj/org-set-tag-align-keywords ()
+  (add-to-list 'font-lock-extra-managed-props 'org-tag-aligned)
+  (setq org-font-lock-extra-keywords
+        (append
+         org-font-lock-extra-keywords
+         '((yant/org-align-tags t)))))
+
+
+(defun aj/string-pixel-width (string &optional mode)
+  "Calculate pixel width of STRING.
+Optional MODE specifies major mode used for display."
+  (let ((fra face-remapping-alist))
+    (with-temp-buffer
+      (with-silent-modifications
+        (setf (buffer-string) string))
+      (when (fboundp mode)
+        (funcall mode)
+        (font-lock-ensure))
+      (setq-local face-remapping-alist fra)
+      (if (get-buffer-window (current-buffer))
+	      (car (window-text-pixel-size nil (line-beginning-position) (point)))
+        (set-window-buffer nil (current-buffer))
+        (car (window-text-pixel-size nil (line-beginning-position) (point)))))))
+
+(defun yant/org-align-tags (limit &optional force)
+  "Align all the tags in org buffer."
+  (save-match-data
+    (when (eq major-mode 'org-mode)
+	  (while (re-search-forward "^\\*+ \\(.+?\\)\\([ \t]+\\)\\(:\\(?:[^ \n]+:\\)+\\)$" limit t)
+	    (when (and (match-string 2)
+		           (or force
+			           (not (get-text-property (match-beginning 2) 'org-tag-aligned))))
+	      (with-silent-modifications
+            (put-text-property (match-beginning 2) (match-end 2) 'org-tag-aligned t)
+	        (put-text-property
+             (if (>= 2 (- (match-end 2) (match-beginning 2)))
+				 (match-beginning 2)
+			   ;; multiple whitespaces may mean that we are in process of typing
+			   (1+ (match-beginning 2)))
+			 (match-end 2)
+			 'display
+			 `(space . (:align-to
+                        (- right
+						   (,(+ 3 ;; no idea, but otherwise it is sometimes not enough
+							    (aj/string-pixel-width org-ellipsis)
+							    (aj/string-pixel-width (or (match-string 3) ""))))))))))))))
+
+
+
 #+end_src
 
 *** org-fold-linebreaks-mode
@@ -4718,8 +5194,7 @@ An ideally flexible org word count would be based on the parser in org-element, 
 This one is based on regex walking and skipping though. And that is quite fast.
 #+begin_src emacs-lisp
 (use-package org-wc
-  :straight nil ;; TODO fix
-  :load-path "~/kodat/elisp/org-wc"
+  :straight (:depth full :host github :repo "tesujimath/org-wc")
   :commands (org-word-count org-wc-count-subtrees org-wc-display org-wc-remove-overlays)
   :bind (:map org-mode-map
               ("C-c C-=" . org-wc-display)))
