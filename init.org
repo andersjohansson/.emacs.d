@@ -1862,15 +1862,18 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
 
   (advice-add 'password-store-generate :around #'aj/password-store-generate)
 
-  (defun aj/password-store-generate-and-copy ()
-    (interactive)
+  (defun aj/password-store-generate-and-copy (&optional replace)
+    (interactive "P")
+    (let ((entry (aj/password-store-get-new-entry-with-completion replace)))
+      (password-store--run-generate entry nil replace)
+      (password-store-copy entry))
     (password-store-copy
      (call-interactively #'password-store-generate)))
 
-  (defun aj/password-store-generate-and-copy-simpler ()
-    (interactive)
-    (let ((entry (aj/password-store-get-new-entry-with-completion)))
-      (password-store--run-generate entry 19 t t)
+  (defun aj/password-store-generate-and-copy-simpler (&optional replace)
+    (interactive "P")
+    (let ((entry (aj/password-store-get-new-entry-with-completion replace)))
+      (password-store--run-generate entry 19 replace t)
       (password-store-copy entry)))
 
   (defun aj/password-store-generate-and-copy-words (&optional number-of-words)
@@ -1897,14 +1900,18 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
                finally return
                (string-join words "-"))))
 
-  (defun aj/password-store-get-new-entry-with-completion ()
+  (defun aj/password-store-get-new-entry-with-completion (&optional replace)
     (helm
      :prompt: "Password entry:"
      :sources
-     (list (helm-build-sync-source "Pass dirs"
-             :candidates #'aj/password-store-list-dirs
-             :persistent-action #'aj/password-helm-complete-persistent)
-           (helm-build-dummy-source "Insert"))))
+     (if replace
+         (list (helm-build-sync-source "Pass files"
+                 :candidates (aj/password-store-list-dirs nil t)
+                 :persistent-action #'aj/password-helm-complete-persistent))
+       (list (helm-build-sync-source "Pass dirs"
+               :candidates #'aj/password-store-list-dirs
+               :persistent-action #'aj/password-helm-complete-persistent)
+             (helm-build-dummy-source "Insert")))))
 
   (defun aj/password-helm-complete-persistent (candidate)
     (with-selected-window (or (active-minibuffer-window)
@@ -1912,16 +1919,18 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
       (delete-minibuffer-contents)
       (insert (substring-no-properties candidate))))
 
-  (defun aj/password-store-list-dirs (&optional subdir)
+  (defun aj/password-store-list-dirs (&optional subdir include-files)
     "List password entries under SUBDIR."
     (unless subdir (setq subdir ""))
     (let ((dir (f-join (password-store-dir) subdir)))
       (when (f-directory-p dir)
         (-reject
          (lambda (d) (string-match-p "\\(/\\.\\|^\\.\\)" d))
-         (mapcar (lambda (f) (file-name-as-directory (password-store--file-to-entry f)))
-                 (f-directories dir nil t))))))
-  )
+         (if include-files
+             (mapcar #'password-store--file-to-entry
+                     (f-entries dir nil t))
+           (mapcar (lambda (f) (file-name-as-directory (password-store--file-to-entry f)))
+                   (f-directories dir nil t))))))))
 
 (use-package pass
   :defer t
