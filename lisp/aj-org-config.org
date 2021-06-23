@@ -236,7 +236,6 @@ With a special "thin" space for org-indent, we can have lines with low line-heig
 
   (add-hook 'aj/cycle-font-size-hook #'aj/org-indent-recalculate-all-org-buffers)
 
-
   (advice-add 'org-indent-set-line-properties :override #'aj/org-indent-set-line-properties)
   (defun aj/org-indent-set-line-properties (level indentation &optional heading)
     "Set prefix properties on current line and move to next one.
@@ -265,112 +264,11 @@ have `org-warning' face."
 			               `(line-prefix ,line wrap-prefix ,wrap)))
     (forward-line))
 
-  ;; (el-patch-defun
-  ;;     org-indent-set-line-properties (level indentation &optional heading)
-  ;;     "Set prefix properties on current line an move to next one.
 
-  ;; LEVEL is the current level of heading.  INDENTATION is the
-  ;; expected indentation when wrapping line.
+  ;; THIS IS FOR SPECIAL org-quote INDENT.
+  ;; (advice-add 'org-indent-add-properties :override #'aj/org-indent-add-properties)
 
-  ;; When optional argument HEADING is non-nil, assume line is at
-  ;; a heading.  Moreover, if it is `inlinetask', the first star will
-  ;; have `org-warning' face."
-  ;;     (let* ((line (aref (pcase heading
-  ;; 		                 (`nil org-indent--text-line-prefixes)y
-  ;; 		                 (`inlinetask org-indent--inlinetask-line-prefixes)
-  ;; 		                 (_ org-indent--heading-line-prefixes))
-  ;; 		               level))
-  ;; 	       (wrap
-  ;; 	        (el-patch-swap
-  ;;               (org-add-props
-  ;; 	              (concat line
-  ;; 		                  (if heading (concat (make-string level ?*) " ")
-  ;; 			                (make-string indentation ?\s)))
-  ;; 	              nil 'face 'org-indent)
-  ;;               (pcase heading
-  ;;                 (`nil (let ((wl (+ (length line) indentation)))
-  ;;                         (aj/org-indent-make-space wl ?\s wl)))
-  ;;                 (`inlinetask (aj/org-indent-make-space level ?\s level))
-  ;;                 (_ (aref aj/org-indent--heading-wrap-prefixes level))))))
-  ;;       ;; Add properties down to the next line to indent empty lines.
-  ;;       (add-text-properties (line-beginning-position) (line-beginning-position 2)
-  ;; 			               `(line-prefix ,line wrap-prefix ,wrap)))
-  ;;     (forward-line))
-
-  (advice-add 'org-indent-add-properties :override #'aj/org-indent-add-properties)
-  (defun aj/org-indent-add-properties (beg end &optional delay)
-    "Add indentation properties between BEG and END.
-
-When DELAY is non-nil, it must be a time value.  In that case,
-the process is asynchronous and can be interrupted, either by
-user request, or after DELAY.  This is done by throwing the
-`interrupt' tag along with the buffer position where the process
-stopped."
-    (save-match-data
-      (org-with-wide-buffer
-       (goto-char beg)
-       (beginning-of-line)
-       ;; Initialize prefix at BEG, according to current entry's level.
-       (let* ((case-fold-search t)
-	          (limited-re (org-get-limited-outline-regexp))
-	          (level (or (org-current-level) 0))
-	          (time-limit (and delay (org-time-add nil delay))))
-         ;; For each line, set `line-prefix' and `wrap-prefix'
-         ;; properties depending on the type of line (headline, inline
-         ;; task, item or other).
-         (with-silent-modifications
-	       (while (and (<= (point) end) (not (eobp)))
-	         (cond
-	          ;; When in asynchronous mode, check if interrupt is
-	          ;; required.
-	          ((and delay (input-pending-p)) (throw 'interrupt (point)))
-	          ;; In asynchronous mode, take a break of
-	          ;; `org-indent-agent-resume-delay' every DELAY to avoid
-	          ;; blocking any other idle timer or process output.
-	          ((and delay (org-time-less-p time-limit nil))
-	           (setq org-indent-agent-resume-timer
-		             (run-with-idle-timer
-		              (time-add (current-idle-time) org-indent-agent-resume-delay)
-		              nil #'org-indent-initialize-agent))
-	           (throw 'interrupt (point)))
-	          ;; Headline or inline task.
-	          ((looking-at org-outline-regexp)
-	           (let* ((nstars (- (match-end 0) (match-beginning 0) 1))
-		              (type (or (looking-at-p limited-re) 'inlinetask)))
-	             (org-indent-set-line-properties nstars 0 type)
-	             ;; At an headline, define new value for LEVEL.
-	             (unless (eq type 'inlinetask) (setq level nstars))))
-	          ;; List item: `wrap-prefix' is set where body starts.
-	          ((org-at-item-p)
-	           (org-indent-set-line-properties
-	            level
-                (length (match-string 0))
-                ;; (org-list-item-body-column (point))
-                ))
-              ;; indent quotes
-              ((org-in-block-p '("quote"))
-               ;; (org-element-lineage (org-element-at-point) '(quote-block) t)
-               ;; (cl-intersection (face-at-point nil t)
-               ;;                  '(aj/org-quote-beg-end-face org-quote))
-               (org-indent-set-line-properties
-                (+ 1 level)
-                (current-indentation)))
-	          ;; Regular line.
-	          (t
-	           (org-indent-set-line-properties
-	            level
-	            (current-indentation)
-	            ;; When adapt indentation is 'headline-data, use
-	            ;; `org-indent--heading-line-prefixes' for setting
-	            ;; headline data indentation.
-	            (and (eq org-adapt-indentation 'headline-data)
-		             (or (org-at-planning-p)
-		                 (org-at-clock-log-p)
-		                 (looking-at-p org-property-start-re)
-		                 (looking-at-p org-property-end-re)
-		                 (looking-at-p org-property-re))))))))))))
-
-  ;; (el-patch-defun org-indent-add-properties (beg end &optional delay)
+  ;;   (defun aj/org-indent-add-properties (beg end &optional delay)
   ;;     "Add indentation properties between BEG and END.
 
   ;; When DELAY is non-nil, it must be a time value.  In that case,
@@ -412,17 +310,20 @@ stopped."
   ;; 	             (org-indent-set-line-properties nstars 0 type)
   ;; 	             ;; At an headline, define new value for LEVEL.
   ;; 	             (unless (eq type 'inlinetask) (setq level nstars))))
-  ;; 	          ;; List item: `wrap-prefix' is set where body starts.
-  ;; 	          ((org-at-item-p)
-  ;; 	           (org-indent-set-line-properties
-  ;; 	            level (org-list-item-body-column (point))))
-  ;;               (el-patch-add
-  ;;                 ;; indent quotes
-  ;;                 ((cl-intersection (face-at-point nil t)
-  ;;                                   '(aj/org-quote-beg-end-face org-quote))
+  ;;               ;; indent quotes
+  ;;               ((org-in-block-p '("quote"))
+  ;;                (if (org-at-item-p)
+  ;; 	               (org-indent-set-line-properties
+  ;; 	                (1+ level)
+  ;;                     (length (match-string 0)))
   ;;                  (org-indent-set-line-properties
   ;;                   (+ 1 level)
   ;;                   (current-indentation))))
+  ;; 	          ;; List item: `wrap-prefix' is set where body starts.
+  ;; 	          ((org-at-item-p)
+  ;; 	           (org-indent-set-line-properties
+  ;; 	            level
+  ;;                 (length (match-string 0))))
   ;; 	          ;; Regular line.
   ;; 	          (t
   ;; 	           (org-indent-set-line-properties
@@ -437,22 +338,9 @@ stopped."
   ;; 		                 (looking-at-p org-property-start-re)
   ;; 		                 (looking-at-p org-property-end-re)
   ;; 		                 (looking-at-p org-property-re))))))))))))
+
+
   )
-
-
-;; (aj/add-visual-replacement "#+BEGIN_QUOTE" "▄▁▁▁▁▁▁▁▁▁▁▁▁▁▁" aj/org-prettify-symbols)
-;; (aj/add-visual-replacement "#+begin_quote" "▄▁▁▁▁▁▁▁▁▁▁▁▁▁▁" aj/org-prettify-symbols)
-;; (aj/add-visual-replacement "#+END_QUOTE"   "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▀" aj/org-prettify-symbols)
-;; (aj/add-visual-replacement "#+end_quote"   "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▀" aj/org-prettify-symbols)
-
-;; (dolist (kw '(("#+BEGIN_QUOTE" . ?❝)
-;;               ("#+begin_quote" . ?❝)
-;;               ("#+END_QUOTE" . ?❞)
-;;               ("#+end_quote" . ?❞)))
-;;   (add-to-list 'aj/org-prettify-symbols kw))
-
-
-
 #+end_src
 
 
@@ -723,28 +611,33 @@ I often find it useful to copy in a tree from somewhere (for instance reviewer c
 #+begin_src emacs-lisp
 (defvar aj/org-todo-tree-maxlevel 100)
 
-(defun aj/org-todo-tree (&optional maxlevel)
+(defun aj/org-todo-tree (&optional arg)
   "Make TODO states of all nodes in current tree and add [/]
-A numeric prefix determines the depth where TODO states are created."
+A numeric prefix ARG determines the depth where TODO states are created.
+Two prefixes let’s you choose the state."
   (interactive "P")
-  (let ((aj/org-todo-tree-maxlevel
-         (if maxlevel (+ (org-current-level) (prefix-numeric-value maxlevel))
-           100)))
+  (let ((maxlevel
+         (if (and arg (not (equal '(16) arg)))
+             (+ (org-current-level) (prefix-numeric-value arg))
+           100))
+        (state (if (equal '(16) arg)
+                   (completing-read "State: " org-todo-keywords-1 nil t)
+                 "TODO")))
     (save-restriction
       (save-excursion
         (org-narrow-to-subtree)
         (goto-char (point-max))
         (while (outline-previous-heading)
-          (aj/org-add-todo-and-cookie))))))
+          (aj/org-add-todo-and-cookie maxlevel state))))))
 
-(defun aj/org-add-todo-and-cookie ()
+(defun aj/org-add-todo-and-cookie (maxlevel state)
   "Add TODO if not in a TODO state and a [/]-cookie if there are children"
   (let ((level (org-current-level)))
-    (unless (or (> level aj/org-todo-tree-maxlevel)
+    (unless (or (> level maxlevel)
                 (org-get-todo-state))
-      (org-todo "TODO"))
+      (org-todo state))
     (when (and
-           (not (>= level aj/org-todo-tree-maxlevel))
+           (not (>= level maxlevel))
            (not (re-search-forward
 		         "\\(\\[[0-9]*%\\]\\|\\[[0-9]*/[0-9]*\\]\\)"
 		         (point-at-eol) t))
@@ -881,8 +774,6 @@ all children are done, you can use the following setup:
 
   (advice-add 'org-habit-build-graph :filter-return #'aj/org-agenda-habit-align-right))
 
-
-
 (defun aj/org-agenda-fix-faces (&rest _ignore)
   (with-eval-after-load 'org-habit
     (cl-loop for f in '(org-habit-alert-face
@@ -900,9 +791,10 @@ all children are done, you can use the following setup:
                                                fa
                                              (list fa)))
                                          '(fixed-pitch)))))
-  (with-eval-after-load 'org-faces
-    (set-face-attribute 'org-agenda-date nil :overline "#CCCCCC")
-    (set-face-attribute 'org-agenda-date-weekend nil :overline "#CCCCCC")))
+  ;; (with-eval-after-load 'org-faces
+  ;;   (set-face-attribute 'org-agenda-date nil :overline "#CCCCCC")
+  ;;   (set-face-attribute 'org-agenda-date-weekend nil :overline "#CCCCCC"))
+  )
 
 
 
@@ -1100,7 +992,7 @@ In addition, eligible trees should not include TODO entries without subtasks.
 #+end_src
 *** Times and clocking
 **** Enable Swedish for parsing of names of weekdays and months
-The date input prompt uses functionality from ~parse-time~. I want it to be able to guess from Swedish names for months and weekdays as well as English. This just means adding a few elements to the relevant lists (some of the names or abbreviations are identical in English and Swedish, e.g. "April").
+The date input prompt uses functionality from ~parse-time~. I want it to be able to guess from Swedish names for months and weekdays as well as English.   This just means adding a few elements to the relevant lists (some of the names or abbreviations are identical in English and Swedish, e.g. "April").
 #+begin_src emacs-lisp
 (with-eval-after-load "parse-time"
   (setq parse-time-months
@@ -1121,27 +1013,6 @@ The date input prompt uses functionality from ~parse-time~. I want it to be able
           ("torsdag" . 4) ("fredag" . 5) ("lördag" . 6))))
 #+end_src
 
-**** Calendar view, show iso-week (we often use week numbers in Sweden)
-#+begin_src emacs-lisp
-(copy-face font-lock-constant-face 'calendar-iso-week-face)
-(set-face-attribute 'calendar-iso-week-face nil
-                    :height .7)
-(setq calendar-intermonth-text
-      '(propertize
-        (format "%2d"
-                (car
-                 (calendar-iso-from-absolute
-                  (calendar-absolute-from-gregorian (list month day year)))))
-        'font-lock-face 'calendar-iso-week-face))
-
-;; Title for week number
-;; (copy-face 'default 'calendar-iso-week-header-face)
-;; (set-face-attribute 'calendar-iso-week-header-face nil
-;;                     :height 0.7)
-;; (setq calendar-intermonth-header
-;;       (propertize "Wk" ; or e.g. "KW" in Germany
-;;                   'font-lock-face 'calendar-iso-week-header-face))
-#+end_src
 **** Auto deadline
 #+begin_src emacs-lisp
 (defun aj/org-add-auto-deadline (force)
@@ -1619,6 +1490,9 @@ Doesn’t care at all about ‘org-odd-levels-only’, because I don’t use it.
 (use-package helm-org
   :custom (helm-org-format-outline-path t)
   :commands helm-org-goto-marker
+  :custom
+  (helm-org-format-outline-path nil)
+  (helm-org-headings-fontify t)
   :bind (:map org-mode-map
               ("<f2>" . helm-org-in-buffer-headings)
               :map helm-org-headings-map
@@ -1875,7 +1749,7 @@ Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entrie
         helm-org-rifle-show-tags t))
 #+end_src
 
-*** helm-org + helm-org-rifle: Make display of headings focus on first and last
+*** helm-org + helm-org-rifle: Make display of headings focus on first and last :ARCHIVE:
 #+begin_src emacs-lisp
 (defun aj/override-org-format-outline-path (fn &rest rest)
   (cl-letf (((symbol-function 'org-format-outline-path)
@@ -1964,12 +1838,15 @@ Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entrie
 
 *** Refile with helm
 Present a nicer-looking helm buffer for ~org-refile~
+This doesn’t use the functions defined above at all.
 #+begin_src emacs-lisp
 (setq org-refile-use-outline-path t
       org-outline-path-complete-in-steps nil)
 
 (add-to-list 'helm-completing-read-handlers-alist
              '(org-refile . helm-aj/org-refile-handler))
+(add-to-list 'helm-completing-read-handlers-alist
+             '(orgqda-refile-and-merge-tags . helm-aj/org-refile-handler))
 
 (defun helm-aj/org-refile-handler (prompt collection test
                                           _require-match init hist
@@ -1983,18 +1860,16 @@ Present a nicer-looking helm buffer for ~org-refile~
                     :name name :buffer buffer)))
 
 (defun aj/helm-org-hl-transformer (tbl _s)
-  (mapcar #'aj/org-outline-propertize tbl))
-
-;; perhaps not the most efficient way of doing this:
-(defun aj/org-outline-propertize (outline-path)
   (cl-loop with n = (length org-level-faces)
-           with i = -1
-           for p in (split-string outline-path "/")
-           do (cl-incf i)
-           collect (propertize p 'face (nth (mod i n) org-level-faces)) into l
-           finally return (string-join l "/")))
-
-
+           for outline-path in tbl
+           collect
+           (cl-loop
+            with cleaned = (replace-regexp-in-string "\\(\*\\|\\\\/\\)" "" outline-path)
+            with i = -1
+            for p in (split-string cleaned "/")
+            do (cl-incf i)
+            collect (propertize p 'face (nth (mod i n) org-level-faces)) into l
+            finally return (cons (string-join l "/") outline-path))))
 #+end_src
 
 ** Columns view
@@ -2733,7 +2608,7 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
   :config
 
   (defconst zotxt-url-base
-	"http://127.0.0.1:23200/zotxt"
+	"http://127.0.0.1:23119/zotxt"
 	"Base URL to contact.")
   ;; funkar det inte med custom?
   (setq zotxt-default-bibliography-style "apa")

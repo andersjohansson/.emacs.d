@@ -301,13 +301,25 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 *** Fix recipes and stuff for loading some packages
 #+begin_src emacs-lisp
 ;; Define how to build org and mu4e already here, so that dependencies work out
-(straight-use-package '(org :host github :repo "yantar92/org" :branch "weekday-repeats"
+(straight-use-package '(org :host github
+                            :repo "yantar92/org"
+                            :branch "weekday-repeats"
                             :pre-build (list "make" "autoloads" (concat "EMACS=" invocation-directory invocation-name))
                             :build (:not autoloads)
                             :files (:defaults
                                     "lisp/*.el"
-                                    ("etc/styles/" "etc/styles/*"))))
-(straight-use-package '(mu4e :type built-in))
+                                    ("etc/styles/" "etc/styles/*")))) ;;TODO update with csl-stuff
+
+(straight-use-package '(mu4e :host github
+                             :repo "djcb/mu"
+                             :branch "master"
+                             :files ("mu4e/*")
+                             ;; straight is too eager rebuilding
+                             ;; (every small change), and
+                             ;; compiling mu is slow!!! I’ll do it
+                             ;; manually when needed
+                             ;; :pre-build (("./autogen.sh") ("make"))
+                             ))
 
 ;; Don’t do any stupid options saving for eudc, my options are defined in mail-config.org
 (setq eudc-options-file "nonononononononono.el") ;; see eudc.el::1157
@@ -456,9 +468,12 @@ Example of alist entry:
 (use-package helm
   :bind (("<f2>" . helm-imenu))
   :demand t
+  :custom
   ;; Setting this to nil seems to avoid a memory leak
   ;; https://debbugs.gnu.org/cgi/bugreport.cgi?bug=43389
-  :custom (helm-ff-keep-cached-candidates . nil)
+  (helm-ff-keep-cached-candidates . nil)
+  ;; don’t want to do it too early:
+  (helm-turn-on-recentf nil)
   :config
   (setq-default helm-command-prefix-key "C-c h")
   (helm-mode)
@@ -1160,6 +1175,10 @@ overriding it, but you should know before you do.
 **** Load with org
 ***** orgqda
 #+begin_src emacs-lisp
+
+;; don’t install old versions with melpa repository and git.
+(straight-use-package '(hierarchy :type built-in))
+
 (use-package orgqda
   :straight (:depth full :host gitlab :repo "andersjohansson/orgqda" :files ("orgqda.el"))
   :defer t
@@ -1180,18 +1199,16 @@ overriding it, but you should know before you do.
                t)
 
   (org-link-set-parameters "otag" :face 'mu4e-header-key-face)
+  (org-link-set-parameters "otag" :activate-func #'aj/orgqda-otag-activate)
 
-  ;; (defhydra aj/orgqda-hydra (:color blue :hint t)
-  ;;   ("m" #'orgqda-mode "Toggle mode")
-  ;;   ("ö" #'orgqda-list-tags "List tags")
-  ;;   ("C-ö" #'orgqda-list-tags nil)
-  ;;   ("ä" #'normal-mode "Normal mode")
-  ;;   ("Ö" #'orgqda-list-tags-full "List and extract")
-  ;;   ("c" #'orgqda-collect-tagged "Collect tagged")
-  ;;   ("C-c" #'orgqda-collect-tagged "Collect tagged")
-  ;;   ("v" #'orgqda-collect-tagged-csv "Collect csv")
-  ;;   ("V" #'orgqda-collect-tagged-csv-save "Collect csv save")
-  ;;   ("b" #'orgqda-collect-tagged-csv-save-all "Save all as csv"))
+  (defun aj/orgqda-otag-activate (start end path _br)
+    (save-match-data
+      (save-excursion
+        (goto-char start)
+        (when (search-forward "][" end t) ;; we have description
+          (when (looking-at (rx (seq (group-n 1 (+ (seq (+ alnum) "_"))))))
+            (add-face-text-property (match-beginning 1) (match-end 1)
+                                    'shadow))))))
 
   (with-eval-after-load 'orgqda-helm-tags
     (define-key orgqda-helm-tags-mode-map [remap org-set-tags-command]
@@ -1218,7 +1235,11 @@ ARG is passed through."
   :bind (:map orgqda-mode-map
               ("C-c C-ö" . #'orgqda-transient)
               :map orgqda-codebook-mode-map
-              ("C-c C-ö" . #'orgqda-transient-codebook)))
+              ("C-c C-ö" . #'orgqda-transient-list)
+              :map orgqda-list-mode-map
+              ("C-c C-ö" . #'orgqda-transient-list)))
+
+
 #+end_src
 
 ***** Org-pomodoro
@@ -1242,7 +1263,7 @@ ARG is passed through."
   :init
   (setq org-directory "~/org"
         org-ellipsis " ⤵"
-        org-export-backends '(beamer odt ascii html icalendar latex)
+        org-export-backends '(odt ascii html icalendar latex md)
         org-modules '(org-protocol org-habit org-inlinetask org-mu4e org-id org-pdfview)
         org-list-allow-alphabetical t
         org-id-method 'ts
@@ -1451,8 +1472,32 @@ ARG is passed through."
       holiday-oriental-holidays nil)
 
 (load "swedish-holidays.el")
-#+end_src
 
+(setq calendar-day-name-array ["Söndag" "Måndag" "Tisdag" "Onsdag" "Torsdag" "Fredag" "Lördag"]
+      calendar-day-abbrev-array ["Sön" "Mån" "Tis" "Ons" "Tor" "Fre" "Lör"]
+      calendar-day-header-array ["Sö" "Må" "Ti" "On" "To" "Fr" "Lö"]
+      calendar-month-name-array ["Januari" "Februari" "Mars" "April" "Maj"
+	                             "Juni" "Juli" "Augusti" "September"
+				                 "Oktober" "November" "December"])
+
+;; show iso-week in calendar (we often use week numbers in Sweden)
+(copy-face 'calendar-weekday-header 'calendar-iso-week-face)
+(set-face-attribute 'calendar-iso-week-face nil :height 0.75)
+(setq calendar-intermonth-text
+      '(propertize "   "
+                   'display
+                   (propertize (format
+                                " %2d "
+                                (car
+                                 (calendar-iso-from-absolute
+                                  (calendar-absolute-from-gregorian (list month day year)))))
+                               'font-lock-face 'calendar-iso-week-face)))
+
+;; spaces in the same face here for getting the alignment right
+;; it is right up to one pixel at places
+(setq calendar-intermonth-header
+      (propertize "   " 'display (propertize "    " 'font-lock-face 'calendar-iso-week-face)))
+#+end_src
 ** Some optimizations for long lines
 https://200ok.ch/posts/2020-09-29_comprehensive_guide_on_handling_long_lines_in_emacs.html
 I very seldom happen upon right-to-left text in Emacs, and couldn’t read it in any case. We can avoid some scanning work by forcing left-to-right. Then there’s also ~so-long-mode~.
@@ -1518,18 +1563,26 @@ Use mu4e, the extensive config is in an [[file:lisp/aj-mail-config.org][external
          ("C-x i" . mu4e~headers-jump-to-maildir)
          ("C-x å" . mu4e-headers-search-bookmark))
   :defer 10
-  :init (setq mu4e-get-mail-command "aj-mailsync" ; bash script
+  :custom ((mu4e-mu-binary (expand-file-name "mu/mu" (straight--repos-dir "mu")))
+           (mu4e-confirm-quit nil)
+           (mu4e-context-policy 'pick-first)
+           (mu4e-compose-context-policy 'ask-if-none)
+           (mu4e~update-buffer-height 4)
+           (mu4e-split-view 'vertical)
+           (mu4e-get-mail-command "aj-mailsync") ; bash script
                                         ; running several offlineimap
                                         ; processes for syncing
                                         ; different mailboxes
-              mu4e-update-interval 600
-              mu4e-view-show-images t
-              mu4e-use-fancy-chars t
-              mu4e-headers-results-limit 200 ; easier on my slow computer
-              mu4e-attachment-dir "~/Hämtningar"
-              ;; mu4e-change-filenames-when-moving t ;;for mbsync
-              mu4e-completing-read-function #'completing-read) ; hands it to helm
+           (mu4e-update-interval 600)
+           (mu4e-view-show-images t)
+           (mu4e-use-fancy-chars t)
+           (mu4e-headers-results-limit 500) ; easier on my slow computer
+           (mu4e-attachment-dir "~/Hämtningar")
+           ;; mu4e-change-filenames-when-moving t ;;for mbsync
+           ;; hands it to helm:
+           (mu4e-completing-read-function #'completing-read))
   :config (require 'aj-mail-config)
+  (setq message-kill-buffer-on-exit t)
   (mu4e t) ;; start delayed in background
   )
 #+end_src
@@ -1766,28 +1819,6 @@ Store visited directories in a list, make it accessible from helm
   (setq dired-recent-mode-map nil)
   ;; cleanup once a day or something (emacs is often running at 16:10)
   (run-at-time "16:10" nil #'dired-recent-cleanup))
-#+end_src
-
-*** Recentf
-#+begin_src emacs-lisp
-(use-package recentf
-  :demand t
-  :init
-  :custom
-  (recentf-max-menu-items 500)
-  (recentf-max-saved-items 500)
-  :config
-  (defun aj/recentf-exclude (filename)
-    (cl-loop for reg in completion-ignored-extensions
-             when
-             (string-match-p
-              (if (equal "$" (substring reg -1))
-                  reg
-                (concat reg "$"))
-              filename)
-             return t))
-
-  (recentf-mode 1))
 #+end_src
 
 *** Ignore more files for normal completion
@@ -2553,18 +2584,37 @@ already narrowed."
 #+end_src
 
 ** Searching, file-management, completion (helm and others)
-*** Smarter default search with char-folding
+*** Search customizations
+**** Isearch
+#+begin_src emacs-lisp
+(use-package isearch
+  :straight nil
+  :custom
+  (isearch-lazy-count t)
+  (isearch-allow-scroll t)
+  (isearch-yank-on-move 'shift))
+#+end_src
+
+**** Smarter default search with char-folding
 #+begin_src emacs-lisp
 (setq search-default-mode #'char-fold-to-regexp)
 
-;; In Swedish, åäö are separate wovels (not umlauts), and it’s not
-;; good to match them to a and o
+;; In Swedish, å, ä, and ö are separate wovels (not umlauts), and
+;; confusing to fold them to a and o
 (use-package char-fold
   :custom (char-fold-exclude '((?a "å") (?a "ä") (?o "ö")
                                (?A "Å") (?A "Ä") (?O "Ö"))))
 #+end_src
 
-*** CTRLF
+**** Anzu: Shows number of search matches in modeline, replacements inline etc.
+But we only use it for the nice query-replace display. Number of search matches is given by ~isearch-lazy-count~ since 27.1.
+#+begin_src emacs-lisp
+(use-package anzu
+  :bind (("M-%" . anzu-query-replace)
+         ("C-M-%" . anzu-query-replace-regexp)))
+#+end_src
+
+*** CTRLF :ARCHIVE:
 A bit nicer than isearch. I also like to use fuzzy search (words separated by whatever) by default. It is also helpful to use char-fold (é → e) by default, so I define functions for that.
 #+begin_src emacs-lisp
 (use-package ctrlf
@@ -2610,16 +2660,6 @@ A bit nicer than isearch. I also like to use fuzzy search (words separated by wh
 ;;   (add-hook hook #'ctrlf-disable-local-mode))
 #+end_src
 
-*** Anzu: Shows number of search matches in modeline, replacements inline etc.
-#+begin_src emacs-lisp
-(use-package anzu
-  :defer 12
-  :bind (("M-%" . anzu-query-replace)
-         ("C-M-%" . anzu-query-replace-regexp))
-  :config
-  (global-anzu-mode))
-
-#+end_src
 
 *** Company
 #+begin_src emacs-lisp
@@ -3058,7 +3098,6 @@ I often have more use for killing emacs (including all GUI-windows).
 (global-set-key (kbd "C-x k") #'aj/kill-this-buffer)
 (global-set-key (kbd "C-x K") #'kill-buffer-and-window)
 
-
 (defun aj/kill-this-buffer ()
   "Kill the current buffer.
 When called in the minibuffer, get out of the minibuffer using
@@ -3315,7 +3354,7 @@ Needed when starting in a non-interactive shell.
   :config (global-whitespace-cleanup-mode))
 #+end_src
 
-*** LSP, language server protocol
+*** LSP, language server protocol :ARCHIVE:
 This is the new thing, and it is good, because it knows a lot about the code and provides completion etc.
 #+begin_src emacs-lisp
 (use-package lsp-mode
@@ -3355,7 +3394,14 @@ This is the new thing, and it is good, because it knows a lot about the code and
   (ediff-split-window-function #'split-window-sensibly)
   ;;ediff expects diff to return results in C-locale, I’ve made a
   ;;wrapper script to solve this (script is: LANG=C diff "$1" "$2")
-  (ediff-diff-program "aj-diff-no-locale"))
+  (ediff-diff-program "aj-diff-no-locale")
+  :config
+  ;; unfold when moving to position with ediff.
+  (advice-add 'ediff-position-region :before #'aj/org-ediff-unfold)
+  (defun aj/org-ediff-unfold (beg end &rest _)
+    (when (derived-mode-p 'org-mode)
+      (save-excursion (goto-char beg) (org-fold-show-set-visibility 'canonical)
+                      (goto-char end) (org-fold-show-set-visibility 'canonical)))))
 #+end_src
 
 *** paren-face
@@ -4551,7 +4597,7 @@ But also with some inspiration from here: https://lepisma.github.io/2017/10/28/r
 #+end_src
 
 *** Cycle font size
-Sometimes I feel the need for a generally bigger font in all emacs frames. Especially when switching between my 13 inch 1920*1080-screen and my 24 inch 1920*1080-screen (systemwide screenwise fractional scaling is still not an option on linux). On the small screen I sometimes toogle text-scaling in gnome, and if emacs is started with that setting it is kept so the font is to large when switching to the large screen. Then I can also cycle to a smaller size.
+Sometimes I feel the need for a generally bigger font in all emacs frames. Especially when switching between my 13 inch 1920*1080-screen and my 24 inch 1920*1080-screen (systemwide screenwise fractional scaling is still not an option on linux). On the small screen I sometimes toogle text-scaling in gnome, and if emacs is started with that setting it is kept so the font is too large when switching to the large screen. Then I can also cycle to a smaller size.
 #+begin_src emacs-lisp
 (defvar aj/orig-font-size nil)
 (defvar aj/orig-gnome-font-size nil)
@@ -4594,55 +4640,55 @@ Sometimes I feel the need for a generally bigger font in all emacs frames. Espec
 *** Modeline
 **** mini-modeline + doom-modeline
 #+begin_src emacs-lisp
-(use-package doom-modeline
-  :demand t
-  :straight (doom-modeline :fork (:host github :repo "andersjohansson/doom-modeline" :branch "mini-modeline"))
-  :custom
-  (doom-modeline-buffer-file-name-style 'truncate-all)
-  ;; (doom-modeline-bar-width (frame-parameter nil 'left-fringe))
-  (doom-modeline-height 10)
-  (doom-modeline-icon t)
-  (doom-modeline-icons-scale-factor 0.75)
-  (doom-modeline-icons-v-adjust-factor 0.75)
-  :config
+;; (use-package doom-modeline
+;;   :demand t
+;;   :straight (doom-modeline :fork (:host github :repo "andersjohansson/doom-modeline" :branch "mini-modeline"))
+;;   :custom
+;;   (doom-modeline-buffer-file-name-style 'truncate-all)
+;;   ;; (doom-modeline-bar-width (frame-parameter nil 'left-fringe))
+;;   (doom-modeline-height 10)
+;;   (doom-modeline-icon t)
+;;   (doom-modeline-icons-scale-factor 0.75)
+;;   (doom-modeline-icons-v-adjust-factor 0.75)
+;;   :config
 
-  (set-face-attribute 'doom-modeline nil :inherit 'default)
-  (set-face-attribute 'doom-modeline-inactive nil :inherit 'shadow)
+;;   (set-face-attribute 'doom-modeline nil :inherit 'default)
+;;   (set-face-attribute 'doom-modeline-inactive nil :inherit 'shadow)
 
-  ;; (set-face-attribute 'doom-modeline nil :inherit 'variable-pitch)
-  ;; (set-face-attribute 'doom-modeline-inactive nil :inherit 'variable-pitch)
+;;   ;; (set-face-attribute 'doom-modeline nil :inherit 'variable-pitch)
+;;   ;; (set-face-attribute 'doom-modeline-inactive nil :inherit 'variable-pitch)
 
-  ;; (cl-loop for f in '(doom-modeline-buffer-file doom-modeline-buffer-major-mode)
-  ;;          do (set-face-attribute f nil :inherit
-  ;;                                 (merge-face-attribute
-  ;;                                  :inherit 'variable-pitch-mode
-  ;;                                  (face-attribute f :inherit))))
-  ;; (merge-face-attribute
-  ;;  :inherit '(bold)
-  ;;  '(variable-pitch-mode)
-  ;;  ;; (face-attribute 'doom-modeline-buffer-file :inherit)
-  ;;  )
+;;   ;; (cl-loop for f in '(doom-modeline-buffer-file doom-modeline-buffer-major-mode)
+;;   ;;          do (set-face-attribute f nil :inherit
+;;   ;;                                 (merge-face-attribute
+;;   ;;                                  :inherit 'variable-pitch-mode
+;;   ;;                                  (face-attribute f :inherit))))
+;;   ;; (merge-face-attribute
+;;   ;;  :inherit '(bold)
+;;   ;;  '(variable-pitch-mode)
+;;   ;;  ;; (face-attribute 'doom-modeline-buffer-file :inherit)
+;;   ;;  )
 
-  ;;   ;; pdf pages with pagelabels
-  (advice-add 'doom-modeline-update-pdf-pages :override #'aj/doom-modeline-update-pdf-pages)
+;;   ;;   ;; pdf pages with pagelabels
+;;   (advice-add 'doom-modeline-update-pdf-pages :override #'aj/doom-modeline-update-pdf-pages)
 
-  (defun aj/doom-modeline-update-pdf-pages ()
-    "Update PDF pages. Use pagelabels if available."
-    (setq doom-modeline--pdf-pages
-          (let* ((cp (eval `(pdf-view-current-page)))
-                 (physical (format "%d/%d"
-                                   cp
-                                   (pdf-cache-number-of-pages)))
-                 (currlabel (pdf-view-current-pagelabel)))
+;;   (defun aj/doom-modeline-update-pdf-pages ()
+;;     "Update PDF pages. Use pagelabels if available."
+;;     (setq doom-modeline--pdf-pages
+;;           (let* ((cp (eval `(pdf-view-current-page)))
+;;                  (physical (format "%d/%d"
+;;                                    cp
+;;                                    (pdf-cache-number-of-pages)))
+;;                  (currlabel (pdf-view-current-pagelabel)))
 
-            (propertize
-             (if (equal currlabel (number-to-string cp))
-                 (concat " P: " physical " ")
-               (concat " P:" currlabel " (" physical ") "))
-             'face (if (doom-modeline--active)
-                       'mode-line
-                     'mode-line-inactive)))))
-  )
+;;             (propertize
+;;              (if (equal currlabel (number-to-string cp))
+;;                  (concat " P: " physical " ")
+;;                (concat " P:" currlabel " (" physical ") "))
+;;              'face (if (doom-modeline--active)
+;;                        'mode-line
+;;                      'mode-line-inactive)))))
+;;   )
 
 (use-package mini-modeline
   :straight (mini-modeline :fork (:host github :repo "andersjohansson/mini-modeline" :branch "buffer-local-formats"))
@@ -4650,10 +4696,43 @@ Sometimes I feel the need for a generally bigger font in all emacs frames. Espec
   :demand t
   :hook (window-setup . mini-modeline-mode)
   :config
-  (doom-modeline-def-modeline 'minibuffer-line
-    '(workspace-name window-number matches buffer-info remote-host buffer-position word-count parrot selection-info objed-state misc-info persp-name battery grip irc mu4e gnus github debug lsp checker minor-modes input-method indent-info buffer-encoding major-mode process vcs))
+  ;; (doom-modeline-def-modeline 'minibuffer-line
+  ;;   '(workspace-name window-number matches buffer-info remote-host buffer-position word-count parrot selection-info objed-state misc-info persp-name battery grip irc mu4e gnus github debug lsp checker minor-modes input-method indent-info buffer-encoding major-mode process vcs))
 
-  (setq mini-modeline-r-format (doom-modeline-format--minibuffer-line))
+  ;; (setq mini-modeline-r-format
+  ;; (doom-modeline-format--minibuffer-line))
+
+  (defsubst aj/modeline-column (pos)
+    "Get the column of the position `POS'."
+    (save-excursion (goto-char pos)
+                    (current-column)))
+
+  (defun aj/mode-line-region ()
+    (when (and mark-active (not (derived-mode-p 'special-mode)))
+      (let* ((beg (region-beginning))
+             (end (region-end))
+             (lines (count-lines beg (min end (point-max)))))
+        (concat " ｢"
+                (cond ((bound-and-true-p rectangle-mark-mode)
+                       (let ((cols (abs (- (aj/modeline-column end)
+                                           (aj/modeline-column beg)))))
+                         (format "%d×%d " lines cols)))
+                      ((> lines 1)
+                       (format "·%d≣%d" (- end beg) lines))
+                      ((format "·%d" (- end beg))))
+                (format " %dw" (count-words beg end))
+                "｣ "))))
+
+  (setq mini-modeline-r-format '("%e" mode-line-front-space
+                                 (:eval (aj/mode-line-region))
+                                 mode-line-mule-info
+                                 ;; mode-line-client
+                                 mode-line-modified
+                                 mode-line-remote
+                                 mode-line-frame-identification
+                                 mode-line-buffer-identification
+                                 " " mode-line-position " "
+                                 mode-line-misc-info))
 
   (setq mini-modeline-right-padding 1
         mini-modeline-enhance-visual nil)
@@ -4669,37 +4748,37 @@ Sometimes I feel the need for a generally bigger font in all emacs frames. Espec
 
 
   ;; no need for bars
-  (defun doom-modeline-segment--bar ()
-    "Don’t show the bar when using mini-modeline"
-    "")
-  (remove-hook 'after-setting-font-hook #'doom-modeline-refresh-bars)
-  (remove-hook 'window-configuration-change-hook #'doom-modeline-refresh-bars)
+  ;; (defun doom-modeline-segment--bar ()
+  ;;   "Don’t show the bar when using mini-modeline"
+  ;;   "")
+  ;; (remove-hook 'after-setting-font-hook #'doom-modeline-refresh-bars)
+  ;; (remove-hook 'window-configuration-change-hook #'doom-modeline-refresh-bars)
 
 
-  (defsubst doom-modeline-vspc ()
-    "Text style with icons in mode-line."
-    (propertize " " 'face 'doom-modeline-vspc-face))
+  ;; (defsubst doom-modeline-vspc ()
+  ;;   "Text style with icons in mode-line."
+  ;;   (propertize " " 'face 'doom-modeline-vspc-face))
 
-  (defsubst doom-modeline-spc ()
-    "Text style with whitespace."
-    (propertize " " 'face 'doom-modeline-spc-face))
+  ;; (defsubst doom-modeline-spc ()
+  ;;   "Text style with whitespace."
+  ;;   (propertize " " 'face 'doom-modeline-spc-face))
 
-  ;; use some special doom-modelines
-  (defun aj/mini-modeline-set-doom-special (key)
-    (when-let ((modeline (doom-modeline key)))
-      (setq-local mini-modeline-r-format modeline)))
+  ;; ;; use some special doom-modelines
+  ;; (defun aj/mini-modeline-set-doom-special (key)
+  ;;   (when-let ((modeline (doom-modeline key)))
+  ;;     (setq-local mini-modeline-r-format modeline)))
 
-  (add-hook 'Info-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'info)))
-  (add-hook 'pdf-view-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'pdf)))
-  (add-hook 'dired-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'project)))
-  (add-hook 'dashboard-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'project)))
-  (add-hook 'image-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'media)))
-  (add-hook 'mu4e-compose-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'message)))
-  (add-hook 'git-commit-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'message)))
-  (add-hook 'magit-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'vcs)))
-  (add-hook 'org-src-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'org-src)))
-  (add-hook 'git-timemachine-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'timemachine)))
-  (add-hook 'xwidget-webkit-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'minimal)))
+  ;; (add-hook 'Info-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'info)))
+  ;; (add-hook 'pdf-view-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'pdf)))
+  ;; (add-hook 'dired-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'project)))
+  ;; (add-hook 'dashboard-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'project)))
+  ;; (add-hook 'image-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'media)))
+  ;; (add-hook 'mu4e-compose-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'message)))
+  ;; (add-hook 'git-commit-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'message)))
+  ;; (add-hook 'magit-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'vcs)))
+  ;; (add-hook 'org-src-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'org-src)))
+  ;; (add-hook 'git-timemachine-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'timemachine)))
+  ;; (add-hook 'xwidget-webkit-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'minimal)))
 
 
   ;; show modeline for helm, it displays some needed info, like when
@@ -4708,21 +4787,26 @@ Sometimes I feel the need for a generally bigger font in all emacs frames. Espec
   ;; (advice-add #'helm-display-mode-line :after #'aj/visible-helm-modeline)
   ;; (advice-remove #'helm-display-mode-line
   ;; #'aj/visible-helm-modeline)
-  (advice-add #'helm-display-mode-line :after #'doom-modeline-set-helm-modeline)
+  ;; (advice-add #'helm-display-mode-line :after #'doom-modeline-set-helm-modeline)
 
   ;; (remove-hook 'helm-after-initialize-hook #'aj/visible-helm-modeline)
   (add-hook 'helm-window-configuration-hook #'aj/visible-helm-modeline)
   (defun aj/visible-helm-modeline (&rest _)
     (with-helm-buffer
       (setq-local face-remapping-alist
-                  (cons '(doom-modeline . mode-line)
-                        (cl-delete
-                         'doom-modeline
-                         (cl-delete
-                          'mode-line
-                          face-remapping-alist
-                          :key #'car)
-                         :key #'car)))))
+                  (cl-delete
+                   'mode-line
+                   face-remapping-alist
+                   :key #'car)
+                  ;; (cons '(doom-modeline . mode-line)
+                  ;;       (cl-delete
+                  ;;        'doom-modeline
+                  ;;        (cl-delete
+                  ;;         'mode-line
+                  ;;         face-remapping-alist
+                  ;;         :key #'car)
+                  ;;        :key #'car))
+                  )))
 
 
   ;; show modeline for some other special buffers. Currently
@@ -4829,6 +4913,8 @@ Also runs hook aj/face-definitions-hook."
       (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
       (set-face-attribute 'org-table nil :family "Input Mono Compressed")
 
+      (set-face-attribute 'org-agenda-date-today nil :background nil)
+
       (when (eq theme 'modus-operandi)
         ;; (set-face-attribute 'org-block nil :background "#f8f8f8")
         (dolist (n '("1" "2" "3" "4" "5" "6" "7" "8"))
@@ -4918,8 +5004,11 @@ Also runs hook aj/face-definitions-hook."
   (modus-themes-links 'neutral-underline)
   (modus-themes-fringes 'subtle)
   (modus-themes-diffs 'desaturated)
-  (modus-themes-org-blocks 'greyscale)
-  ;; (modus-themes-heading-block t)
+  (modus-themes-org-blocks 'gray-background)
+  (modus-themes-mail-citations 'faint)
+  (modus-themes-region 'bg-only-no-extend)
+  (modus-themes-org-agenda '((header-date . (bold-all))))
+  (modus-themes-variable-pitch-ui t)
   (modus-themes-completions 'opinionated)
   :config
   (setq org-fontify-whole-heading-line t))
@@ -4998,18 +5087,19 @@ From modus-themes manual
   (writeroom-extra-line-spacing 0.3)
   (writeroom-restore-window-config t)
   (writeroom-global-effects '(writeroom-set-fullscreen))
-  :config
-  (doom-modeline-def-modeline 'writeroom-doom-modeline '(matches buffer-info buffer-position word-count selection-info github  vcs))
+  ;; :config
+  ;; (doom-modeline-def-modeline 'writeroom-doom-modeline '(matches buffer-info buffer-position word-count selection-info github  vcs))
 
-  (defun aj/writeroom-mini-modeline ()
-    (setq-local mini-modeline-r-format (doom-modeline-format--writeroom-doom-modeline)))
+  ;; (defun aj/writeroom-mini-modeline ()
+  ;;   (setq-local mini-modeline-r-format (doom-modeline-format--writeroom-doom-modeline)))
 
-  (add-hook 'writeroom-mode-hook #'aj/writeroom-mini-modeline)
+  ;; (add-hook 'writeroom-mode-hook #'aj/writeroom-mini-modeline)
 
-  (defun aj/writeroom-mini-modeline-disable ()
-    (kill-local-variable 'mini-modeline-r-format))
+  ;; (defun aj/writeroom-mini-modeline-disable ()
+  ;;   (kill-local-variable 'mini-modeline-r-format))
 
-  (add-hook 'writeroom-mode-disable-hook #'aj/writeroom-mini-modeline-disable))
+  ;; (add-hook 'writeroom-mode-disable-hook #'aj/writeroom-mini-modeline-disable)
+  )
 #+end_src
 
 *** Hide mode-line
@@ -5041,7 +5131,7 @@ From: http://stackoverflow.com/questions/4726220/how-to-have-colors-in-the-outpu
 (use-package scimax
   :straight '(:host github :repo "jkitchin/scimax"))
 #+end_src
-*** sqlite3
+*** sqlite3 :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package sqlite3)
 #+end_src
@@ -5050,7 +5140,7 @@ Some special functions for managing my data files.
 #+begin_src emacs-lisp
 (use-package aj-forskning ;; private package
   :straight nil
-  :commands (ajf/mount-forskningsdata ajf/swap-quotes-cycle aj/repeat-last-words))
+  :commands (ajf/mount-forskningsdata ajf/swap-quotes-cycle aj/repeat-last-words ajf/stage-tag-changes))
 
 ;;; font-lock () och {}
 ;; (with-eval-after-load 'org
@@ -5303,8 +5393,9 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
 
 #+end_src
 
-** Auto-saving and reverting
-*** Auto-saving of all buffers in visited files :ARCHIVE:
+** Late file settings
+*** Auto-saving and reverting
+**** Auto-saving of all buffers in visited files :ARCHIVE:
 I don’t currently use this. It has caused more problems for me than it has solved. Over-eager auto-save interferes with some packages (most notably helm). And I’m kind of used to using unsaved buffers for some parts of my workflow.
 
 Inspired by https://github.com/grettke/lolsmacs, it’s better to not keep inconsistent state in non-saved buffers. Especially since Emacs or my computer crashes from time to time.
@@ -5369,7 +5460,7 @@ Ignore all _ARGS. "
 (define-key special-event-map [sigusr1] #'aj/save-all-buffers)
 #+end_src
 
-*** Auto reverting
+**** Auto reverting
 #+begin_src emacs-lisp
 (global-auto-revert-mode t)
 ;; Don't update pdfs in process of being built though:
@@ -5393,6 +5484,29 @@ A function for reverting all opened files, even remote files (because auto-rever
 	  (when (and (buffer-file-name) (not (buffer-modified-p)))
 		(revert-buffer t t t) )))
   (message "Refreshed open files."))
+#+end_src
+
+*** Recentf
+#+begin_src emacs-lisp
+(use-package recentf
+  :demand t
+  :init (require 'aj-forskning)
+  :custom
+  (recentf-max-menu-items 500)
+  (recentf-max-saved-items 500)
+  (recentf-keep '(recentf-keep-default-predicate ajf/recentf-keep))
+  :config
+  (defun aj/recentf-exclude (filename)
+    (cl-loop for reg in completion-ignored-extensions
+             when
+             (string-match-p
+              (if (equal "$" (substring reg -1))
+                  reg
+                (concat reg "$"))
+              filename)
+             return t))
+
+  (recentf-mode 1))
 #+end_src
 
 ** Helm for recent org files at startup :ARCHIVE:
@@ -5427,6 +5541,7 @@ A function for reverting all opened files, even remote files (because auto-rever
 
 (add-hook 'window-setup-hook #'aj/helm-recentf-org 95)
 #+end_src
+
 * Final
 ** Load custom loaddefs :org_async:ARCHIVE:
 #+begin_src emacs-lisp
