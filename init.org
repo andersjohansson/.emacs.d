@@ -1192,16 +1192,33 @@ overriding it, but you should know before you do.
                         '("ARCHIVE" "Reflektion" "Observation" "Forskningsdagbok")))
 
 
+  ;; Clean up filenames
   (defun aj/orgqda-remove-filename-num (filename)
+    "Clean up initial numbers from FILENAME."
     (replace-regexp-in-string "^[0-9]+-" "" filename))
   (add-to-list 'orgqda-tagcount-files-transform-functions
                #'aj/orgqda-remove-filename-num
                t)
 
+  ;; Add quote block around extracts
+  (setq orgqda-transform-collected-paragraph-function #'aj/orgqda-transform-quotewrap)
+  (defun aj/orgqda-transform-quotewrap (extract)
+    "Add org quote block and interviewee name to EXTRACT."
+    (let ((name (unless (string-match
+                         (rx (seq bol (repeat 1 15 alpha) ":"))
+                         extract)
+                  (orgqda--tagcount-transform-file-name (buffer-file-name)))))
+      (concat "#+begin_quote\n"
+              (string-trim extract)
+              (when name (concat "\\\\\n(" name ")"))
+              "\n#+end_quote")))
+
+  ;; some custom fontification,
   (org-link-set-parameters "otag" :face 'mu4e-header-key-face)
   (org-link-set-parameters "otag" :activate-func #'aj/orgqda-otag-activate)
 
   (defun aj/orgqda-otag-activate (start end path _br)
+    "Fontify otag tags with prefixes dimmed."
     (save-match-data
       (save-excursion
         (goto-char start)
@@ -1210,6 +1227,7 @@ overriding it, but you should know before you do.
             (add-face-text-property (match-beginning 1) (match-end 1)
                                     'shadow))))))
 
+  ;; Special function for inserting or modifying tags
   (with-eval-after-load 'orgqda-helm-tags
     (define-key orgqda-helm-tags-mode-map [remap org-set-tags-command]
       #'aj/orgqda-tag-or-code))
@@ -1223,6 +1241,7 @@ ARG is passed through."
           (orgqda-helm-tags-set-tags arg)
         (orgqda-insert-inlinetask-coding arg))))
 
+  ;; Word-wrap long tag strings correctly.
   (add-hook 'orgqda-mode-hook #'aj/word-wrap-colons)
   (defun aj/word-wrap-colons ()
     (setq word-wrap-by-category t)
