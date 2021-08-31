@@ -135,16 +135,13 @@ for refile folder selection)"
       '(seen unread replied passed attach encrypted signed draft flagged))
 #+end_src
 
-** Save-attachment suiting me better
+** Save-attachment, with open function suits me better
 #+begin_src emacs-lisp
 (define-key mu4e-view-mode-map [remap mu4e-view-save-attachments] #'aj/mu4e-view-save-attachments)
 (define-key mu4e-view-mode-map "o" #'aj/mu4e-view-open-attachments)
 
 (defun aj/mu4e-view-save-attachments (&optional arg open)
-  "Save mime parts from current mu4e gnus view buffer.
-
-Use prefix ARG for choosing directory.
-OPEN for opening files after saving."
+  "Save mime parts from current mu4e gnus view buffer."
   (interactive "P")
   (cl-assert (and (eq major-mode 'mu4e-view-mode)
                   (derived-mode-p 'gnus-article-mode)))
@@ -159,18 +156,13 @@ OPEN for opening files after saving."
           (push fname files))))
     (if files
         (progn
-          (setq files (let ((helm-comp-read-use-marked t))
-                        (completing-read "Save part(s): " files))
-                dir (if arg
-                        (helm-read-file-name "Save to directory: " :test #'file-directory-p)
-                      mu4e-attachment-dir))
-          (cl-loop with saved = nil
-                   for (f . h) in handles
+          (setq files (completing-read-multiple "Save part(s): " files)
+                dir (if arg (read-directory-name "Save to directory: ") mu4e-attachment-dir))
+          (cl-loop for (f . h) in handles
                    when (member f files)
                    do (let ((sf (expand-file-name f dir)))
                         (mm-save-part-to-file h sf)
-                        (push sf saved)
-                        (when open (ergoemacs-open-in-external-app sf)))))
+                        (when open (consult-file-externally sf)))))
       (mu4e-message "No attached files found"))))
 
 (defun aj/mu4e-view-open-attachments (arg)
@@ -195,7 +187,7 @@ OPEN for opening files after saving."
   (mu4e-maildirs-extension-load))
 #+end_src
 
-*** helm-mu
+*** helm-mu :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package helm-mu
   :commands (helm-mu helm-mu-contacts)
@@ -203,14 +195,14 @@ OPEN for opening files after saving."
   (bind-key "S" #'helm-mu mu4e-main-mode-map))
 #+end_src
 
-*** mu4e-helm-contact
-Insert contacts with helm
-https://gitlab.com/andersjohansson/mu4e-helm-contact
+*** mu4e-crm-contacts
+Insert contacts with completing-read-multiple
+https://gitlab.com/andersjohansson/mu4e-crm-contacts
 #+begin_src emacs-lisp
-(use-package mu4e-helm-contact
-  :straight (:depth full :host gitlab :repo "andersjohansson/mu4e-helm-contact")
+(use-package mu4e-crm-contacts
+  :straight (:depth full :host gitlab :repo "andersjohansson/mu4e-crm-contacts")
   :bind (:map mu4e-compose-mode-map
-              ("<backtab>" . mu4e-helm-contact-insert))
+              ("<backtab>" . mu4e-crm-contacts-insert))
   :after mu4e-compose)
 #+end_src
 
@@ -811,7 +803,7 @@ https://vxlabs.com/2019/08/25/format-flowed-with-long-lines/
       mu4e-compose-hidden-headers '("^Face:" "^X-Face:" "^X-Draft-From:" "^User-agent:" "References:"))
 
 ;; in case write is invoked before mu4e is loaded
-(add-hook 'mu4e-compose-pre-hook #'mu4e~start)
+(add-hook 'mu4e-compose-pre-hook #'mu4e--start)
 
 ;; (with-eval-after-load "helm-mode"
 ;;   (add-to-list 'helm-mode-no-completion-in-region-in-modes 'mu4e-compose-mode))
@@ -865,7 +857,7 @@ separator is never written to the message file. Also see
             (insert "\n" sepa)))))))
 #+end_src
 
-*** Allow and handle context change while composing
+*** KOLLA Allow and handle context change while composing
 I often open a compose buffer without checking the context. The functions below make sure that switching context in a compose buffer works as expected. A function to switch address and signature when switching context is defined. However, several compose buffers may be open at once, and this will only switch for the current buffer (which I believe is the most reasonable behaviour). To ensure that we don’t attempt to send a message with the wrong context active, a function to check if the context matches with the from address is added to ~message-send-hook~.
 #+begin_src emacs-lisp
 (defun aj/mu4e-compose-context-switch (&rest _ignore)
@@ -1071,13 +1063,13 @@ I have never gotten this to work though.
 ;;          ;; remove the <>
 ;;          (when (and in-reply-to (string-match "<\\(.*\\)>" in-reply-to))
 ;;            (mu4e~proc-view (match-string 1 in-reply-to))
-;;            (mu4e~proc-move (match-string 1 in-reply-to)
+;;            (mu4e--server-move (match-string 1 in-reply-to)
 ;;                            (and (accept-process-output mu4e~proc-process 1)
 ;;                                 (aj/mu4e-refile-folder aj/mu4e-rep-msg-tmp t))
 ;;                            "+R-N-F"))
 ;;          (when (and forwarded-from (string-match "<\\(.*\\)>" forwarded-from))
 ;;            (mu4e~proc-view (match-string 1 forwarded-from))
-;;            (mu4e~proc-move (match-string 1 forwarded-from)
+;;            (mu4e--server-move (match-string 1 forwarded-from)
 ;;                            (and (accept-process-output mu4e~proc-process 1)
 ;;                                 (aj/mu4e-refile-folder aj/mu4e-rep-msg-tmp t))
 ;;                            "+P-N-F"))))))
@@ -1111,7 +1103,7 @@ I have never gotten this to work though.
 ;;              (mu4e~proc-view msgid)
 ;;              ;; (accept-process-output mu4e~proc-process 10 nil)
 ;;              (message "AJ: %s" aj/mu4e-rep-msg-tmp)
-;;              ;; (mu4e~proc-move msgid
+;;              ;; (mu4e--server-move msgid
 ;;              ;;                 (and aj/mu4e-rep-msg-tmp
 ;;              ;;                      (aj/mu4e-refile-folder aj/mu4e-rep-msg-tmp t))
 ;;              ;;                 "+R-N-F")
@@ -1119,7 +1111,7 @@ I have never gotten this to work though.
 ;;          (when (and forwarded-from (string-match "<\\(.*\\)>" forwarded-from))
 ;;            (mu4e~proc-view (match-string 1 forwarded-from))
 ;;            ;;(accept-process-output mu4e~proc-process 1 nil t)
-;;            (mu4e~proc-move (match-string 1 forwarded-from)
+;;            (mu4e--server-move (match-string 1 forwarded-from)
 ;;                            (and aj/mu4e-rep-msg-tmp
 ;;                                 (aj/mu4e-refile-folder aj/mu4e-rep-msg-tmp t))
 ;;                            "+P-N-F"))))))
@@ -1130,15 +1122,28 @@ I have never gotten this to work though.
 
 *** Yank adressess
 #+begin_src emacs-lisp
-(defun aj/message-yank-adressess ()
-  (interactive)
-  (let* ((ck (current-kill 0))
-         (cksp (split-string ck "\n" t "[ 	]+")))
-    (if (< 1 (safe-length cksp))
-        (insert (mapconcat 'substring-no-properties cksp ", "))
-      (insert-for-yank ck))))
+;; (defun aj/message-yank-adressess ()
+;;   (interactive)
+;;   (let* ((ck (current-kill 0))
+;;          (cksp (split-string ck "\n" t "[ 	]+")))
+;;     (if (< 1 (safe-length cksp))
+;;         (insert (mapconcat 'substring-no-properties cksp ", "))
+;;       (insert-for-yank ck))))
 
-(bind-key "C-c M-y" #'aj/message-yank-adressess mu4e-compose-mode-map)
+;; (bind-key "C-c M-y" #'aj/message-yank-adressess mu4e-compose-mode-map)
+
+(define-key mu4e-compose-mode-map [remap yank] #'aj/message-yank-addressess)
+
+(defun aj/message-yank-addressess ()
+  "Yank addresses correctly if we are in address field, otherwise yank."
+  (interactive)
+  (if (save-excursion (beginning-of-line) (looking-at-p "\\(To\\|Cc\\Bcc\\):"))
+      (let* ((ck (current-kill 0))
+             (cksp (split-string ck "\n" t "[ 	]+")))
+        (if (< 1 (safe-length cksp))
+            (insert (mapconcat 'substring-no-properties cksp ", "))
+          (insert-for-yank ck)))
+    (yank)))
 #+end_src
 
 *** Don’t return to mu4e buffers when mail has been sent
@@ -1433,7 +1438,7 @@ attachment - should launch the no-attachment warning.")
 
 ** Headers settings
 
-*** Thread folding
+*** Thread folding :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package mu4e-thread-folding
   :straight '(mu4e-thread-folding :host github :repo "rougier/mu4e-thread-folding")
@@ -1593,8 +1598,8 @@ attachment - should launch the no-attachment warning.")
 (autoload '--all? "dash")
 (defun aj/mu4e-set-headers-fields (query)
   "Set ‘mu4e-headers-fields’ depending on which maildir is viewed."
-  (when (buffer-live-p (mu4e-get-headers-buffer))
-    (with-current-buffer (mu4e-get-headers-buffer)
+  (when (buffer-live-p mu4e-headers-buffer-name)
+    (with-current-buffer mu4e-headers-buffer-name
       (let* ((mdm
               (s-match-strings-all
                "maildir:\\(?2:\\\"\\(?1:[^\\\"]+\\)\\\"\\|\\(?1:[^[:space:]]+\\)\\)"
@@ -1674,9 +1679,10 @@ attachment - should launch the no-attachment warning.")
 (defun aj/mu4e-other-maildir (msg)
   "Returns a possibly shortened indication of MSGs maildir
 Returns the empty string if this is the \"current\" maildir."
-  (let ((mmd (mu4e-message-field msg :maildir)))
-    (if (string-match  "maildir:\\\"\\(.+\\)\\\"" mu4e~headers-last-query)
-        (let ((smd (match-string 1 mu4e~headers-last-query)))
+  (let ((mmd (mu4e-message-field msg :maildir))
+        (lq (mu4e-last-query)))
+    (if (string-match  "maildir:\\\"\\(.+\\)\\\"" lq)
+        (let ((smd (match-string 1 lq)))
           (if (string= smd mmd)
               ""
             (s-chop-prefix (s-shared-start mmd smd) mmd)))
@@ -1795,24 +1801,23 @@ Like ‘mu4e-user-mailing-lists’."
 
 (defun aj/mu-next-messages-for-query ()
   (interactive)
-  (let ((hb (mu4e-get-headers-buffer)))
-    (when (and (buffer-live-p hb) (not mu4e-headers-full-search))
-      (with-current-buffer hb
-        (when-let ((query (mu4e-last-query)))
-          (cl-incf aj/mu-page)
-          (let ((mu4e-headers-results-limit
-                 (* aj/mu-page mu4e-headers-results-limit))
-                (last-msg (save-excursion
-                            (goto-char (point-max))
-                            (forward-line -1)
-                            (plist-get
-                             (mu4e-message-at-point)
-                             :message-id))))
-            (mu4e-headers-search query nil nil t last-msg)
-            ;; (mu4e-mark-handle-when-leaving)
-            ;;(mu4e~headers-search-execute expr ignore-history)
-            ;; (run-hook-with-args 'mu4e-headers-search-hook expr)
-            ))))))
+  (when (and (buffer-live-p mu4e-headers-buffer-name) (not mu4e-headers-full-search))
+    (with-current-buffer mu4e-headers-buffer-name
+      (when-let ((query (mu4e-last-query)))
+        (cl-incf aj/mu-page)
+        (let ((mu4e-headers-results-limit
+               (* aj/mu-page mu4e-headers-results-limit))
+              (last-msg (save-excursion
+                          (goto-char (point-max))
+                          (forward-line -1)
+                          (plist-get
+                           (mu4e-message-at-point)
+                           :message-id))))
+          (mu4e-headers-search query nil nil t last-msg)
+          ;; (mu4e-mark-handle-when-leaving)
+          ;;(mu4e~headers-search-execute expr ignore-history)
+          ;; (run-hook-with-args 'mu4e-headers-search-hook expr)
+          )))))
 
 (bind-key "N" #'aj/mu-next-messages-for-query mu4e-headers-mode-map)
 #+end_src
@@ -1876,16 +1881,17 @@ No automatic guess if FORCE-CHOICE is non-nil."
         found
       (aj/mu4e-choose-refile found msg))))
 
-(defvar aj/mu4e-helm-refile-history nil)
+;; (defvar aj/mu4e-helm-refile-history nil)
 (defun aj/mu4e-choose-refile (startdir msg)
   "Choose a refile directory for MSG, starting search from STARTDIR"
   (let* ((subject (mu4e-message-field msg :subject))
          (subject (substring subject 0 (min 18 (length subject))))
          (case-fold-search t)
-         (dir (helm-comp-read (format "Refile \"%s\":" subject)
-                              (mu4e-get-maildirs) :initial-input startdir
-                              :nomark t :must-match t :fuzzy t :case-fold t
-                              :input-history aj/mu4e-helm-refile-history)))
+         (dir (completing-read (format "Refile \"%s\":" subject)
+                               (mu4e-get-maildirs)
+                               nil
+                               t
+                               startdir)))
     (unless (string= " " dir)
       dir)))
 
@@ -1944,7 +1950,7 @@ messages “refiled” in gmail accounts from the inbox listing."
    (aj/mu4e-msg-account msg
      :gmail (lambda (_docid msg _target) (aj/mu4e-retag-as-move msg "-\\Inbox"))
      :default (lambda (docid _msg target)
-                (mu4e~proc-move docid (mu4e~mark-check-target target) "-N+S")))
+                (mu4e--server-move docid (mu4e~mark-check-target target) "-N+S")))
    docid msg target))
 
 ;; Redefine move to trash
@@ -1957,7 +1963,7 @@ messages “refiled” in gmail accounts from the inbox listing."
               (aj/mu4e-msg-account msg
                 :gmail (lambda (msg) (mu4e-action-retag-message msg "-\\Inbox,-\\Starred,-\\Important")))))
     (funcall retagfn msg))
-  (mu4e~proc-move docid (mu4e~mark-check-target target) "+T+S-N"))
+  (mu4e--server-move docid (mu4e~mark-check-target target) "+T+S-N"))
 #+end_src
 
 ** Marks
@@ -1976,7 +1982,7 @@ messages “refiled” in gmail accounts from the inbox listing."
                         tag)))
 
         (case-fold-search t))
-    (helm-comp-read "Add tag:" tags :fuzzy t :case-fold t)))
+    (completing-read "Add tag: " tags)))
 (add-to-list 'mu4e-marks
              '(tag
                :char       ("g" . "🏷")
@@ -2009,9 +2015,9 @@ At times, I can safely refile messages without reading them and at the same time
    (aj/mu4e-msg-account msg
      :gmail (lambda (docid msg target)
               (mu4e-action-retag-message msg "-\\Inbox")
-              (mu4e~proc-move docid (mu4e~mark-check-target target) "-N+S"))
+              (mu4e--server-move docid (mu4e~mark-check-target target) "-N+S"))
      :default (lambda (docid _msg target)
-                (mu4e~proc-move
+                (mu4e--server-move
                  docid (mu4e~mark-check-target target) "-N+S")))
    docid msg target))
 
