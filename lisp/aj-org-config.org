@@ -713,8 +713,8 @@ all children are done, you can use the following setup:
 #+begin_src emacs-lisp
 (setq org-log-into-drawer t
       org-clock-into-drawer t
-      org-overriding-columns-format
-      "%40ITEM(Task) %TODO %8Effort(Effort){:} %8CLOCKSUM %CLOCKSUM_T %CATEGORY %TAGS %DEADLINE %SCHEDULED %PRIORITY"
+      org-columns-default-format-for-agenda
+      "%40ITEM(Task) %TODO %8AGENDA_DURATION(Takes){:} %CATEGORY %TAGS %DEADLINE %SCHEDULED %PRIORITY"
       org-habit-show-habits-only-for-today t
       org-habit-graph-column 60
       ;; time grid with mostly whitespace:
@@ -992,17 +992,22 @@ In addition, eligible trees should not include TODO entries without subtasks.
 #+end_src
 *** Times and clocking
 **** Enable Swedish for parsing of names of weekdays and months
-The date input prompt uses functionality from ~parse-time~. I want it to be able to guess from Swedish names for months and weekdays as well as English.   This just means adding a few elements to the relevant lists (some of the names or abbreviations are identical in English and Swedish, e.g. "April").
+The date input prompt uses functionality from ~parse-time~. I want it to be able to guess from Swedish names for months and weekdays as well as English. This just means adding a few elements to the relevant lists (some of the names or abbreviations are identical in English and Swedish, e.g. "April").
 #+begin_src emacs-lisp
 (with-eval-after-load "parse-time"
   (setq parse-time-months
-        '(("jan" . 1) ("feb" . 2) ("mar" . 3) ("apr" . 4) ("may" . 5) ("jun" . 6)
+        '(;; english, default
+          ("jan" . 1) ("feb" . 2) ("mar" . 3) ("apr" . 4) ("may" . 5) ("jun" . 6)
           ("jul" . 7) ("aug" . 8) ("sep" . 9) ("oct" . 10) ("nov" . 11)
           ("dec" . 12) ("january" . 1) ("february" . 2) ("march" . 3)
           ("april" . 4) ("june" . 6) ("july" . 7) ("august" . 8) ("september" . 9)
-          ("october" . 10) ("november" . 11) ("december" . 12) ("maj" . 5)
-          ("okt" . 10) ("januari" . 1) ("februari" . 2) ("mars" . 3) ("juni" . 6)
-          ("juli" . 7) ("augusti" . 8) ("oktober" . 10)))
+          ("october" . 10) ("november" . 11) ("december" . 12)
+          ;; Swedish, short
+          ("sept" . 9) ("okt" . 10)
+          ;; Swedish full
+          ("januari" . 1) ("februari" . 2) ("mars" . 3) ("maj" . 5)
+          ("juni" . 6) ("juli" . 7) ("augusti" . 8) ("oktober" . 10))
+        )
 
   (setq parse-time-weekdays
         '(("sun" . 0) ("mon" . 1) ("tue" . 2) ("wed" . 3) ("thu" . 4) ("fri" . 5)
@@ -1010,7 +1015,10 @@ The date input prompt uses functionality from ~parse-time~. I want it to be able
           ("wednesday" . 3) ("thursday" . 4) ("friday" . 5) ("saturday" . 6)
           ("sön" . 0) ("mån" . 1) ("tis" . 2) ("ons" . 3) ("tor" . 4) ("fre" . 5)
           ("lör" . 6) ("söndag" . 0) ("måndag" . 1) ("tisdag" . 2) ("onsdag" . 3)
-          ("torsdag" . 4) ("fredag" . 5) ("lördag" . 6))))
+          ("torsdag" . 4) ("fredag" . 5) ("lördag" . 6)
+          ;; very short
+          ("sö" . 0) ("må" . 1) ("ti" . 2) ("on" . 3) ("to" . 4) ("fr" . 5) ("lö" . 6)
+          )))
 #+end_src
 
 **** Auto deadline
@@ -1108,7 +1116,7 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
  '("Effort_ALL" . "0:15 1p 2p 3p 4p 1h 2h 3h 4h 6h 1d 2d 3d 4d 1w 2w 3w :ETC"))
 #+end_src
 
-**** Org clock with helm
+**** Org clock with helm                                         :ARCHIVE:
 #+begin_src emacs-lisp
 (advice-add 'org-clock-select-task :override #'aj/helm-org-clock-select-task)
 
@@ -1286,8 +1294,6 @@ From: http://kitchingroup.cheme.cmu.edu/blog/2014/09/13/Make-some-org-sections-r
 ;; make tags editable
 (advice-add 'org-set-tags-command :before #'aj/org-remove-readonly)
 (advice-add 'org-set-tags-command :after #'aj/org-mark-readonly)
-(advice-add 'orgqda-helm-tags-set-tags :before #'aj/org-remove-readonly)
-(advice-add 'orgqda-helm-tags-set-tags :after #'aj/org-mark-readonly)
 #+end_src
 
 *** Version of ~org-tree-to-indirect-buffer~ that works as I want it to
@@ -1484,8 +1490,50 @@ Doesn’t care at all about ‘org-odd-levels-only’, because I don’t use it.
       (dotimes (_i (1- diff))
         (org-promote-subtree)))))
 #+end_src
-** Navigation etc. (helm-org)
-*** helm-org
+** Refile settings
+#+begin_src emacs-lisp
+(setq org-refile-use-outline-path t
+      org-outline-path-complete-in-steps nil)
+#+end_src
+
+*** Refile with helm :ARCHIVE:
+Present a nicer-looking helm buffer for ~org-refile~
+This doesn’t use the functions defined above at all.
+#+begin_src emacs-lisp
+(setq org-refile-use-outline-path t
+      org-outline-path-complete-in-steps nil)
+
+;; (add-to-list 'helm-completing-read-handlers-alist
+;;              '(org-refile . helm-aj/org-refile-handler))
+;; (add-to-list 'helm-completing-read-handlers-alist
+;;              '(orgqda-refile-and-merge-tags . helm-aj/org-refile-handler))
+
+;; (defun helm-aj/org-refile-handler (prompt collection test
+;;                                           _require-match init hist
+;;                                           default _iim name buffer)
+
+;;   (let ((helm-truncate-lines nil))
+;;     (helm-comp-read prompt (mapcar #'car collection)
+;;                     :test test :initial-input init :default default
+;;                     :history hist :multiline nil :nomark t
+;;                     :fc-transformer #'aj/helm-org-hl-transformer
+;;                     :name name :buffer buffer)))
+
+;; (defun aj/helm-org-hl-transformer (tbl _s)
+;;   (cl-loop with n = (length org-level-faces)
+;;            for outline-path in tbl
+;;            collect
+;;            (cl-loop
+;;             with cleaned = (replace-regexp-in-string "\\(\*\\|\\\\/\\)" "" outline-path)
+;;             with i = -1
+;;             for p in (split-string cleaned "/")
+;;             do (cl-incf i)
+;;             collect (propertize p 'face (nth (mod i n) org-level-faces)) into l
+;;             finally return (cons (string-join l "/") outline-path))))
+#+end_src
+
+** Navigation etc. (helm-org) :ARCHIVE:
+*** helm-org :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package helm-org
   :custom (helm-org-format-outline-path t)
@@ -1574,7 +1622,7 @@ Uses CUSTOM_ID or `org-store-link' for linking."
   )
 #+end_src
 
-*** Redefine ~helm-org--get-candidates-in-file~
+*** Redefine ~helm-org--get-candidates-in-file~ :ARCHIVE:
 Use ~org-scan-tags~ to get some exclusion tools. Note that also ~org-agenda-skip-archived-trees~, ~org-agenda-skip-comment~, and ~org-agenda-skip-function~ can be let-bound to have effects here.
 
 Should check if it’s less efficient doing this than the homegrown mapping in helm-org. Right now it actually feels snappier, maybe because it excludes unneeded headings.
@@ -1726,7 +1774,7 @@ Should check if it’s less efficient doing this than the homegrown mapping in h
     (message (string-join listan "\n"))))
 #+end_src
 
-*** Redefine ~helm-org-in-buffer-preselect~
+*** Redefine ~helm-org-in-buffer-preselect~ :ARCHIVE:
 This works better for my purposes.
 #+begin_src emacs-lisp
 (defun aj/helm-org-in-buffer-preselect ()
@@ -1737,7 +1785,7 @@ This works better for my purposes.
 (advice-add 'helm-org-in-buffer-preselect :override #'aj/helm-org-in-buffer-preselect)
 #+end_src
 
-*** helm-org-rifle
+*** helm-org-rifle :ARCHIVE:
 Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entries.
 #+begin_src emacs-lisp
 (use-package helm-org-rifle
@@ -1836,42 +1884,6 @@ Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entrie
 #+end_src
 
 
-*** Refile with helm
-Present a nicer-looking helm buffer for ~org-refile~
-This doesn’t use the functions defined above at all.
-#+begin_src emacs-lisp
-(setq org-refile-use-outline-path t
-      org-outline-path-complete-in-steps nil)
-
-(add-to-list 'helm-completing-read-handlers-alist
-             '(org-refile . helm-aj/org-refile-handler))
-(add-to-list 'helm-completing-read-handlers-alist
-             '(orgqda-refile-and-merge-tags . helm-aj/org-refile-handler))
-
-(defun helm-aj/org-refile-handler (prompt collection test
-                                          _require-match init hist
-                                          default _iim name buffer)
-
-  (let ((helm-truncate-lines nil))
-    (helm-comp-read prompt (mapcar #'car collection)
-                    :test test :initial-input init :default default
-                    :history hist :multiline nil :nomark t
-                    :fc-transformer #'aj/helm-org-hl-transformer
-                    :name name :buffer buffer)))
-
-(defun aj/helm-org-hl-transformer (tbl _s)
-  (cl-loop with n = (length org-level-faces)
-           for outline-path in tbl
-           collect
-           (cl-loop
-            with cleaned = (replace-regexp-in-string "\\(\*\\|\\\\/\\)" "" outline-path)
-            with i = -1
-            for p in (split-string cleaned "/")
-            do (cl-incf i)
-            collect (propertize p 'face (nth (mod i n) org-level-faces)) into l
-            finally return (cons (string-join l "/") outline-path))))
-#+end_src
-
 ** Columns view
 *** Cut field length in org-columns-view dblocks
 #+begin_src emacs-lisp
@@ -1935,7 +1947,7 @@ This doesn’t use the functions defined above at all.
 
 
 #+end_src
-** Redefine ~org-paste-special~ to choose from kill-ring (with helm)
+** Redefine ~org-paste-special~ to choose from kill-ring (with helm) :ARCHIVE:
 If we have inadvertantly killed something between the special kill and yank we intended, we are then given an opportunity to easily choose the right thing to yank.
 #+begin_src emacs-lisp
 (defalias 'org-paste-special 'aj/org-paste-special)
@@ -2173,13 +2185,23 @@ Don’t use it now
 #+end_src
 
 
-**** Return zotxt-references.
+**** Return zotxt-references. :ARCHIVE:
 #+begin_src emacs-lisp
 (defun aj/org-return-org-zotxt-ref ()
   "Fetch an org-zotxt link and return it as a string"
   (let ((zotxt--debug-sync t))
     (with-temp-buffer
       (org-zotxt-insert-reference-link nil)
+      (buffer-string))))
+#+end_src
+
+**** Return citations
+#+begin_src emacs-lisp
+(defun aj/org-return-citation ()
+  "Fetch an org-zotxt link and return it as a string"
+  (with-temp-buffer
+    (let ((major-mode 'org-mode))
+      (org-cite-insert)
       (buffer-string))))
 #+end_src
 
@@ -2581,6 +2603,123 @@ List of prefix strings or regex."
      (aj/org-annotate-add-right-margin))))
 #+end_src
 
+** Cite with new org-cite
+*** Inserting with bibtex-actions
+#+begin_src emacs-lisp
+(use-package bibtex-actions
+  :custom
+  (bibtex-completion-additional-search-fields '(doi url))
+  (bibtex-completion-pdf-field "file")
+  (bibtex-actions-at-point-function 'embark-act)
+  :config
+  (bibtex-actions-filenotify-setup nil))
+
+(use-package oc-bibtex-actions
+  :after (embark org oc bibtex-actions)
+  :straight nil
+  :demand t
+  :bind ( :map org-mode-map
+          ("C-c C-å" . org-cite-insert))
+  :config
+  (define-key oc-bibtex-actions-map (kbd "z") '("Open in zotero" . org-cite-zotxt-follow))
+  (setq org-cite-insert-processor 'oc-bibtex-actions
+        org-cite-follow-processor 'oc-bibtex-actions
+        org-cite-activate-processor 'basic))
+
+;; (require 'zotxt)
+
+(defun org-cite-zotxt-follow (key)
+  "Follow citation KEY to Zotero."
+  (request
+   (format "%s/select" zotxt-url-base)
+   :params `(("betterbibtexkey" . ,key))))
+
+#+end_src
+
+*** Nice display (activation) with csl styles :ARCHIVE:
+But putting the display property seems not to work, is that because of the org-fold branch?
+#+begin_src emacs-lisp
+(use-package citeproc)
+
+(use-package oc-csl-activate
+  :straight (:host github :repo "andras-simonyi/org-cite-csl-activate")
+  :config
+  (setq org-cite-activate-processor 'csl-activate))
+#+end_src
+
+*** Activate using oc-basic
+#+begin_src emacs-lisp
+(require 'oc-basic)
+(setq org-cite-activate-processor 'basic)
+#+end_src
+
+*** Follow, with three choices. :ARCHIVE:
+I just override ~org-cite-follow~, because these choices are what I always want.
+#+begin_src emacs-lisp
+
+;; (advice-add 'org-cite-follow :override #'aj/org-cite-follow)
+
+;; (defun aj/org-cite-follow (datum arg)
+;;   (funcall
+;;    (cl-case
+;;        (read-char-choice
+;;         "p. Open pdf\nb. Open in BibTeX\nz. Open in Zotero"
+;;         '(?p ?b ?z))
+;;      (?p #'aj/org-cite-open-file-via-bibtex)
+;;      (?b #'org-cite-basic-goto)
+;;      (?z #'org-cite-zotxt-follow))
+;;    datum arg))
+
+;; (embark-define-keymap embark-org-cite-map
+;;   "Keymap for org-cite commands."
+;;   ("p" #'aj/org-cite-open-file-via-bibtex)
+;;   ("x" #'aj/org-cite-open-file-externally-via-bibtex)
+;;   ("b" #'org-cite-basic-goto)
+;;   ("z" #'org-cite-zotxt-follow))
+
+;; (add-to-list 'embark-keymap-alist
+;;              '(org-cite . embark-org-cite-map))
+
+;; (defun aj/org-cite-follow (datum arg)
+;;   (let ((action
+;;          (or (embark--prompt (funcall embark-indicator)
+;;                              (embark--action-keymap 'org-cite nil)
+;;                              (aj/org-cite-get-citekeys datum)
+;;                              ;; (string-join  ", ")
+;;                              )
+;;              (user-error "Canceled"))))
+;;     (funcall action datum arg)))
+
+;; (defun aj/org-cite-get-citekeys (datum)
+;;   "Return list of citekeys."
+;;   (let ((keys (if (eq 'citation-reference (org-element-type datum))
+;;                   (org-element-property :key datum)
+;;                 (org-cite-get-references datum t))))
+;;     (if (stringp keys)
+;;         (list keys)
+;;       keys)))
+
+;; (defun aj/org-cite-open-file-via-bibtex (datum _arg)
+;;   (bibtex-completion-open-pdf
+;;    (aj/org-cite-get-citekeys datum)))
+
+;; (defun aj/org-cite-open-file-externally-via-bibtex (datum _arg)
+;;   (let ((bibtex-completion-pdf-open-function #'consult-file-externally))
+;;     (bibtex-completion-open-pdf
+;;      (aj/org-cite-get-citekeys datum))))
+
+
+#+end_src
+
+
+*** Exporting
+See also [[file:~/.emacs.d/init.org::*ox-md-pandoc-zotero]] for the zotero-conversion export
+
+**** Oc-pandoc, export to markdown with pandoc citations.
+#+begin_src emacs-lisp
+(use-package oc-pandoc
+  :straight (:host gitlab :repo "andersjohanssson/org-cite-pandoc"))
+#+end_src
 
 ** Zotxt
 For using Zotero reference management in plain text.
