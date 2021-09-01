@@ -4358,7 +4358,7 @@ Works ok with selectrum.
   :after flyspell
   :bind (:map flyspell-mode-map
               ("C-," . flyspell-auto-correct-previous-word)
-              ("C-." . flyspell-correct-wrapper)))
+              ("C-;" . flyspell-correct-wrapper)))
 #+end_src
 
 **** Extra words and areas to avoid spellchecking in various modes.
