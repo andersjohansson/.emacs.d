@@ -3176,7 +3176,7 @@ An option for "cleaning up" exported html from some org markup. Good for generat
     (set-process-filter
      proc
      (lambda (process output)
-       (when (string-match-p "Waiting..." output)
+       (when (string-match-p "Running server" output)
          (aj/org-reveal-try-server-browse-url aj/org-reveal-current-url t)
          (set-process-filter process nil))))
     (accept-process-output proc 5)))
