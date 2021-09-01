@@ -751,10 +751,7 @@ https://www.freedesktop.org/wiki/Specifications/desktop-bookmark-spec/"
        :items ,#'aj/consult-dir-xdg-directories)
     "Xdg directory source for `consult-dir--pick'.")
 
-
   )
-
-
 #+end_src
 
 ***** Embark for doing actions on selections, both in minibuffer (completions) and normal buffers
@@ -2024,17 +2021,40 @@ But some of the options for listing-switches doesn’t work with remote sessions
     (bind-key "C-c C-s" 'dired-toggle-sudo dired-mode-map)))
 #+end_src
 
-**** Dired-recent :ARCHIVE:
-Store visited directories in a list, make it accessible from helm
+**** Dired-recent
+Store visited directories in a list
 #+begin_src emacs-lisp
 (use-package dired-recent
   :custom
   (dired-recent-max-directories 300)
+  :bind (:map dired-recent-mode-map
+              ("C-x C-d" . nil))
   :config
-  (setq dired-recent-mode-map (make-sparse-keymap))
+
+  ;; (setq dired-recent-mode-map (make-sparse-keymap))
   (dired-recent-mode 1)
   ;; cleanup once a day or something (emacs is often running at 16:10)
-  (run-at-time "16:10" nil #'dired-recent-cleanup))
+  (run-at-time "16:10" nil #'dired-recent-cleanup)
+
+  ;;add source to consult-dir
+
+  (with-eval-after-load 'consult-dir
+    (defun aj/consult-dir-dired-recent ()
+      (consult-dir--filter-hashed dired-recent-directories))
+
+    (defvar aj/consult-dir--source-dired-recent
+      `( :name "Dired recent"
+         :narrow ?r
+         :category file
+         :face consult-file
+         :history file-name-history
+         :items ,#'aj/consult-dir-dired-recent)
+      "Dired recent source for `consult-dir--pick'.")
+
+    (add-to-list 'consult-dir-sources 'aj/consult-dir--source-dired-recent 'append)
+    )
+
+  )
 #+end_src
 
 *** Ignore more files for normal completion
