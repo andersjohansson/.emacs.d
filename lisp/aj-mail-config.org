@@ -1337,7 +1337,8 @@ attachment - should launch the no-attachment warning.")
             (and (setq search-result
                        (re-search-forward
                         aj/message-attachment-intent-re nil t))
-                 (org-match-line mu4e-cited-regexp)))
+                 ;; old mu4e-cited-regexp
+                 (org-match-line "^\\(\\([[:alpha:]]+\\)\\|\\( *\\)\\)\\(\\(>+ ?\\)+\\)")))
         search-result))))
 
 (defun aj/message-has-attachment-p ()
