@@ -479,7 +479,9 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 
 
 (use-package selectrum-prescient
-  ;; :custom
+  :custom
+  (prescient-sort-length-enable nil) ; many of my sources return
+                                        ; things already sorted
   ;; (prescient-filter-method 'fuzzy)
   :init
   (selectrum-prescient-mode +1)
@@ -781,6 +783,235 @@ https://www.freedesktop.org/wiki/Specifications/desktop-bookmark-spec/"
   :init (all-the-icons-completion-mode))
 #+end_src
 
+**** Open zotero library files
+#+begin_src emacs-lisp
+(defcustom aj/zotero-library nil
+  "Directory of Zotero library files"
+  :group 'aj
+  :type 'directory)
+
+(defvar aj/zoterofile-history nil)
+
+(defun aj/open-zoterofile-new-frame ()
+  (aj/run-cmd-in-small-frame 100 20 #'aj/open-zoterofile "Zotero file" t))
+
+(defun aj/open-zoterofile ()
+  (interactive)
+  (let* ((common (list :category 'file
+                       :history 'aj/zoterofile-history
+                       :action (if aj/running-cmd-in-small-frame
+                                   #'consult-file-externally
+                                 #'find-file))))
+    (consult--multi
+     (list (append (list :name "Zotero recently modified"
+                         :items #'aj/zotero-recently-modified
+                         :narrow ?m)
+                   common)
+           (append (list :name "Zotero recentf"
+                         :items #'aj/zotero-recentf
+                         :narrow ?r)
+                   common)
+           (append (list :name "Zotero files"
+                         :items #'aj/zotero-files
+                         :narrow ?f)
+                   common))
+     :prompt "Zoterofil: ")))
+
+(defun aj/zotero-recently-modified ()
+  (when (file-accessible-directory-p aj/zotero-library)
+    (with-temp-buffer
+      (call-process "ls" nil t nil "-t" "-1" aj/zotero-library)
+      (goto-char (point-min))
+      (cl-loop with i = 0
+               while
+               (and (< i 20) (search-forward-regexp "^.+\\.\\(pdf\\|epub\\|vue\\)$"))
+               collect (expand-file-name (match-string 0) aj/zotero-library)
+               and do (cl-incf i)))))
+
+(defun aj/zotero-recentf ()
+  (seq-filter
+   (lambda (f) (string-match-p
+           (concat "^" aj/zotero-library ".+\\.\\(pdf\\|epub\\|vue\\)$")
+           f))
+   recentf-list))
+
+(defun aj/zotero-files ()
+  (when (file-accessible-directory-p aj/zotero-library)
+    (directory-files aj/zotero-library t "\\.\\(pdf\\|djvu\\|vue\\)$")))
+#+end_src
+
+***** Favourite files (to mark files which should be prioritized in helm matches) :ARCHIVE:
+#+begin_src emacs-lisp
+(defvar aj/favourite-files nil)
+(with-eval-after-load 'savehist-mode
+  (add-to-list 'savehist-additional-variables 'aj/favourite-files))
+
+(defun aj/add-favourite-file ()
+  (interactive)
+  (if-let ((name (or
+                  (buffer-file-name)
+                  (and (eq major-mode 'dired-mode) default-directory))))
+      (cl-pushnew name aj/favourite-files :test #'string=)
+    (user-error "Not in a file- or dired-buffer")))
+
+(with-eval-after-load 'helm-for-files
+  (defun aj/remove-favourite-file (_candidate)
+    ;; to be run from helm
+    (cl-loop for file in (helm-marked-candidates)
+             do (setq aj/favourite-files (delete file aj/favourite-files))))
+
+  (defclass aj/helm-favourite-files-source (helm-source-sync helm-type-file)
+    ((candidates :initform 'aj/favourite-files)
+     (pattern-transformer :initform 'helm-recentf-pattern-transformer)
+     (match-part :initform (lambda (candidate)
+                             (if (or helm-ff-transformer-show-only-basename
+                                     helm-recentf--basename-flag)
+                                 (helm-basename candidate) candidate)))
+     (persistent-action :initform 'helm-ff-kill-or-find-buffer-fname)
+     (fuzzy-match :initform t)))
+
+  (defmethod helm--setup-source :after ((source aj/helm-favourite-files-source))
+    (setf (slot-value source 'action)
+          (append (symbol-value (helm-actions-from-type-file))
+                  '(("Delete file(s) from aj/favourite-files" .
+                     aj/remove-favourite-file)))
+          (slot-value source 'filtered-candidate-transformer)
+          (append (slot-value source 'filtered-candidate-transformer)
+                  '(aj/helm-recentf-filtered-candidates-shorten))))
+
+  (defvar aj/helm-source-favourite-files
+    (helm-make-source "Favourite files" 'aj/helm-favourite-files-source))
+
+  (setq helm-mini-default-sources
+        (-insert-at 1 'aj/helm-source-favourite-files helm-mini-default-sources))
+
+  )
+#+end_src
+
+***** Favourite directories :ARCHIVE:
+http://endlessparentheses.com/visit-directory-inside-a-set-of-directories.html
+#+begin_src emacs-lisp
+(defcustom aj/favourite-directories nil
+  "List of favorite directories.
+Used in `aj/visit-favorite-dir'. The order here affects the order
+that completions will be offered. Each element is a list of
+directory, search depth, and whether to include files."
+  :type '(repeat (list (directory :tag "Directory")
+                       (integer :tag "Search depth")
+                       (boolean :tag "Include files")))
+  :group 'aj)
+
+(defvar aj/fav-dir-history nil)
+
+(defun aj/visit-favourite-dir (files-too)
+  "Offer all directories inside a set of directories.
+Compile a list of all directories inside each element of
+`aj/favorite-directories', and visit one of them with
+`ido-completing-read'.
+With prefix argument FILES-TOO also offer to find files."
+  (interactive "P")
+  (let ((completions
+         (apply #'append
+                (mapcar (lambda (x)
+                          (aj/get-dir-list (car x) (cadr x) (or files-too (nth 2 x))))
+                        aj/favourite-directories)))
+        (helm-candidate-number-limit nil))
+    (dired
+     (helm-comp-read "Open directory: " completions
+                     :input-history aj/fav-dir-history))))
+
+
+(defun aj/get-dir-list (dir level &optional files-too)
+  "Get list of directories (or files with FILES-TOO) to a certain level"
+  (if (and (file-directory-p dir) (> level 0))
+      ;; recurse into directories if we have levels left
+      (apply #'append
+             (list dir)
+             (mapcar
+              (lambda (sdir) (aj/get-dir-list sdir (1- level) files-too))
+              (mapcar
+               #'abbreviate-file-name
+               (cl-remove-if-not
+                (if files-too #'file-readable-p
+                  #'file-directory-p)
+                (directory-files
+                 (expand-file-name dir)
+                 t "^[^\.].*" t)))))
+    ;; just return dir or file
+    (list dir)))
+
+;;TODO, define as helm-source
+;; (defclass aj/helm-favorit-dir-class (helm-source-sync helm-type-timers)
+;;   ((candidates :initform timer-idle-list)
+;;    (allow-dups :initform t)
+;;    (volatile :initform t)
+;;    (filtered-candidate-transformer
+;;     :initform
+;;     (lambda (candidates _source)
+;;       (cl-loop for timer in candidates
+;;                collect (cons (helm-elisp--format-timer timer) timer))))))
+
+;; (defvar helm-source-idle-time-timers
+;;   (helm-make-source "Idle Time Timers" 'helm-idle-time-timers-class))
+#+end_src
+
+Note that C-x d is usually bound to dired. I find
+this redundant with C-x C-f, so I don't mind
+overriding it, but you should know before you do.
+#+begin_src emacs-lisp
+(define-key ctl-x-map "d" #'aj/visit-favorite-dir)
+
+#+end_src
+
+
+**** Launch in small frame
+#+begin_src emacs-lisp
+(defvar aj/running-cmd-in-small-frame nil)
+
+(defun aj/run-cmd-in-small-frame (width height cmd name &optional forcecleanup frame-params face-customizations)
+  (unwind-protect
+      (let ((ocframe
+             (make-frame
+              `(,@frame-params
+                (width . ,width) (height . ,height) (name . ,name)
+                (undecorated . t) (fullscreen . nil))))
+            (aj/running-cmd-in-small-frame t))
+        (select-frame-set-input-focus ocframe)
+        (aj/center-frame ocframe)
+        (cl-loop for (f . c) in face-customizations
+                 do (apply #'set-face-attribute f ocframe c))
+        (funcall cmd))
+    (when forcecleanup
+      (delete-frame))))
+
+#+end_src
+
+***** helm-launcher :ARCHIVE:
+#+begin_src emacs-lisp
+(use-package helm-launcher
+  :straight (:depth full :host gitlab :repo "andersjohansson/helm-launcher")
+  :commands helm-launcher
+  :custom (helm-launcher-sources
+           '(helm-launcher-desktop-applications-source
+             helm-launcher-file-history-source
+             helm-launcher-recentf-mime-source
+             aj/helm-source-favourite-files
+             ;; aj/helm-source-dired-recent
+             ))
+  ;; :after helm
+  :init
+  (defun aj/helm-launcher-frame ()
+    (interactive)
+    (aj/run-cmd-in-small-frame 100 20 #'helm-launcher "Helm launcher" t nil
+                               '(;; (helm-selection :background "transparent")
+                                 )))
+  :config
+  (dolist (s '(helm-launcher-file-history-source
+               helm-launcher-recentf-mime-source
+               aj/helm-source-favourite-files))
+    (helm-all-the-icons-add-transformer #'helm-all-the-icons-files-add-icons (symbol-value s))))
+#+end_src
+
 **** Helm
 ***** Loading helm
 (Really too much in config section here. Should probably move it to another file)
@@ -1080,266 +1311,6 @@ Use ~fd~ for searching instead of ~find~. Faster and easier.
   :init (helm-all-the-icons-enable))
 #+end_src
 
-***** Launch in small frame
-#+begin_src emacs-lisp
-(with-eval-after-load 'helm
-  (defvar aj/running-cmd-in-small-frame nil)
-
-  (defun aj/run-cmd-in-small-frame (width height cmd name &optional forcecleanup frame-params face-customizations)
-    (let ((ocframe
-           (make-frame
-            `(,@frame-params
-              (width . ,width) (height . ,height) (name . ,name)
-              (undecorated . t) (fullscreen . nil))))
-          (helm-full-frame t)
-          (aj/running-cmd-in-small-frame t))
-      (select-frame-set-input-focus ocframe)
-      (aj/center-frame ocframe)
-      (cl-loop for (f . c) in face-customizations
-               do (apply #'set-face-attribute f ocframe c))
-      (funcall cmd)
-      (when (or forcecleanup (eq 1 helm-exit-status))
-        (delete-frame))))
-  )
-#+end_src
-
-***** helm-launcher :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package helm-launcher
-  :straight (:depth full :host gitlab :repo "andersjohansson/helm-launcher")
-  :commands helm-launcher
-  :custom (helm-launcher-sources
-           '(helm-launcher-desktop-applications-source
-             helm-launcher-file-history-source
-             helm-launcher-recentf-mime-source
-             aj/helm-source-favourite-files
-             ;; aj/helm-source-dired-recent
-             ))
-  ;; :after helm
-  :init
-  (defun aj/helm-launcher-frame ()
-    (interactive)
-    (aj/run-cmd-in-small-frame 100 20 #'helm-launcher "Helm launcher" t nil
-                               '(;; (helm-selection :background "transparent")
-                                 )))
-  :config
-  (dolist (s '(helm-launcher-file-history-source
-               helm-launcher-recentf-mime-source
-               aj/helm-source-favourite-files))
-    (helm-all-the-icons-add-transformer #'helm-all-the-icons-files-add-icons (symbol-value s))))
-#+end_src
-
-***** Open zotero library files
-#+begin_src emacs-lisp
-(with-eval-after-load 'helm-files
-  (defcustom aj/helm-zotero-library nil
-    "Directory of Zotero library files"
-    :group 'aj
-    :type 'directory)
-
-  (defvar aj/helm-zoterofile-history)
-
-  (defun aj/open-zoterofile-new-frame ()
-    (aj/run-cmd-in-small-frame 100 20 #'aj/helm-open-zoterofile "helm-zotero"))
-
-  (defun aj/helm-open-zoterofile ()
-    (interactive)
-    (let* ((oe '("Open externally" . aj/helm-open-file-externally-delete-frame))
-           (ff '("Find file" . aj/helm-find-many-files-widen-frame))
-           (active-actions (if aj/running-cmd-in-small-frame
-                               (list oe ff)
-                             (list ff oe))))
-      (helm :sources
-            (list
-             (helm-build-sync-source "Zotero recently modified"
-               :candidates #'aj/helm-zotero-recently-modified
-               :action active-actions
-               :pattern-transformer #'helm-recentf-pattern-transformer
-               :keymap helm-generic-files-map)
-             (helm-build-sync-source "Zotero recentf"
-               :candidates #'aj/recentf-list-zotero
-               :action active-actions
-               :fuzzy-match t
-               :filtered-candidate-transformer #'helm-highlight-files
-               :pattern-transformer #'helm-recentf-pattern-transformer
-               :match-part #'aj/helm-zotero-match-part
-               :keymap helm-generic-files-map)
-             (helm-build-sync-source "Zotero files"
-               :candidates #'aj/helm-zotero-files
-               :action active-actions
-               :fuzzy-match t
-               :candidate-transformer #'helm-skip-boring-files
-               :filtered-candidate-transformer #'helm-highlight-files
-               :pattern-transformer #'helm-recentf-pattern-transformer
-               :match-part #'aj/helm-zotero-match-part
-               :keymap helm-generic-files-map))
-
-            :buffer "*helm-zoterofile*"
-            :history 'aj/helm-zoterofile-history
-            :ff-transformer-show-only-basename t)))
-
-
-  (defun aj/helm-zotero-recently-modified ()
-    (when (file-accessible-directory-p aj/helm-zotero-library)
-      (with-temp-buffer
-        (call-process "ls" nil t nil "-t" "-1" aj/helm-zotero-library)
-        (cl-loop for f in (split-string
-                           (buffer-substring (point-min)
-                                             (progn (goto-char (point-min))
-                                                    (forward-line 20) (point)))
-                           "\n"
-                           t)
-                 collect (cons f (expand-file-name f aj/helm-zotero-library))))))
-
-  (defun aj/recentf-list-zotero ()
-    (--filter (string-match-p aj/helm-zotero-library it) recentf-list))
-
-  (defun aj/helm-zotero-files ()
-    (when (file-accessible-directory-p aj/helm-zotero-library)
-      (directory-files aj/helm-zotero-library t "\\.\\(pdf\\|djvu\\|vue\\)$")))
-
-  (defun aj/helm-zotero-match-part (candidate)
-    (if (or helm-ff-transformer-show-only-basename
-            helm-recentf--basename-flag)
-        (helm-basename candidate) candidate))
-
-  (defun aj/helm-find-many-files-widen-frame (_ignore)
-    (helm-find-many-files t)
-    (when aj/running-cmd-in-small-frame
-      (aj/frame-to-left)
-      (set-frame-name (buffer-file-name))))
-
-  (defun aj/helm-open-file-externally-delete-frame (file)
-    (helm-open-file-externally file)
-    (when aj/running-cmd-in-small-frame
-      (delete-frame)))
-  )
-#+end_src
-
-***** Favourite files (to mark files which should be prioritized in helm matches) :ARCHIVE:
-#+begin_src emacs-lisp
-(defvar aj/favourite-files nil)
-(with-eval-after-load 'savehist-mode
-  (add-to-list 'savehist-additional-variables 'aj/favourite-files))
-
-(defun aj/add-favourite-file ()
-  (interactive)
-  (if-let ((name (or
-                  (buffer-file-name)
-                  (and (eq major-mode 'dired-mode) default-directory))))
-      (cl-pushnew name aj/favourite-files :test #'string=)
-    (user-error "Not in a file- or dired-buffer")))
-
-(with-eval-after-load 'helm-for-files
-  (defun aj/remove-favourite-file (_candidate)
-    ;; to be run from helm
-    (cl-loop for file in (helm-marked-candidates)
-             do (setq aj/favourite-files (delete file aj/favourite-files))))
-
-  (defclass aj/helm-favourite-files-source (helm-source-sync helm-type-file)
-    ((candidates :initform 'aj/favourite-files)
-     (pattern-transformer :initform 'helm-recentf-pattern-transformer)
-     (match-part :initform (lambda (candidate)
-                             (if (or helm-ff-transformer-show-only-basename
-                                     helm-recentf--basename-flag)
-                                 (helm-basename candidate) candidate)))
-     (persistent-action :initform 'helm-ff-kill-or-find-buffer-fname)
-     (fuzzy-match :initform t)))
-
-  (defmethod helm--setup-source :after ((source aj/helm-favourite-files-source))
-    (setf (slot-value source 'action)
-          (append (symbol-value (helm-actions-from-type-file))
-                  '(("Delete file(s) from aj/favourite-files" .
-                     aj/remove-favourite-file)))
-          (slot-value source 'filtered-candidate-transformer)
-          (append (slot-value source 'filtered-candidate-transformer)
-                  '(aj/helm-recentf-filtered-candidates-shorten))))
-
-  (defvar aj/helm-source-favourite-files
-    (helm-make-source "Favourite files" 'aj/helm-favourite-files-source))
-
-  (setq helm-mini-default-sources
-        (-insert-at 1 'aj/helm-source-favourite-files helm-mini-default-sources))
-
-  )
-#+end_src
-
-***** Favourite directories :ARCHIVE:
-http://endlessparentheses.com/visit-directory-inside-a-set-of-directories.html
-#+begin_src emacs-lisp
-(defcustom aj/favourite-directories nil
-  "List of favorite directories.
-Used in `aj/visit-favorite-dir'. The order here affects the order
-that completions will be offered. Each element is a list of
-directory, search depth, and whether to include files."
-  :type '(repeat (list (directory :tag "Directory")
-                       (integer :tag "Search depth")
-                       (boolean :tag "Include files")))
-  :group 'aj)
-
-(defvar aj/fav-dir-history nil)
-
-(defun aj/visit-favourite-dir (files-too)
-  "Offer all directories inside a set of directories.
-Compile a list of all directories inside each element of
-`aj/favorite-directories', and visit one of them with
-`ido-completing-read'.
-With prefix argument FILES-TOO also offer to find files."
-  (interactive "P")
-  (let ((completions
-         (apply #'append
-                (mapcar (lambda (x)
-                          (aj/get-dir-list (car x) (cadr x) (or files-too (nth 2 x))))
-                        aj/favourite-directories)))
-        (helm-candidate-number-limit nil))
-    (dired
-     (helm-comp-read "Open directory: " completions
-                     :input-history aj/fav-dir-history))))
-
-
-(defun aj/get-dir-list (dir level &optional files-too)
-  "Get list of directories (or files with FILES-TOO) to a certain level"
-  (if (and (file-directory-p dir) (> level 0))
-      ;; recurse into directories if we have levels left
-      (apply #'append
-             (list dir)
-             (mapcar
-              (lambda (sdir) (aj/get-dir-list sdir (1- level) files-too))
-              (mapcar
-               #'abbreviate-file-name
-               (cl-remove-if-not
-                (if files-too #'file-readable-p
-                  #'file-directory-p)
-                (directory-files
-                 (expand-file-name dir)
-                 t "^[^\.].*" t)))))
-    ;; just return dir or file
-    (list dir)))
-
-;;TODO, define as helm-source
-;; (defclass aj/helm-favorit-dir-class (helm-source-sync helm-type-timers)
-;;   ((candidates :initform timer-idle-list)
-;;    (allow-dups :initform t)
-;;    (volatile :initform t)
-;;    (filtered-candidate-transformer
-;;     :initform
-;;     (lambda (candidates _source)
-;;       (cl-loop for timer in candidates
-;;                collect (cons (helm-elisp--format-timer timer) timer))))))
-
-;; (defvar helm-source-idle-time-timers
-;;   (helm-make-source "Idle Time Timers" 'helm-idle-time-timers-class))
-#+end_src
-
-Note that C-x d is usually bound to dired. I find
-this redundant with C-x C-f, so I don't mind
-overriding it, but you should know before you do.
-#+begin_src emacs-lisp
-(define-key ctl-x-map "d" #'aj/visit-favorite-dir)
-
-#+end_src
-
-
 *** Org init
 **** Load with org
 ***** orgqda
@@ -1412,6 +1383,7 @@ ARG is passed through."
       (if (org-at-heading-p)
           (org-set-tags-command arg)
         (orgqda-insert-inlinetask-coding arg))))
+  (add-to-list 'marginalia-command-categories '(aj/orgqda-tag-or-code . org-tags))
 
   ;; Word-wrap long tag strings correctly.
   (add-hook 'orgqda-mode-hook #'aj/word-wrap-colons)
@@ -1420,15 +1392,15 @@ ARG is passed through."
     (modify-category-entry ?: ?|)))
 
 (use-package orgqda-transient
-  :straight (:depth full :host gitlab :repo "andersjohansson/orgqda"
-                    :files ( "orgqda-transient.el"))
+  :straight ( :depth full :host gitlab :repo "andersjohansson/orgqda"
+              :files ( "orgqda-transient.el"))
   :after orgqda
-  :bind (:map orgqda-mode-map
-              ("C-c C-ö" . #'orgqda-transient)
-              :map orgqda-codebook-mode-map
-              ("C-c C-ö" . #'orgqda-transient-list)
-              :map orgqda-list-mode-map
-              ("C-c C-ö" . #'orgqda-transient-list)))
+  :bind ( :map orgqda-mode-map
+          ("C-c C-ö" . #'orgqda-transient)
+          :map orgqda-codebook-mode-map
+          ("C-c C-ö" . #'orgqda-transient-list)
+          :map orgqda-list-mode-map
+          ("C-c C-ö" . #'orgqda-transient-list)))
 
 
 #+end_src
@@ -1466,7 +1438,7 @@ For exporting and converting to zotero.
   (setq org-directory "~/org"
         org-ellipsis " ⤵"
         org-export-backends '(odt ascii html icalendar latex md md-pandoc-zotero)
-        org-modules '(org-protocol org-habit org-inlinetask org-mu4e org-id org-pdfview)
+        org-modules '(org-protocol org-habit org-inlinetask org-id org-pdfview)
         org-list-allow-alphabetical t
         org-id-method 'ts
         org-id-ts-format "%Y-%m-%d.%H:%M:%S.%3N"
@@ -1544,6 +1516,10 @@ For exporting and converting to zotero.
   (setq org-agenda-text-search-extra-files
         (let ((org-agenda-files (expand-file-name "kodningsfiler" org-directory)))
           (org-read-agenda-file-list)))
+
+  ;; for some reason, the new default binding "C-c C-TAB" (since 565361eb) doesn’t work on
+  ;; my emacs (pgtk). haven’t tested different builds.
+  (define-key org-mode-map (kbd "C-c C-<tab>") #'org-cycle-force-archived)
   )
 #+end_src
 **** org init async                             :org_async:no_default_tangle:
@@ -2583,9 +2559,8 @@ Swich to  ~other-buffer~ with ~C-§~.
 (unbind-key "C-x o") ; to get out of that habit
 
 (bind-keys
- ("<C-tab>" . other-window)
- ("<C-iso-lefttab>" . aj/back-window) ;; really C-S-tab ...
- )
+ ("C-<tab>" . other-window)
+ ("C-<iso-lefttab>" . aj/back-window))
 
 (use-package buffer-flip
   :bind  (("C-§" . buffer-flip)
@@ -3620,9 +3595,6 @@ This is the new thing, and it is good, because it knows a lot about the code and
   :custom
   (ediff-window-setup-function #'ediff-setup-windows-plain)
   (ediff-split-window-function #'split-window-sensibly)
-  ;;ediff expects diff to return results in C-locale, I’ve made a
-  ;;wrapper script to solve this (script is: LANG=C diff "$1" "$2")
-  (ediff-diff-program "aj-diff-no-locale")
   :config
   ;; unfold when moving to position with ediff.
   (advice-add 'ediff-position-region :before #'aj/org-ediff-unfold)
@@ -3966,7 +3938,7 @@ That’s a stupid convention from the days of the typewriter (and in Swedish we 
 *** Fill-paragraph fixes + ~aj/one-sentence-per-line-mode~
 I generally don’t want hard line breaks in my text-mode paragraphs, so a very wide fill-column allows me to use ~M-q~ to remove all line breaks in a paragraph.
 
-However, sometimes I put every sentence on it’s own line (good for version control) and then it would be good if ~fill-paragraph~ made sure that this was the case instead.
+However, sometimes I put every sentence on its own line (good for version control) and then it would be good if ~fill-paragraph~ made sure that this was the case instead.
 
 The minor mode defined below takes care of this. I advice ~fill-region-as-paragraph~ which is called by ~org-fill-paragraph~ (which is the most common way for me of invoking it), but perhaps there can be some invocations that are not matched by this. It would probably be cleaner to remap some keys, but this covers many cases in one go.
 
@@ -3994,9 +3966,9 @@ The minor mode defined below takes care of this. I advice ~fill-region-as-paragr
       ;; start by removing all but the last line breaks
       (while (search-forward "\n" (1- to) t)
         (replace-match " " t t))
-      (goto-char from)
+      (goto-char to)
       ;; has to changed? too much?
-      (while (search-forward-regexp se (- to 2) t)
+      (while (search-backward-regexp se from t)
         (replace-match "\n" t nil nil 2)))))
 
 (defun aj/set-org-sentence-end ()
@@ -4061,6 +4033,7 @@ Should be bound to ', in relevant modes."
     (insert "'")))
 
 (bind-key "'" #'aj/single-quote-to-curly 'text-mode-map)
+(bind-key "'" #'aj/single-quote-to-curly 'org-mode-map)
 #+end_src
 
 *** Abbrev-mode
@@ -4743,29 +4716,19 @@ https://gist.github.com/politza/a3339a4f3b3901fcce4c
   :defer t)
 #+end_src
 
-**** pdf-zotxt-quote
-Copying from a pdf with correct org-zotxt references and page numbers
-https://gitlab.com/andersjohansson/pdf-zotxt-quote
+**** pdf-oc-quote
+Copying from a pdf with correct org references and page numbers
+https://gitlab.com/andersjohansson/pdf-oc-quote
 #+begin_src emacs-lisp
 (use-package pdf-oc-quote
   :straight (:depth full :host gitlab :repo "andersjohansson/pdf-oc-quote")
-  ;; :load-path ("~/kodat/elisp/pdf-oc-quote/" "~/kodat/elisp/oc-emacs/")
-  :commands (pdf-oc-quote-mode pdf-oc-quote-cleanup-mode pdf-oc-quote-activate)
   :custom
   (pdf-oc-quote-fill-column 999999)
-  (pdf-oc-quote-ligatures
-   '(("ﬁ" . "fi")
-     ("ﬃ" . "ffi")
-     ("ﬀ" . "ff")
-     ("ﬂ" . "fl")
-     ("ﬄ" . "ﬄ")
-     ("‘‘" . "“")
-     ("’’" . "”")))
-  (pdf-oc-quote-cite-functions
-   (list
-    #'pdf-oc-quote-cite-from-bibtex
-    (pdf-oc-quote-make-cite-function
-     #'aj/helm-bibtex-cite))))
+  :config
+  (setq pdf-oc-quote-cite-functions
+        (list
+         #'pdf-oc-quote-cite-from-bibtex-or-json
+         (pdf-oc-quote-make-cite-function (org-cite-insert nil)))))
 #+end_src
 
 **** pdf-view-restore
@@ -5641,7 +5604,7 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
       ;; because the native wayland pgtk frame can’t otherwise get rid of title bar.
       (progn
         (add-to-list 'default-frame-alist '(undecorated . t))
-        (add-to-list 'default-frame-alist '(internal-border-width . 1)))
+        (add-to-list 'default-frame-alist '(internal-border-width . 2)))
 
     ;; doesn’t work with pgtk
     (add-to-list 'default-frame-alist '(top . 0))
@@ -5776,7 +5739,7 @@ A function for reverting all opened files, even remote files (because auto-rever
 #+begin_src emacs-lisp
 (use-package recentf
   :demand t
-  :init (require 'aj-forskning)
+  :init (require 'aj-forskning) ;; some important exclusions there
   :custom
   (recentf-max-menu-items 500)
   (recentf-max-saved-items 500)

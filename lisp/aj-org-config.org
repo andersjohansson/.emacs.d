@@ -466,10 +466,9 @@ Org emphasize: _b_old  _i_talic _u_nderline _c_ode _v_erbatim _s_trikethrough  _
                (concat m (propertize (concat " (" e ")") 'face 'shadow))
                m))
      :multiline t))))
-
-
 #+end_src
-*** Template inserting (hydra)
+
+*** CHECK Template inserting (hydra)
 If before headline, insert options template with completion.
 
 Otherwise hydra for template insertion.
@@ -1102,11 +1101,12 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
           ("d" . ,(* 60 8)) ; 8 hour work day
           ("w" . ,(* 60 8 5)) ; 5 days a week
           ("m" . ,(* 60 8 21)) ; 21 working days per month
+          ;; 10.5 such working months (because I have 31 days of
+          ;; vacation. 🙌 Swedish working agreements)
           ("y" . ,(round (* 60 8 21 10.5))))
-        ;; 10.5 such working months (because I have 31 days of
-        ;; vacation. 🙌 Swedish working agreements)
+
         org-duration-format
-        '(("m") ("w") ("d") ("h") (special . h:mm)))
+        '(("m") ("w") ("d") (special . h:mm)))
 
   (org-duration-set-regexps))
 
@@ -1258,9 +1258,12 @@ STATE should be one of the symbols listed in the docstring of
        (org-cycle-set-visibility-according-to-property)))))
 #+end_src
 
-*** Read-only-trees
+*** Read-only-trees :ARCHIVE:
 Trees can be defined as read only with tag ~read_only~
 From: http://kitchingroup.cheme.cmu.edu/blog/2014/09/13/Make-some-org-sections-read-only/
+
+But I don’t actually use this much at all. Disable it for now
+
 #+begin_src emacs-lisp
 (defface aj/org-readonly-face '((t . (:inherit fringe)))
   "Face for read-only-sections"
@@ -1294,6 +1297,8 @@ From: http://kitchingroup.cheme.cmu.edu/blog/2014/09/13/Make-some-org-sections-r
 ;; make tags editable
 (advice-add 'org-set-tags-command :before #'aj/org-remove-readonly)
 (advice-add 'org-set-tags-command :after #'aj/org-mark-readonly)
+
+
 #+end_src
 
 *** Version of ~org-tree-to-indirect-buffer~ that works as I want it to
@@ -2611,6 +2616,8 @@ List of prefix strings or regex."
   (bibtex-completion-additional-search-fields '(doi url))
   (bibtex-completion-pdf-field "file")
   (bibtex-actions-at-point-function 'embark-act)
+  (bibtex-actions-open-library-file-external nil)
+  (bibtex-actions-file-open-function #'find-file-other-window)
   :config
   (bibtex-actions-filenotify-setup nil))
 
@@ -2621,18 +2628,22 @@ List of prefix strings or regex."
   :bind ( :map org-mode-map
           ("C-c C-å" . org-cite-insert))
   :config
-  (define-key oc-bibtex-actions-map (kbd "z") '("Open in zotero" . org-cite-zotxt-follow))
   (setq org-cite-insert-processor 'oc-bibtex-actions
-        org-cite-follow-processor 'oc-bibtex-actions
-        org-cite-activate-processor 'basic))
+        org-cite-follow-processor 'oc-bibtex-actions)
 
-;; (require 'zotxt)
+  (define-key oc-bibtex-actions-map (kbd "z") '("open in zotero" . aj/org-cite-zotxt-follow))
+  (define-key oc-bibtex-actions-map (kbd "F") '("open externally" . aj/bibtex-actions-open-files-externally))
 
-(defun org-cite-zotxt-follow (key)
+  (defun aj/bibtex-actions-open-files-externally (keys)
+    "Open citation KEYS in external program."
+    (let ((bibtex-actions-open-library-file-external t))
+      (bibtex-actions-open-library-files keys))))
+
+(defun aj/org-cite-zotxt-follow (key)
   "Follow citation KEY to Zotero."
   (request
-   (format "%s/select" zotxt-url-base)
-   :params `(("betterbibtexkey" . ,key))))
+    (format "%s/select" zotxt-url-base)
+    :params `(("betterbibtexkey" . ,key))))
 
 #+end_src
 
@@ -2828,7 +2839,7 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
   :straight nil ;; already installed with zotxt-emacs above
   :hook (org-mode . org-zotxt-mode)
   :demand t
-  :init (setq org-zotxt-link-description-style :betterbibtexkey)
+  :init (setq org-zotxt-link-description-style :citekey)
   :commands org-zotxt-extract-link-id-at-point org-zotxt-choose-path
   :config
   ;;prompt to add page references in quotes
@@ -2937,6 +2948,14 @@ Some hackish functions
   :load-path "~/kodat/elisp/biblatex-to-zotxt/"
   :commands biblatex-to-zotxt)
 #+end_src
+
+** Zotxt to org cite
+Compatibility library for converting old zotxt citations to new org-cite ones.
+#+begin_src emacs-lisp
+(use-package zotxt-to-org-cite
+  :straight (:host 'gitlab :repo "andersjohansson/zotxt-to-org-cite"))
+#+end_src
+
 ** Export :org_async:
 *** Some more or less general export settings
 #+begin_src emacs-lisp
@@ -2994,8 +3013,10 @@ Mostly for html and reveal
 *** Html-export cleanup
 An option for "cleaning up" exported html from some org markup. Good for generating clean html for pasting into systems.
 #+begin_src emacs-lisp
-(defcustom aj/org-export-html-cleanup nil
-  "If non-nil, cleanup html from org classes etc."
+(defcustom org-aj-export-html-cleanup nil
+  "If non-nil, cleanup html from org classes etc.
+
+Named with org prefix to be preserved in org exports."
   :group 'aj
   :type 'boolean
   :safe #'booleanp)
@@ -3005,7 +3026,7 @@ An option for "cleaning up" exported html from some org markup. Good for generat
 
 (defun aj/org-export-html-cleanup (string backend _info)
   (if (and (eq backend 'html)
-           aj/org-export-html-cleanup)
+           org-aj-export-html-cleanup)
       (with-temp-buffer
         (insert string)
         (goto-char (point-min))
@@ -3019,16 +3040,16 @@ An option for "cleaning up" exported html from some org markup. Good for generat
         (buffer-string))
     string))
 #+end_src
+
 *** ox-ascii, don’t fill paragraphs
 #+begin_src emacs-lisp
 (setq org-ascii-inner-margin 0
       org-ascii-text-width 3000
       org-ascii-charset 'utf-8)
 
-;; Fix title? (doesn’t work)
-;; (advice-add 'org-ascii-template--document-title :filter-args #'aj/ox-ascii-fix-title)
-;; (defun aj/ox-ascii-fix-title (info)
-;;   (plist-put (copy-tree info) :ascii-text-width 80)))
+(advice-add 'org-ascii-template--document-title :filter-args #'aj/ox-ascii-fix-title)
+(defun aj/ox-ascii-fix-title (info)
+  (list (plist-put (car info) :ascii-text-width 72)))
 #+end_src
 
 *** org-re-reveal, reveal.js
@@ -3328,26 +3349,77 @@ Fungerar inte på grund av relativiseringen av sökvägar i slutet av org-insert
 **** Enable citations in quote blocks
 Kind of messy, but does the job of making org-zotxt links in cite-attributes to correct citations.
 #+begin_src emacs-lisp
-(with-eval-after-load 'ox
-  (add-to-list 'org-export-filter-quote-block-functions #'aj/org-html-citations-in-code-blocks)
-  (defun aj/org-html-citations-in-code-blocks (qb backend info)
-    (if (and
-         (org-export-derived-backend-p backend 'html)
-         (string-match "cite=\"\\(\\[\\[zotero:[^\"]+\\]\\]\\)\"" qb))
-        (let ((ms (match-string 1 qb)))
-          (replace-match
-           (save-match-data
-             (string-trim
-              (replace-regexp-in-string
-               "</?\\(span\\|p\\)[^>]*?>"
-               ""
-               (org-export-data
-                (org-element-parse-secondary-string ms '(link)) info))))
-           t t qb 1))
-      qb)))
+;; (with-eval-after-load 'ox
+;;   (add-to-list 'org-export-filter-quote-block-functions #'aj/org-html-citations-in-code-blocks)
+;;   (defun aj/org-html-citations-in-code-blocks (qb backend info)
+;;     (if (and
+;;          (org-export-derived-backend-p backend 'html)
+;;          (string-match "cite=\"\\(\\[cite[^]]+\\]\\)\"" qb))
+;;         (let ((ms (match-string 1 qb)))
+;;           (replace-match
+;;            (save-match-data
+;;              (org-export-data
+;;               (org-element-parse-secondary-string ms '(cite)) info))
+;;            ;; (save-match-data
+;;            ;;   (string-trim
+;;            ;;    (replace-regexp-in-string
+;;            ;;     "</?\\(span\\|p\\)[^>]*?>"
+;;            ;;     ""
+;;            ;;     )))
+;;            t t qb 1))
+;;       qb)))
+
+
+;; Alternativ. Kanske modifiera org-cite-list-citations? Oklart om det
+;; kommer fungera.
+
+
+;; (defun aj/org-html-citations-in-quote-blocks (tree backend info)
+;;   (when (org-export-derived-backend-p backend 'html)
+;;     (org-element-map tree 'quote-block
+;;       (lambda (qb)
+;;         (when-let (;; (citearg (org-element-property :attr_html qb))
+;;                    (cite (org-export-read-attribute :attr_html qb :cite))
+;;                    (citation (org-element-parse-secondary-string cite '(citation))))
+;;           (plist-put info :citations (push citation (plist-get info :citations)))
+;;           (let ((formatted "den formaterade";; (org-cite-export-citation citation nil info)
+;;                            ))
+;;             (org-element-put-property qb :attr_html (concat ":cite " formatted)))))
+;;       info)))
+
+;; (add-to-list 'org-export-filter-parse-tree-functions #'aj/org-html-citations-in-quote-blocks)
+
+
+
 #+end_src
 
 
+**** Split bibliography across reveal.js slides
+We install an output filter for doing this.
+#+begin_src emacs-lisp
+(defun aj/org-reveal-split-bibliography (string backend _info)
+  (if (org-export-derived-backend-p backend 're-reveal 'reveal)
+      (with-temp-buffer
+        (insert string)
+        (goto-char (point-min))
+        ;; we assume just one bibliography
+        (when (search-forward "<div class=\"csl-bib-body\">" nil t)
+          (cl-loop with i = 0
+                   with positions = nil
+                   while (search-forward "<div class=\"csl-entry\">" nil t) do
+                   (cl-incf i)
+                   (when (eq 0 (mod i 6))
+                     (push (match-beginning 0) positions))
+                   finally do ;; this is from the bottom, so pos is correct
+                   (cl-loop for pos in positions do
+                            (goto-char pos)
+                            (insert "</div></section><section><h2>References cont.</h2><div class=\"csl-bib-body\">"))))
+        (buffer-string))
+    string))
+
+(add-to-list 'org-export-filter-final-output-functions #'aj/org-reveal-split-bibliography)
+
+#+end_src
 **** Possibly add end-slide if using a certain template
 For my university template, add a final slide with the logo.
 #+begin_src emacs-lisp
@@ -3594,7 +3666,7 @@ Use spaced paragraphs in lists")
 **** Quotes in latex export
 ***** Use csquotes for smart-quotes
 #+begin_src emacs-lisp
-(defcustom aj/org-export-smart-quotes-use-csquotes t
+(defcustom org-aj-export-smart-quotes-use-csquotes t
   "If non-nil, uses csquotes when exporting smart quotes to latex"
   :type 'boolean
   :group 'org-export
@@ -3630,7 +3702,7 @@ Use spaced paragraphs in lists")
 
 
   (defun aj/org-export-smart-quotes-install-hook (_backend)
-    (if aj/org-export-smart-quotes-use-csquotes
+    (if org-aj-export-smart-quotes-use-csquotes
         (setq org-export-smart-quotes-alist
               aj/org-export-smart-quotes-alist-csquotes)
       (setq org-export-smart-quotes-alist

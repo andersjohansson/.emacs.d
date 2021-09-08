@@ -150,19 +150,34 @@ for refile folder selection)"
          (files '())
          dir)
     (dolist (part parts)
-      (let ((fname (cdr (assoc 'filename (assoc "attachment" (cdr part))))))
-        (when fname
-          (push `(,fname . ,(cdr part)) handles)
-          (push fname files))))
+      (let ((fname (or (cdr (assoc 'filename (assoc "attachment" (cdr part))))
+                       (cl-loop for item in part
+                                for name = (and (listp item) (assoc-default 'name item))
+                                thereis (and (stringp name) name)))))
+	    (when fname
+	      (push `(,fname . ,(cdr part)) handles)
+	      (push fname files))))
     (if files
         (progn
           (setq files (completing-read-multiple "Save part(s): " files)
                 dir (if arg (read-directory-name "Save to directory: ") mu4e-attachment-dir))
           (cl-loop for (f . h) in handles
                    when (member f files)
-                   do (let ((sf (expand-file-name f dir)))
-                        (mm-save-part-to-file h sf)
-                        (when open (consult-file-externally sf)))))
+                   do (let* ((file (expand-file-name f dir))
+                             (file (if (file-exists-p file)
+			                           (let (newname (count 1))
+				                         (while (and
+					                             (setq newname
+					                                   (concat
+						                                (file-name-sans-extension file)
+						                                (format "(%s)" count)
+						                                (file-name-extension file t)))
+					                             (file-exists-p newname))
+				                           (cl-incf count))
+				                         newname)
+			                         file)))
+                        (mm-save-part-to-file h f)
+                        (when open (consult-file-externally f)))))
       (mu4e-message "No attached files found"))))
 
 (defun aj/mu4e-view-open-attachments (arg)
@@ -1823,6 +1838,7 @@ Like ‘mu4e-user-mailing-lists’."
 (bind-key "N" #'aj/mu-next-messages-for-query mu4e-headers-mode-map)
 #+end_src
 
+
 ** Dynamic folders for refile etc. + special functions for gmail-relabeling
 One could think that it would be reasonable to put this in the contexts, but no, these settings are mostly per message, and is therefore better dynamically matched on the current message.
 
@@ -1860,6 +1876,33 @@ The most complex part is for choosing refile folders, depending on account and s
                             :ajf "/ajf/Papperskorgen"))
       mu4e-refile-folder #'aj/mu4e-refile-folder)
 
+
+(defvar aj/mu4e-refile-sender-hash (make-hash-table :test 'equal))
+(add-to-list 'savehist-additional-variables 'aj/mu4e-refile-sender-hash)
+
+(defun aj/mu4e-refile-guess-by-sender (msg)
+  (cl-loop with current-max = 0
+           with current-mf = nil
+           for (folder . count) in
+           (gethash (cdar (mu4e-msg-field msg :from))
+                    aj/mu4e-refile-sender-hash)
+           if (< current-max count) do
+           (setq current-mf folder)
+           finally return (when current-mf (list current-mf))))
+
+(defun aj/mu4e-refile-store-history (msg folder)
+  "Stores history and returns FOLDER."
+  (cl-incf (alist-get
+            folder
+            (gethash (cdar (mu4e-msg-field msg :from))
+                     aj/mu4e-refile-sender-hash
+                     '())
+            0))
+  folder)
+
+(add-to-list 'aj/mu4e-refile-fns #'aj/mu4e-refile-guess-by-sender t)
+
+
 (defun aj/mu4e-refile-folder (msg &optional force-choice)
   "Guess or offer to select a refile folder for MSG.
 Chooses depending on account functions in ‘aj/mu4e-refile-fns’
@@ -1870,17 +1913,19 @@ No automatic guess if FORCE-CHOICE is non-nil."
                        (when-let ((res (funcall fn msg)))
                          (cond
                           ((stringp res) (cl-return res))
-                          ((listp res) (cl-return (prog1 (aj/mu4e-choose-refile (car ajrf) msg)
+                          ((listp res) (cl-return (prog1 (aj/mu4e-choose-refile (car res) msg)
                                                     (setq user-has-chosen t)))))))
               (aj/mu4e-msg-account msg
                 :chalmers "/chalmers/Arkiv"
                 ;; Only for show, they get changed labels via custom action
                 :mejla "/mejla/Alla mail"
                 :ajf "/ajf/Alla mail"))))
-    (if (and found
-             (or user-has-chosen (not force-choice)))
-        found
-      (aj/mu4e-choose-refile found msg))))
+    (aj/mu4e-refile-store-history
+     msg
+     (if (and found
+              (or user-has-chosen (not force-choice)))
+         found
+       (aj/mu4e-choose-refile found msg)))))
 
 ;; (defvar aj/mu4e-helm-refile-history nil)
 (defun aj/mu4e-choose-refile (startdir msg)
