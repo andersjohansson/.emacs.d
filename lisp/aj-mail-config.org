@@ -107,7 +107,7 @@ for refile folder selection)"
     (mu4e-headers-attach-mark     ("a" . "📎"))
     (mu4e-headers-encrypted-mark  ("x" . "🔐"))
     (mu4e-headers-signed-mark     ("s" . "🔏"))
-    (mu4e-headers-unread-mark    ("u" . "⚫ ") modus-themes-mark-symbol) ;; ★
+    (mu4e-headers-unread-mark    ("u" . "● ") modus-themes-mark-symbol) ;; ★
     ))
 
 
@@ -133,56 +133,6 @@ for refile folder selection)"
 
 (setq mu4e-headers-visible-flags
       '(seen unread replied passed attach encrypted signed draft flagged))
-#+end_src
-
-** Save-attachment, with open function suits me better
-#+begin_src emacs-lisp
-(define-key mu4e-view-mode-map [remap mu4e-view-save-attachments] #'aj/mu4e-view-save-attachments)
-(define-key mu4e-view-mode-map "o" #'aj/mu4e-view-open-attachments)
-
-(defun aj/mu4e-view-save-attachments (&optional arg open)
-  "Save mime parts from current mu4e gnus view buffer."
-  (interactive "P")
-  (cl-assert (and (eq major-mode 'mu4e-view-mode)
-                  (derived-mode-p 'gnus-article-mode)))
-  (let* ((parts (mu4e~view-gather-mime-parts))
-         (handles '())
-         (files '())
-         dir)
-    (dolist (part parts)
-      (let ((fname (or (cdr (assoc 'filename (assoc "attachment" (cdr part))))
-                       (cl-loop for item in part
-                                for name = (and (listp item) (assoc-default 'name item))
-                                thereis (and (stringp name) name)))))
-	    (when fname
-	      (push `(,fname . ,(cdr part)) handles)
-	      (push fname files))))
-    (if files
-        (progn
-          (setq files (completing-read-multiple "Save part(s): " files)
-                dir (if arg (read-directory-name "Save to directory: ") mu4e-attachment-dir))
-          (cl-loop for (f . h) in handles
-                   when (member f files)
-                   do (let* ((file (expand-file-name f dir))
-                             (file (if (file-exists-p file)
-			                           (let (newname (count 1))
-				                         (while (and
-					                             (setq newname
-					                                   (concat
-						                                (file-name-sans-extension file)
-						                                (format "(%s)" count)
-						                                (file-name-extension file t)))
-					                             (file-exists-p newname))
-				                           (cl-incf count))
-				                         newname)
-			                         file)))
-                        (mm-save-part-to-file h f)
-                        (when open (consult-file-externally f)))))
-      (mu4e-message "No attached files found"))))
-
-(defun aj/mu4e-view-open-attachments (arg)
-  (interactive "P")
-  (aj/mu4e-view-save-attachments arg t))
 #+end_src
 
 ** Add ons
@@ -275,14 +225,14 @@ Only display unread count in modeline
 #+end_src
 
 *** mu4e-query-helper
-Some completion for searching.
+Some completion for searching, more extensive than the recently included completion-at-point functions in mu4e-search.
 Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 
 #+begin_src emacs-lisp
 (use-package mu4e-query-helper
   :straight (:depth full :host gitlab :repo "andersjohansson/mu4e-query-helper")
   :after mu4e-headers
-  :bind (:map mu4e-headers-mode-map
+  :bind (:map mu4e-search-minor-mode-map
 		      ("s" . mu4e-query-helper-search)
 		      ("S" . mu4e-query-helper-search-edit)))
 #+end_src
@@ -349,7 +299,7 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 ;; eudc-attribute-display-method-alist
 #+end_src
 
-** View mode settings
+** View mode
 *** Standard settings
 #+begin_src emacs-lisp
 (add-hook 'mu4e-view-mode-hook #'variable-pitch-mode)
@@ -779,6 +729,56 @@ Examples:
 ;;           (gnus-treat-article 'head))))))
 #+end_src
 
+*** Save-attachment, with open function suits me better
+#+begin_src emacs-lisp
+(define-key mu4e-view-mode-map [remap mu4e-view-save-attachments] #'aj/mu4e-view-save-attachments)
+(define-key mu4e-view-mode-map "o" #'aj/mu4e-view-open-attachments)
+
+(defun aj/mu4e-view-save-attachments (&optional arg open)
+  "Save mime parts from current mu4e gnus view buffer."
+  (interactive "P")
+  (cl-assert (and (eq major-mode 'mu4e-view-mode)
+                  (derived-mode-p 'gnus-article-mode)))
+  (let* ((parts (mu4e~view-gather-mime-parts))
+         (handles '())
+         (files '())
+         dir)
+    (dolist (part parts)
+      (let ((fname (or (cdr (assoc 'filename (assoc "attachment" (cdr part))))
+                       (cl-loop for item in part
+                                for name = (and (listp item) (assoc-default 'name item))
+                                thereis (and (stringp name) name)))))
+	    (when fname
+	      (push `(,fname . ,(cdr part)) handles)
+	      (push fname files))))
+    (if files
+        (progn
+          (setq files (completing-read-multiple "Save part(s): " files)
+                dir (if arg (read-directory-name "Save to directory: ") mu4e-attachment-dir))
+          (cl-loop for (f . h) in handles
+                   when (member f files)
+                   do (let* ((file (expand-file-name f dir))
+                             (file (if (file-exists-p file)
+			                           (let (newname (count 1))
+				                         (while (and
+					                             (setq newname
+					                                   (concat
+						                                (file-name-sans-extension file)
+						                                (format "(%s)" count)
+						                                (file-name-extension file t)))
+					                             (file-exists-p newname))
+				                           (cl-incf count))
+				                         newname)
+			                         file)))
+                        (mm-save-part-to-file h file)
+                        (when open (consult-file-externally file)))))
+      (mu4e-message "No attached files found"))))
+
+(defun aj/mu4e-view-open-attachments (arg)
+  (interactive "P")
+  (aj/mu4e-view-save-attachments arg t))
+#+end_src
+
 ** Command for quick check of new mails
 #+begin_src emacs-lisp
 ;;(defvar aj/mu4e-get-mail-command-quick "mbsync --new -qq uu-inbox gmail-inbox ajf-inbox")
@@ -1168,32 +1168,36 @@ I often invoke a compose buffer in a window where I’m doing something else, an
 #+end_src
 
 *** Mail greetings
-Quickly insert a "Hi NN" with correct name
+Quickly insert a "Hi NN" with correct name, or if we are at the end of the mail, a "Best, NN".
 #+begin_src emacs-lisp
 (defvar reftex-cite-punctuation)
 (defun aj/mail-insert-greeting (&optional firstname)
   "Insert a language dependent (informal) greeting when composing a mail.
 Recipient names are fetched from the To field. Prefix-argument
-FIRSTNAME greet only first recipient."
+FIRSTNAME means greet only first recipient.
+If not at beginning of body, insert “Best, NN” greeting."
   (interactive "P")
   (require 'reftex-cite)
-  (when-let ((names
-              (save-excursion
-                (save-restriction
-                  (widen)
-                  (message-narrow-to-headers-or-head)
-                  (cl-loop for (name _email) in (mail-extract-address-components
-                                                 (message-fetch-field "To" t) t)
-                           collect (car (split-string name)))))))
-    (let* ((sv (eq 'sv (aj/buffer-language-or-guess)))
-           (reftex-cite-punctuation (if sv '(", " " och " "") '(", " " and " ""))))
-      (insert
-       (if sv "Hej" "Hi")
-       " "
-       (if firstname
-           (car names)
-         (reftex-format-names names 100))
-       ",\n"))))
+  (let ((sv (eq 'sv (aj/buffer-language-or-guess))))
+    (if (looking-back (concat mail-header-separator "[[:space:]]"))
+        (when-let ((names
+                    (save-excursion
+                      (save-restriction
+                        (widen)
+                        (message-narrow-to-headers-or-head)
+                        (cl-loop for (name _email) in (mail-extract-address-components
+                                                       (message-fetch-field "To" t) t)
+                                 collect (car (split-string name)))))))
+          (let ((reftex-cite-punctuation (if sv '(", " " och " "") '(", " " and " ""))))
+            (insert
+             (if sv "Hej" "Hi")
+             " "
+             (if firstname
+                 (car names)
+               (reftex-format-names names 100))
+             ",\n")))
+      (insert (if sv "Vänliga hälsningar,\n" "Best,\n")
+              user-full-name))))
 
 (defun aj/buffer-language-or-guess ()
   "Return symbol sv if we should write in Swedish, else assume english, en."
@@ -1887,45 +1891,81 @@ The most complex part is for choosing refile folders, depending on account and s
            (gethash (cdar (mu4e-msg-field msg :from))
                     aj/mu4e-refile-sender-hash)
            if (< current-max count) do
-           (setq current-mf folder)
-           finally return (when current-mf (list current-mf))))
+           (setq current-mf folder
+                 current-max count)
+           finally return (when current-mf
+                            (if ;; Treat it as a fact if very common, or
+                                ;; if matching match the default folder.
+                                (or (< 3 current-max)
+                                    (equal current-mf (aj/mu4e-default-refile-folder msg)))
+                                current-mf
+                              ;; else, as a suggestion
+                              (list current-mf)))))
 
-(defun aj/mu4e-refile-store-history (msg folder)
-  "Stores history and returns FOLDER."
+(defun aj/mu4e-refile-store-history (from folder)
+  "Store FOLDER in history for sender FROM."
   (cl-incf (alist-get
             folder
-            (gethash (cdar (mu4e-msg-field msg :from))
-                     aj/mu4e-refile-sender-hash
-                     '())
-            0))
+            (gethash from aj/mu4e-refile-sender-hash '())
+            0 nil #'equal)))
+
+(defun aj/mu4e-refile-store-history-msg (msg folder)
+  "Stores history for sender in MSG and returns FOLDER."
+  (when-let ((from (mu4e-msg-field msg :from)))
+    (aj/mu4e-refile-store-history (cdar from) folder))
   folder)
 
-(add-to-list 'aj/mu4e-refile-fns #'aj/mu4e-refile-guess-by-sender t)
+(defun aj/mu4e-refile-store-history-after-move (folder)
+  "Stores history for sender in msg at point and returns FOLDER."
+  (when-let (from (mu4e-field-at-point :from))
+    (aj/mu4e-refile-store-history (cdar from) folder))
+  folder)
 
+(advice-add 'mu4e~mark-get-move-target :filter-return #'aj/mu4e-refile-store-history-after-move)
+
+(add-to-list 'aj/mu4e-refile-fns #'aj/mu4e-refile-guess-by-sender t)
 
 (defun aj/mu4e-refile-folder (msg &optional force-choice)
   "Guess or offer to select a refile folder for MSG.
 Chooses depending on account functions in ‘aj/mu4e-refile-fns’
 No automatic guess if FORCE-CHOICE is non-nil."
-  (let* ((user-has-chosen nil)
-         (found
-          (or (cl-loop for fn in aj/mu4e-refile-fns do
-                       (when-let ((res (funcall fn msg)))
-                         (cond
-                          ((stringp res) (cl-return res))
-                          ((listp res) (cl-return (prog1 (aj/mu4e-choose-refile (car res) msg)
-                                                    (setq user-has-chosen t)))))))
-              (aj/mu4e-msg-account msg
-                :chalmers "/chalmers/Arkiv"
-                ;; Only for show, they get changed labels via custom action
-                :mejla "/mejla/Alla mail"
-                :ajf "/ajf/Alla mail"))))
-    (aj/mu4e-refile-store-history
-     msg
-     (if (and found
-              (or user-has-chosen (not force-choice)))
-         found
-       (aj/mu4e-choose-refile found msg)))))
+  (let ((dir (run-hook-with-args-until-success 'aj/mu4e-refile-fns msg)))
+    (cond
+     ((stringp dir)
+      (if force-choice
+          (aj/mu4e-refile-store-history-msg msg (aj/mu4e-choose-refile dir msg))
+        dir))
+     ((consp dir)
+      (aj/mu4e-refile-store-history-msg msg (aj/mu4e-choose-refile (car dir) msg)))
+     (t
+      (aj/mu4e-refile-store-history-msg msg (aj/mu4e-choose-refile nil msg))))))
+
+;; (defun aj/mu4e-refile-folder (msg &optional force-choice)
+;;   "Guess or offer to select a refile folder for MSG.
+;; Chooses depending on account functions in ‘aj/mu4e-refile-fns’
+;; No automatic guess if FORCE-CHOICE is non-nil."
+;;   (let* ((user-has-chosen nil)
+;;          (found
+;;           (or (cl-loop for fn in aj/mu4e-refile-fns do
+;;                        (when-let ((res (funcall fn msg)))
+;;                          (cond
+;;                           ((stringp res) (cl-return res))
+;;                           ((listp res) (cl-return (prog1 (aj/mu4e-choose-refile (car res) msg)
+;;                                                     (setq user-has-chosen t)))))))
+;;               (aj/mu4e-default-refile-folder msg))))
+;;     (aj/mu4e-refile-store-history-msg
+;;      msg
+;;      (if (and found
+;;               (or user-has-chosen (not force-choice)))
+;;          found
+;;        (aj/mu4e-choose-refile found msg)))))
+
+(defun aj/mu4e-default-refile-folder (msg)
+  (aj/mu4e-msg-account msg
+    :chalmers "/chalmers/Arkiv"
+    ;; Only for show, they get changed labels via custom action
+    :mejla "/mejla/Alla mail"
+    :ajf "/ajf/Alla mail"))
 
 ;; (defvar aj/mu4e-helm-refile-history nil)
 (defun aj/mu4e-choose-refile (startdir msg)
@@ -2170,7 +2210,7 @@ Some of the functions are redefined.
 (add-to-list 'mu4e-view-actions '("View in external browser" . mu4e-action-view-in-browser))
 #+end_src
 
-** Contacts
+** Contacts exclusion
 #+begin_src emacs-lisp
 (defvar aj/mu4e-contacts-exclude-pattern
   (regexp-opt

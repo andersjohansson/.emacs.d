@@ -6,3 +6,5 @@
         ;; "pdf-[-a-z]+\\.el$"
         "mu4e-query-helper\\.el$"
         "the-org-mode-expansions\\.el$"))
+
+(setq org-roam-v2-ack t)

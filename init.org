@@ -474,12 +474,12 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
                   (kbd "<C-backspace>") 'backward-kill-sexp))))
 
   ;; I use consult-completing-read-multiple
-  (advice-remove 'completing-read-multiple #'selectrum-completing-read-multiple)
-  )
+  (advice-remove 'completing-read-multiple #'selectrum-completing-read-multiple))
 
 
 (use-package selectrum-prescient
   :custom
+  (prescient-sort-full-matches-first t)
   (prescient-sort-length-enable nil) ; many of my sources return
                                         ; things already sorted
   ;; (prescient-filter-method 'fuzzy)
@@ -760,12 +760,10 @@ https://www.freedesktop.org/wiki/Specifications/desktop-bookmark-spec/"
 #+begin_src emacs-lisp
 (use-package embark
   :demand t
+  :custom
+  (embark-mixed-indicator-delay 1)
   :bind (("C-." . embark-act)
-         ("M-." . embark-dwim)
-         ;; double C-. also means dwim
-         :map embark-general-map
-         ("C-." . embark-dwim))
-  )
+         ("M-." . embark-dwim)))
 
 ;; Consult users will also want the embark-consult package.
 (use-package embark-consult
@@ -793,7 +791,8 @@ https://www.freedesktop.org/wiki/Specifications/desktop-bookmark-spec/"
 (defvar aj/zoterofile-history nil)
 
 (defun aj/open-zoterofile-new-frame ()
-  (aj/run-cmd-in-small-frame 100 20 #'aj/open-zoterofile "Zotero file" t))
+  (let ((selectrum-display-action '(selectrum-display-full-frame)))
+    (aj/run-cmd-in-small-frame 100 20 #'aj/open-zoterofile "Zotero file" t)))
 
 (defun aj/open-zoterofile ()
   (interactive)
@@ -982,6 +981,7 @@ overriding it, but you should know before you do.
                  do (apply #'set-face-attribute f ocframe c))
         (funcall cmd))
     (when forcecleanup
+      (sit-for 0.01) ;; to allow other commands (for example via embark-act)
       (delete-frame))))
 
 #+end_src
@@ -1469,7 +1469,6 @@ For exporting and converting to zotero.
   (org-catch-invisible-edits 'show)
   (org-blank-before-new-entry '((heading . auto) (plain-list-item . auto)))
   (org-cycle-separator-lines 0)
-  (org-hidden-keywords '(title subtitle author date))
   (org-pretty-entities t)
   (org-pretty-entities-include-sub-superscripts nil)
   (org-hide-emphasis-markers t)
@@ -1492,7 +1491,7 @@ For exporting and converting to zotero.
   ;;faces
   (org-fontify-quote-and-verse-blocks t)
 
-  ;; footnote
+  ;; footnotes (the sane way minimizing problems)
   (org-footnote-define-inline t)
 
   ;; org-src
@@ -1513,9 +1512,9 @@ For exporting and converting to zotero.
   :config
   (load-library "aj-org-config")
 
-  (setq org-agenda-text-search-extra-files
-        (let ((org-agenda-files (expand-file-name "kodningsfiler" org-directory)))
-          (org-read-agenda-file-list)))
+  ;; (setq org-agenda-text-search-extra-files
+  ;;       (let ((org-agenda-files (expand-file-name "kodningsfiler" org-directory)))
+  ;;         (org-read-agenda-file-list)))
 
   ;; for some reason, the new default binding "C-c C-TAB" (since 565361eb) doesn’t work on
   ;; my emacs (pgtk). haven’t tested different builds.
@@ -1863,17 +1862,28 @@ But why do I need to compress pdf-files this way? Shouldn’t pdf-files have rea
   (sudo-edit-indicator-mode t)
   :bind
   (:map embark-file-map
-        ("S" . sudo-edit-find-file))
+        ("z" . sudo-edit-find-file))
   (:map embark-become-file+buffer-map
-        ("S" . sudo-edit-find-file)))
+        ("z" . sudo-edit-find-file)))
 #+end_src
 *** Dired
 **** Some settings
 #+begin_src emacs-lisp
-(setq dired-recursive-deletes 'always
-      dired-recursive-copies 'always
-      dired-dwim-target t)
+(use-package dired
+  :straight (:type built-in)
+  :bind (:map dired-mode-map
+              ;; because ^ is a dead key in my Swedish keyboard
+              ;; layout and has to be typed twice. "å" is next to it.
+              ("å" . dired-up-directory)
+              ;; from nautilus:
+              ("C-S-n" . mkdir)
+              ("<f2>" . dired-do-rename))
+  :custom
+  (dired-recursive-deletes 'always)
+  (dired-recursive-copies 'always)
+  (dired-dwim-target t))
 #+end_src
+
 **** dired: use ~hl-line-mode~ and hide cursor
 But show cursor in ~wdired-mode~
 #+begin_src emacs-lisp
@@ -1918,7 +1928,7 @@ But show cursor in ~wdired-mode~
 #+begin_src emacs-lisp
 (use-package dired-hide-dotfiles
   :bind (:map dired-mode-map
-              ("å" . dired-hide-dotfiles)))
+              ("." . dired-hide-dotfiles)))
 #+end_src
 **** Dired subtree
 #+begin_src emacs-lisp
@@ -1992,9 +2002,8 @@ But some of the options for listing-switches doesn’t work with remote sessions
 #+begin_src emacs-lisp
 (use-package dired-toggle-sudo
   :commands dired-toggle-sudo
-  :init
-  (with-eval-after-load 'dired
-    (bind-key "C-c C-s" 'dired-toggle-sudo dired-mode-map)))
+  :bind (:map dired-mode-map
+              ("C-c C-s" . dired-toggle-sudo)))
 #+end_src
 
 **** Dired-recent
@@ -3178,7 +3187,7 @@ Some bindings both for acting and extending the region.
 (delete-selection-mode)
 #+end_src
 
-*** Whole-line-or-region
+*** Whole-line-or-region :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package whole-line-or-region
   :demand t
@@ -3190,7 +3199,7 @@ Some bindings both for acting and extending the region.
 (setq save-interprogram-paste-before-kill t)
 #+end_src
 
-*** expand-region
+*** expand-region :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package expand-region
   :bind ("C-ä" . er/expand-region))
@@ -4074,7 +4083,7 @@ Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t
   (defun aj/writing-swedish-p ()
     "Does current dictionary include Swedish?"
     (when-let ((dict (or ispell-local-dictionary (and flyspell-mode ispell-dictionary))))
-      (string-match dict "sv")))
+      (string-match "sv" dict)))
 
   ;; the abbrev-tables ‘aj/english-abbrevs’ and ‘aj/swedish-abbrevs’
   ;; are defined in the abbrev file.
@@ -4331,7 +4340,9 @@ Works ok with selectrum.
   :after flyspell
   :bind (:map flyspell-mode-map
               ("C-," . flyspell-auto-correct-previous-word)
-              ("C-;" . flyspell-correct-wrapper)))
+              ("C-;" . flyspell-correct-wrapper)
+              ;; also disable conflicting C-. (embark-act)
+              ("C-." . nil)))
 #+end_src
 
 **** Extra words and areas to avoid spellchecking in various modes.
@@ -4577,7 +4588,7 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
     (nth (1- (pdf-view-current-page window)) (pdf-info-pagelabels)))
 
   (setq-default pdf-view-display-size 'fit-page)
-  (add-hook 'pdf-view-mode-hook (lambda () (auto-revert-mode -1) (whole-line-or-region-local-mode -1)))
+  (add-hook 'pdf-view-mode-hook (lambda () (auto-revert-mode -1)))
 
   (defvar aj/pdf-view-midnight-list
     '(("#282828" . "#f9f5d7")

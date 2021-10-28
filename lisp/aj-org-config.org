@@ -9,6 +9,25 @@
 #+end_src
 
 * Org-config
+
+** Org-roam
+#+begin_src emacs-lisp
+(use-package org-roam
+  :custom
+  (org-roam-directory "/home/aj/jobb/anteckningar")
+
+  ;; :bind (("C-c n l" . org-roam-buffer-toggle)
+  ;;        ("C-c n f" . org-roam-node-find)
+  ;;        ("C-c n g" . org-roam-graph)
+  ;;        ("C-c n i" . org-roam-node-insert)
+  ;;        ("C-c n c" . org-roam-capture)
+  ;;        ;; Dailies
+  ;;        ("C-c n j" . org-roam-dailies-capture-today))
+  :config
+  (org-roam-db-autosync-mode)
+  )
+#+end_src
+
 ** MobileOrg
 #+begin_src emacs-lisp
 (setq org-mobile-files (list org-directory)
@@ -372,6 +391,7 @@ have `org-warning' face."
 
 
 #+end_src
+
 *** Disable some disturbing keybindings
 Disable keys for org-cycle-agenda-files, org-agenda-file-to-front etc.
 I never use this.
@@ -381,7 +401,16 @@ I never use this.
 (define-key org-mode-map "\C-c[" nil)
 (define-key org-mode-map "\C-c]" nil)
 #+end_src
-*** Speed commands on all stars
+
+*** Speed commands at more places
+#+begin_src emacs-lisp
+(defun aj/org-speed-command-here-p ()
+  (and (looking-at org-outline-regexp) (looking-back "^\**" (point-at-bol))))
+
+(setq org-use-speed-commands
+      #'aj/org-speed-command-here-p)
+#+end_src
+
 *** Speed command for "DONE"
 #+begin_src emacs-lisp
 (add-to-list 'org-speed-commands
@@ -533,14 +562,6 @@ Otherwise hydra for template insertion.
 (bind-key "<" #'aj/org-template-completion org-mode-map)
 #+end_src
 
-*** Speed commands at more places?
-#+begin_src emacs-lisp
-(defun aj/org-speed-command-here-p ()
-  (and (looking-at org-outline-regexp) (looking-back "^\**" (point-at-bol))))
-
-(setq org-use-speed-commands
-      #'aj/org-speed-command-here-p)
-#+end_src
 *** Extra bindings
 #+begin_src emacs-lisp
 (bind-keys :map org-mode-map
@@ -702,7 +723,7 @@ all children are done, you can use the following setup:
 (with-eval-after-load 'org-agenda
   (bind-keys :map
              org-agenda-mode-map
-             ;; I don’t use diary anyway:
+             ;; I don’t use meaningless ‘org-agenda-toggle-diary’ anyway:
              ("D" . aj/org-agenda-todo-to-done)
              ("C-z" . org-agenda-undo))
   (defun aj/org-agenda-todo-to-done () (interactive) (org-agenda-todo 'done)))
@@ -827,7 +848,15 @@ all children are done, you can use the following setup:
           (org-agenda-overriding-header "Osorterade eller ej schemalagda: ")))
         ("w" "Väntande" todo "VÄNTAR") ; waiting tasks
         ("j" "Bara jobb" agenda "" ((org-agenda-files aj/org-work-agenda-files)))
-        ("d" "TODO in this dir" todo "" ((org-agenda-files (aj/org-files-in-project-dir))))))
+        ("d" "TODO in this dir" todo "" ((org-agenda-files (aj/org-files-in-project-dir))))
+        ("W" "Weekly review"
+         agenda ""
+         ((org-agenda-start-day "-14d")
+          (org-agenda-span 15)
+          (org-agenda-time-grid nil)
+          (org-agenda-start-on-weekday 1)
+          (org-agenda-start-with-log-mode t)
+          (org-agenda-skip-function '(org-agenda-skip-entry-if 'nottodo 'done))))))
 
 (defun aj/org-files-in-project-dir ()
   (directory-files-recursively
@@ -1330,33 +1359,7 @@ That is, always create a new buffer. (Is there anything more changed?)
 (bind-key "C-c C-x b" #'aj/org-tree-to-indirect-buffer org-mode-map)
 #+end_src
 
-** COMMENT Linking, link-types
-*** COMMENT org-pdfview
-#+begin_src emacs-lisp
-(with-eval-after-load 'org-pdfview
-  ;; (advice-add 'org-pdfview-open :override #'aj/org-pdfview-open)
 
-  ;; (defun aj/org-pdfview-open (link)
-  ;;   "Open LINK in pdf-view-mode."
-  ;;   (cond ((string-match "\\(.*\\)::\\([0-9]+\\)\\+\\+\\([[0-9]\\.*[0-9]*\\)"  link)
-  ;;          (let* ((path (match-string 1 link))
-  ;;                 (page (match-string 2 link))
-  ;;                 (height (string-to-number (match-string 3 link))))
-  ;;            (org-open-file path 1)
-  ;;            (pdf-view-goto-label page)
-  ;;            (image-set-window-vscroll
-  ;;             (round (/ (* height (cdr (pdf-view-image-size))) (frame-char-height))))))
-  ;;         ((string-match "\\(.*\\)::\\([0-9]+\\)$"  link)
-  ;;          (let* ((path (match-string 1 link))
-  ;;                 (page (string-to-number (match-string 2 link))))
-  ;;            (org-open-file path 1)
-  ;;            (pdf-view-goto-page page)))
-  ;;         (t
-  ;;          (org-open-file link 1))
-  ;;         ))
-  )
-
-#+end_src
 ** org-download
 #+begin_src emacs-lisp
 (use-package org-download
@@ -1368,6 +1371,7 @@ That is, always create a new buffer. (Is there anything more changed?)
                 org-download-image-dir "./bilder"))
 
 #+end_src
+
 ** File-associations, opening links externally :org_async:
 #+begin_src emacs-lisp
 (add-to-list 'org-file-apps '("\\.pdf\\'" . emacs)) ; open pdfs in emacs
@@ -2027,6 +2031,11 @@ https://gitlab.com/andersjohansson/org-archive-hierarchically
 #+end_src
 
 ** Org capture
+*** Save files after capturing and refiling
+I almost always finish capturing by refiling, and while ~org-capture-finalize~ does normally save the file, this doesn’t apply in ~org-capture-refile~. Additionally, we can’t be sure if we are still in the same buffer, so we just save all open org-buffer.
+#+begin_src emacs-lisp
+(advice-add 'org-capture-finalize :after #'org-save-all-org-buffers)
+#+end_src
 *** Capture templates
 (private and kept in custom.el)
 #+begin_src emacs-lisp
@@ -2206,7 +2215,7 @@ Don’t use it now
   "Fetch an org-zotxt link and return it as a string"
   (with-temp-buffer
     (let ((major-mode 'org-mode))
-      (org-cite-insert)
+      (org-cite-insert nil)
       (buffer-string))))
 #+end_src
 
@@ -2303,19 +2312,24 @@ I keep some notes for papers in org-mode, but sort my papers in Zotero. With thi
 
 ** Copy region as html or ascii
 #+begin_src emacs-lisp
-(defun aj/org-export-copy-region-as (&optional backend)
-  "Places selected region in kill ring as html or ascii with prefix arg.
+(defun aj/org-export-copy-region-or-subtree-as (&optional backend)
+  "Places selected region in kill ring as ascii, or HTML with prefix arg.
 Can be passed any ox BACKEND in a non-interactive call"
   (interactive "P")
   (let* ((backend (cond
                    ((and backend (symbolp backend)) backend)
                    (backend 'html)
                    (t 'thinascii)))
-         (epl (org-export--get-inbuffer-options backend)))
-    (kill-new (org-export-string-as
-               (buffer-substring (region-beginning) (region-end))
-               backend t epl))))
-(bind-key "M-W" #'aj/org-export-copy-region-as org-mode-map)
+         (epl (org-export--get-subtree-options backend)))
+    (kill-new
+     (if (region-active-p)
+         (save-restriction
+           (narrow-to-region (region-beginning) (region-end))
+           (org-export-as backend nil t t epl))
+       (save-excursion
+         (org-back-to-heading)
+         (org-export-as backend t nil t epl))))))
+(bind-key "M-W" #'aj/org-export-copy-region-or-subtree-as org-mode-map)
 
 (defun aj/second-identity (_first second &rest _args)
   second)
@@ -2629,7 +2643,8 @@ List of prefix strings or regex."
           ("C-c C-å" . org-cite-insert))
   :config
   (setq org-cite-insert-processor 'oc-bibtex-actions
-        org-cite-follow-processor 'oc-bibtex-actions)
+        org-cite-follow-processor 'oc-bibtex-actions
+        org-cite-activate-processor 'oc-bibtex-actions)
 
   (define-key oc-bibtex-actions-map (kbd "z") '("open in zotero" . aj/org-cite-zotxt-follow))
   (define-key oc-bibtex-actions-map (kbd "F") '("open externally" . aj/bibtex-actions-open-files-externally))
@@ -2724,15 +2739,22 @@ I just override ~org-cite-follow~, because these choices are what I always want.
 
 
 *** Exporting
-See also [[file:~/.emacs.d/init.org::*ox-md-pandoc-zotero]] for the zotero-conversion export
+**** Setting up
+#+begin_src emacs-lisp
+(require 'oc-biblatex) ;; processor registration can’t be autoloaded ...
+(setq org-cite-export-processors
+      '((latex biblatex)
+        (t basic)))
+#+end_src
 
 **** Oc-pandoc, export to markdown with pandoc citations.
+See also [[file:../init.org::*ox-md-pandoc-zotero]] for the zotero-conversion export
 #+begin_src emacs-lisp
 (use-package oc-pandoc
   :straight (:host gitlab :repo "andersjohanssson/org-cite-pandoc"))
 #+end_src
 
-** Zotxt
+** Zotxt (old, moving away from this in favor of org-cite)
 For using Zotero reference management in plain text.
 https://gitlab.com/egh/zotxt
 https://gitlab.com/egh/zotxt-emacs
@@ -3119,15 +3141,19 @@ Named with org prefix to be preserved in org exports."
   "Export current buffer to a reveal.js and link the folder to server dir."
   (interactive)
   (let* ((fn (expand-file-name (org-re-reveal-export-to-html async subtreep visible-only body-only ext-plist)))
-		 (fnnd (file-name-nondirectory fn))
-		 (dir (file-name-directory fn))
-		 (linkeddir (concat aj/path-to-revealjs
-							(file-name-nondirectory
-							 (directory-file-name dir))))
-		 (newfile (concat linkeddir "/" fnnd)))
+         (fnnd (file-name-nondirectory fn))
+         (dir (file-name-directory fn))
+		 (dirname (directory-file-name dir))
+         (nextlastdir (file-name-nondirectory
+                       (directory-file-name
+                        (file-name-directory
+                         dirname))))
+	     (lastdir (file-name-nondirectory
+                   dirname))
+         (linkeddir (concat aj/path-to-revealjs nextlastdir "-" lastdir))
+	     (newfile (concat linkeddir "/" fnnd)))
 	(make-symbolic-link dir linkeddir t)
 	newfile))
-
 
 (defvar aj/org-reveal-current-url nil)
 (defvar aj/org-reveal-last-url nil)
@@ -3172,12 +3198,14 @@ Named with org prefix to be preserved in org exports."
   (setq aj/org-reveal-current-url ; used in callback function below
         (or url aj/org-reveal-current-url))
   (if server-running
-      (request aj/org-reveal-current-url
-               :success #'aj/org-reveal-browse-current-url
-               :error #'aj/org-reveal-browse-current-file) ; useful?
-    (request aj/revealjs-base-url
-             :success #'aj/org-reveal-browse-current-url
-             :error #'aj/org-reveal-try-server-start)))
+      (request (url-encode-url aj/org-reveal-current-url)
+        :success #'aj/org-reveal-browse-current-url
+        :error (cl-function (lambda (&key _data &allow-other-keys)
+                              (message "Couldn’t access %s"
+                                       aj/org-reveal-current-url))))
+    (request (url-encode-url aj/revealjs-base-url)
+      :success #'aj/org-reveal-browse-current-url
+      :error #'aj/org-reveal-try-server-start)))
 
 (cl-defun aj/org-reveal-browse-current-url (&key _data &allow-other-keys)
   (browse-url
@@ -3264,8 +3292,6 @@ Named with org prefix to be preserved in org exports."
       ("highlight-current-bold" . "Fragment: Turn text bold, then back to original on next step"))
     "Classes for elements in reveal.js presentations")
 
-
-
   (defhydra aj/hydra-org-reveal-templates (:color blue :columns 4)
     "Reveal templates"
     ("+" (aj/org-insert-element-attributes "#+attr_reveal: :frag (t)") "Piecewise list")
@@ -3280,7 +3306,11 @@ Named with org prefix to be preserved in org exports."
                    " ")))
      "Insert html class for element")
     ("C" (progn (org-set-property "reveal_data_state" "centered-headline")
-                (org-toggle-tag "centered_headline" 'on)) "Centered headline")
+                (org-toggle-tag "centered_headline" 'on))
+     "Centered headline")
+    ("S" (progn (org-set-property "reveal_data_state" "split-headline")
+                (org-toggle-tag "split_headline" 'on))
+     "Split headline")
     ("F" (insert (completing-read "Frag style" '(grow shrink roll-in fade-out highlight-red highlight-green highlight-blue appear))) "Frag style")
     ("H" (insert "#+reveal_html: ") "HTML")
     ("b" (org-set-property "reveal_background"
@@ -3292,7 +3322,7 @@ Named with org prefix to be preserved in org exports."
                            (completing-read "Transition: "
                                             '("none" "fade" "slide" "convex" "concave" "zoom")))
      "Background image-transition")
-    ("s" (aj/org-insert-element-attributes "#+attr_html: :style font-size: 0.9em;") "Style element etc.")
+    ("y" (aj/org-insert-element-attributes "#+attr_html: :style font-size: 0.9em;") "Style element etc.")
     ("p" (insert (format
                   "#+attr_html: :class stretch\n%s"
                   (with-temp-buffer (org-insert-link '(4) nil "") (buffer-string))))
@@ -3317,14 +3347,16 @@ Fungerar inte på grund av relativiseringen av sökvägar i slutet av org-insert
 #+begin_src emacs-lisp
 (add-hook 'org-export-filter-parse-tree-functions #'aj/org-reveal-empty-headline-title)
 
-(defun aj/org-reveal-empty-headline-title (data _backend info)
-  (org-element-map data 'headline
-    (lambda (h)
-      (when (member "notitle" (org-element-property :tags h))
-        (org-element-put-property h :title nil)
-        (org-element-put-property
-         h :tags (delete "notitle" (org-element-property :tags h)))))
-    info nil)
+(defun aj/org-reveal-empty-headline-title (data backend info)
+  (unless (eq backend 'org-notes)
+    (org-element-map data 'headline
+      (lambda (h)
+        (when (member "notitle" (org-element-property :tags h))
+          (org-element-put-property h :title nil)
+          (org-element-put-property
+           h :tags (delete "notitle" (org-element-property :tags h)))
+          (org-element-put-property h :REVEAL_DATA_STATE "notitle")))
+      info nil))
   data)
 
 (add-hook 'org-export-filter-final-output-functions #'aj/org-reveal-prune-empty-headlines)
@@ -3346,7 +3378,7 @@ Fungerar inte på grund av relativiseringen av sökvägar i slutet av org-insert
 (add-to-list 'org-export-filter-link-functions #'aj/org-reveal-lazy-load-links)
 #+end_src
 
-**** Enable citations in quote blocks
+**** Enable citations in quote blocks captions
 Kind of messy, but does the job of making org-zotxt links in cite-attributes to correct citations.
 #+begin_src emacs-lisp
 ;; (with-eval-after-load 'ox
@@ -3389,14 +3421,18 @@ Kind of messy, but does the job of making org-zotxt links in cite-attributes to 
 
 ;; (add-to-list 'org-export-filter-parse-tree-functions #'aj/org-html-citations-in-quote-blocks)
 
-
-
 #+end_src
 
 
-**** Split bibliography across reveal.js slides
-We install an output filter for doing this.
+**** Bibliograhy -- and splitting
+
+Split bibliography across reveal.js slides we install an output filter for doing this.
 #+begin_src emacs-lisp
+(use-package org-re-reveal-citeproc
+  :config
+  (add-to-list 'org-export-filter-paragraph-functions
+               #'org-re-reveal-citeproc-filter-cite))
+
 (defun aj/org-reveal-split-bibliography (string backend _info)
   (if (org-export-derived-backend-p backend 're-reveal 'reveal)
       (with-temp-buffer
@@ -3434,6 +3470,84 @@ For my university template, add a final slide with the logo.
        '(:REVEAL_DATA_STATE "chalmers-final-slide" :level 1 :raw-value ""))))
   data)
 #+end_src
+**** Rewrite image-paths for inclusion.
+#+begin_src emacs-lisp
+(add-to-list 'org-export-filter-parse-tree-functions
+             #'aj/org-reveal-rewrite-image-file-paths)
+
+(defun aj/org-reveal-rewrite-image-file-paths (tree backend info)
+  (if (org-export-derived-backend-p backend 're-reveal)
+      (org-element-map tree 'link
+        (lambda (l)
+          (when (equal "file" (org-element-property :type l))
+            (let ((path (org-element-property :path l)))
+              (when (string-match "^\\(?:/home/aj\\|~\\)/jobb/presentationer/bilder/\\(.+\\)" path)
+                (org-element-put-property
+                 l :path
+                 (replace-match "../bilder/\\1" nil nil path))))))
+        info))
+  tree)
+
+#+end_src
+**** Exporting tree of notes
+#+begin_src emacs-lisp
+(defun aj/org-notes-export (async subtreep visible-only body-only)
+  (org-export-to-buffer 'org-notes "*org-notes*"
+    async subtreep visible-only body-only nil #'org-mode))
+
+(defun aj/org-notes-filter-parse-tree (tree backend info)
+  (when (eq backend 'org-notes)
+    (org-element-map tree (append org-element-all-elements org-element-all-objects)
+      (lambda (e)
+        (unless (or (member (org-element-type e) '(headline section))
+                    (when-let ((sb (org-element-lineage e '(special-block) t)))
+                      (string= (downcase (org-element-property :type sb)) "notes")))
+          (org-element-extract-element e)))
+      info))
+  tree)
+
+(add-to-list 'org-export-filter-parse-tree-functions #'aj/org-notes-filter-parse-tree)
+
+(org-export-define-derived-backend 'org-notes 'org
+  :menu-entry '(?v 3
+                   ((?n "As notes"
+                        aj/org-notes-export)))
+  :translate-alist
+  '((special-block . aj/org-notes-special-block)))
+
+(defun aj/org-notes-special-block (special-block contents info)
+  "Transcode a SPECIAL-BLOCK element from Org to Org if it is notes."
+  (when (string= (downcase (org-element-property :type special-block))
+                 "notes")
+    contents))
+
+;; (defun aj/org-get-all-notes ()
+;;   (interactive)
+;;   (let (notes)
+;;     (org-element-map (org-element-parse-buffer) '(special-block)
+;;       (lambda (sb)
+;;         (when (string= (downcase (org-element-property :type sb)) "notes")
+;;           (push (concat
+;;                  "* "
+;;                  (org-export-data-with-backend
+;;                   (org-element-property
+;;                    :title
+;;                    (org-export-get-parent-headline sb))
+;;                   'org nil)
+;;                  ;; (org-export-string-as
+;;                  ;;  (org-element-property :title (org-export-get-parent-headline sb))
+;;                  ;;  'org t)
+;;                  "\n"
+;;                  (buffer-substring-no-properties
+;;                   (org-element-property :contents-begin sb)
+;;                   (org-element-property :contents-end sb)))
+;;                 notes))))
+;;     (pop-to-buffer (generate-new-buffer "*org notes*"))
+;;     (insert (string-join notes "\n\n"))
+;;     (goto-char (point-min))
+;;     (org-mode)))
+#+end_src
+
 
 *** Ignored drawers
 #+begin_src emacs-lisp
@@ -4874,20 +4988,6 @@ With my use of [[*\[\[https://github.com/integral-dw/org-superstar-mode/\]\[org-
 #+end_src
 
 
-*** Org Bullets :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package org-bullets
-  :hook (org-mode . org-bullets-mode)
-  :custom org-bullets-bullet-list
-  ;; '("■" "■" "■""■" "■" "■" "■" "■" "■" "■" "■" "■" "■")
-  '("▌" "▌" "▌" "▌" "▌" "▌" "▌" "▌" "▌" "▌" "▌" "▌" "▌" )
-  ;; '("■" "━" "━" "━" "━" "━" "━" "━" "━" "━" "━"
-  ;; "━" "━" "━" "━" "━" "━" "━" "━" "━" "━" "━")
-  ;; '("✹" "✸" "✷" "✶" "✻" "✼" "✽" "✿" "❀" "❁"
-  ;;   "❈" "❉" "❊" "❆" "▹" "▹" "▹" "▹")
-  )
-#+end_src
-
 *** Scaling command for org tables
 Sometimes a table is too wide for the window width, and becomes unreadable when lines wrap. One workaround is to do some face remapping to scale down the ~org-table~ face. A command for that is defined here.
 #+begin_src emacs-lisp
@@ -5045,7 +5145,7 @@ Add special tag faces, add for file-local select/exclude-tags. Highlight the ent
 #+end_src
 
 *** Tags column at 0, align tags with display property
-I use variable-width fonts, so trying to align tags to the right using spaces is useless. But in the agenda we want them right aligned and setting it in the hook means we can adapt to the current window.
+I use variable-width fonts, so trying to align tags to the right using spaces is useless. But in the agenda (which uses fixed-width fonts) we want them right aligned and setting it in the hook means we can adapt to the current window.
 
 However, we can also use the display text property to align tags to the right.
 
@@ -5109,9 +5209,6 @@ Optional MODE specifies major mode used for display."
 						   (,(+ 3 ;; no idea, but otherwise it is sometimes not enough
 							    (aj/string-pixel-width org-ellipsis)
 							    (aj/string-pixel-width (or (match-string 3) ""))))))))))))))
-
-
-
 #+end_src
 
 *** org-fold-linebreaks-mode
@@ -5192,18 +5289,6 @@ https://gitlab.com/andersjohansson/org-outline-numbering
   (org-num-skip-unnumbered t)
   (org-num-skip-commented t))
 #+end_src
-
-** Open org links with alternate programs :ARCHIVE:
-#+begin_src emacs-lisp
-(defun aj/org-open-at-point-with-alternate (&optional arg refb)
-  (interactive "P")
-  (let ((org-file-apps '(("pdf" . "pdfxedit %s"))))
-	(org-open-at-point arg refb)))
-
-(define-key org-mode-map (kbd "C-c S-C-o") 'aj/org-open-at-point-with-alternate)
-#+end_src
-
-
 
 * Provide statement
 #+begin_src emacs-lisp
