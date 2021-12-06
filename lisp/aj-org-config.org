@@ -15,7 +15,7 @@
 (use-package org-roam
   :custom
   (org-roam-directory "/home/aj/jobb/anteckningar")
-
+  (org-roam-db-update-on-save nil)
   ;; :bind (("C-c n l" . org-roam-buffer-toggle)
   ;;        ("C-c n f" . org-roam-node-find)
   ;;        ("C-c n g" . org-roam-graph)
@@ -26,6 +26,16 @@
   :config
   (org-roam-db-autosync-mode)
   )
+#+end_src
+
+** Transclusion
+#+begin_src emacs-lisp
+(use-package org-transclusion
+  :straight (:host github :repo "nobiot/org-transclusion")
+  :defer t
+  :config
+  (add-to-list 'org-transclusion-extensions 'org-transclusion-indent-mode)
+  (require 'org-transclusion-indent-mode))
 #+end_src
 
 ** MobileOrg
@@ -50,6 +60,20 @@ Avoid colons for syncing to windows systems (onedrive)"
 #+end_src
 
 ** Cosmetics, early definitions
+*** [[https://github.com/integral-dw/org-superstar-mode/][org-superstar]] (successor to org-bullets)
+#+begin_src emacs-lisp
+(use-package org-superstar
+  :demand t
+  :hook (org-mode . org-superstar-mode)
+  :custom
+  (org-superstar-headline-bullets-list '(?♦))
+  (org-superstar-special-todo-items 'hide)
+  ;; (org-superstar-todo-bullet-alist '((default . ? )))
+  (org-superstar-prettify-item-bullets nil)
+  ;; when I would like to use plain bullets from time to time:
+  (org-superstar-item-bullet-alist '((?- . ?•) (?+ . ?‣))))
+#+end_src
+
 *** Prettify-symbols replacements
 **** Use prettify-symbols
 Define a variable where symbols can be added for use later and enable prettify-symbols-mode for org
@@ -476,8 +500,10 @@ Org emphasize: _b_old  _i_talic _u_nderline _c_ode _v_erbatim _s_trikethrough  _
         (if (eolp)
             (progn (insert wrap wrap)
                    (backward-char))
-          (er/expand-region 1)
-          (sp-wrap-with-pair wrap))))))
+          (save-excursion
+            (backward-word)
+            (mark-word)
+            (sp-wrap-with-pair wrap)))))))
 #+end_src
 
 *** Insert org macro
@@ -504,7 +530,6 @@ Otherwise hydra for template insertion.
 
 #+begin_src emacs-lisp
 (defvar aj/org-header-keywords-history nil)
-(add-to-list 'savehist-additional-variables 'aj/org-header-keywords-history)
 (defun aj/org-insert-header-keyword ()
   (interactive)
   (insert "#+"
@@ -1122,21 +1147,20 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
 
 **** Clocksum variables, duration units, effort global properties
 #+begin_src emacs-lisp
-(with-eval-after-load 'org-duration
-  (setq org-duration-units
-        `(("min" . 1)
-          ("p" . 25) ; time of a pomodoro!
-          ("h" . 60)
-          ("d" . ,(* 60 8)) ; 8 hour work day
-          ("w" . ,(* 60 8 5)) ; 5 days a week
-          ("m" . ,(* 60 8 21)) ; 21 working days per month
-          ;; 10.5 such working months (because I have 31 days of
-          ;; vacation. 🙌 Swedish working agreements)
-          ("y" . ,(round (* 60 8 21 10.5))))
-
-        org-duration-format
-        '(("m") ("w") ("d") (special . h:mm)))
-
+(use-package org-duration
+  :straight nil
+  :custom (org-duration-units `(("min" . 1)
+                                ("p" . 25) ; time of a pomodoro!
+                                ("h" . 60)
+                                ("d" . ,(* 60 8)) ; 8 hour work day
+                                ("w" . ,(* 60 8 5)) ; 5 days a week
+                                ("m" . ,(* 60 8 21)) ; 21 working days per month
+                                ;; 10.5 such working months (because I have 31 days of
+                                ;; vacation. 🙌 Swedish working agreements)
+                                ("y" . ,(round (* 60 8 21 10.5)))))
+  (org-duration-format
+   '(("m") ("w") ("d") (special . h:mm)))
+  :config
   (org-duration-set-regexps))
 
 ;; :ETC makes these the values offered for completion, but won’t require a match
@@ -1499,9 +1523,10 @@ Doesn’t care at all about ‘org-odd-levels-only’, because I don’t use it.
       (dotimes (_i (1- diff))
         (org-promote-subtree)))))
 #+end_src
+
 ** Refile settings
 #+begin_src emacs-lisp
-(setq org-refile-use-outline-path t
+(setq org-refile-use-outline-path 'file
       org-outline-path-complete-in-steps nil)
 #+end_src
 
@@ -2272,25 +2297,43 @@ I keep some notes for papers in org-mode, but sort my papers in Zotero. With thi
 
   (defalias 'aj/org-id-org-protocol-link-copy 'aj/org-make-unique-link-clipoard))
 
-(with-eval-after-load 'zotxt
-  (defun aj/add-zotero-link-to-headline ()
-    (interactive)
-    (if-let ((link (aj/get-org-protocol-link))
-             (id (or
-                  (org-zotxt-extract-link-id-at-point)
-                  (save-excursion
-                    (org-back-to-heading)
-                    (when (search-forward "[[" (point-at-eol) t)
-                      (org-zotxt-extract-link-id-at-point))))))
-        (request
-          (format "%s/inserturl" zotxt-url-base)
-          :params
-          `(("key" . ,id)
-            ("url" . ,link)
-            ("title" . "org")))
-      (user-error "Couldn’t create link")))
-  (with-eval-after-load 'org-zotxt
-    (bind-key "C-c \" l" #'aj/add-zotero-link-to-headline org-zotxt-mode-map)))
+(defun aj/add-zotero-link-to-headline ()
+  (interactive)
+  (if-let ((link (aj/get-org-protocol-link))
+           (id (or
+                (citar-org-key-at-point)
+                (save-excursion
+                  (org-back-to-heading)
+                  (when (search-forward "[cite:" (point-at-eol) t)
+                    (citar-org-key-at-point)))))
+           (fn (buffer-file-name)))
+      (request
+        "http://127.0.0.1:23119/zotxt/inserturl"
+        :params
+        `(("betterbibtexkey" . ,(car id))
+          ("url" . ,link)
+          ("title" . ,(format "org-link to %s" fn))))
+    (user-error "Couldn’t create link")))
+
+;; (with-eval-after-load 'zotxt
+;;   (defun aj/add-zotero-link-to-headline ()
+;;     (interactive)
+;;     (if-let ((link (aj/get-org-protocol-link))
+;;              (id (or
+;;                   (org-zotxt-extract-link-id-at-point)
+;;                   (save-excursion
+;;                     (org-back-to-heading)
+;;                     (when (search-forward "[[" (point-at-eol) t)
+;;                       (org-zotxt-extract-link-id-at-point))))))
+;;         (request
+;;           (format "%s/inserturl" zotxt-url-base)
+;;           :params
+;;           `(("key" . ,id)
+;;             ("url" . ,link)
+;;             ("title" . "org")))
+;;       (user-error "Couldn’t create link")))
+;;   (with-eval-after-load 'org-zotxt
+;;     (bind-key "C-c \" l" #'aj/add-zotero-link-to-headline org-zotxt-mode-map)))
 #+end_src
 
 ** Special commands for org-babel-tangle
@@ -2458,8 +2501,6 @@ List of prefix strings or regex."
 
   ;; add name
   (defvar aj/org-annotate-name-history nil)
-  (with-eval-after-load "savehist" (add-to-list 'savehist-additional-variables 'aj/org-annotate-name-history))
-
   (defun aj/org-annotate-name (&optional name)
     (interactive
      (let ((enable-recursive-minibuffers t))
@@ -2623,43 +2664,53 @@ List of prefix strings or regex."
 #+end_src
 
 ** Cite with new org-cite
-*** Inserting with bibtex-actions
+*** Inserting with citar
 #+begin_src emacs-lisp
-(use-package bibtex-actions
+(use-package citar
   :custom
   (bibtex-completion-additional-search-fields '(doi url))
   (bibtex-completion-pdf-field "file")
-  (bibtex-actions-at-point-function 'embark-act)
-  (bibtex-actions-open-library-file-external nil)
-  (bibtex-actions-file-open-function #'find-file-other-window)
+  (citar-at-point-function 'embark-act)
+  (citar-file-open-function #'find-file-other-window)
+  (citar-insert-reference-function #'aj/citar-get-csl-references)
   :config
-  (bibtex-actions-filenotify-setup nil))
+  (citar-filenotify-setup nil)
+  (define-key citar-citation-map (kbd "z") (cons "open in zotero" #'aj/org-cite-zotxt-follow))
+  (define-key citar-citation-map (kbd "F") (cons "open externally" #'aj/citar-open-files-externally))
+  (defun aj/citar-open-files-externally (keys)
+    "Open citation KEYS in external program."
+    (let ((citar-file-open-function #'citar-file-open-external))
+      (citar-open-library-files keys)))
 
-(use-package oc-bibtex-actions
-  :after (embark org oc bibtex-actions)
+  (defun aj/org-cite-zotxt-follow (key)
+    "Follow citation KEY to Zotero."
+    (request
+      (format "%s/select" zotxt-url-base)
+      :params `(("betterbibtexkey" . ,key))))
+
+  (defun aj/citar-get-csl-references (keys)
+    (let ((proc (citeproc-create "/home/aj/.zotero-profile/styles/apa.csl"
+                                 ;; (lambda (_)
+                                 ;;   (cl-loop for (k . v) in keys
+                                 ;;            collect
+                                 ;;            (list k v)))
+                                 (citeproc-hash-itemgetter-from-any citar-bibliography)
+                                 (org-cite-csl--locale-getter))))
+
+      (citeproc-add-uncited (mapcar #'car keys) proc)
+      (insert (car (citeproc-render-bib proc 'plain)))))
+  )
+
+(use-package citar-org
+  :after (embark org oc citar)
   :straight nil
   :demand t
   :bind ( :map org-mode-map
           ("C-c C-å" . org-cite-insert))
   :config
-  (setq org-cite-insert-processor 'oc-bibtex-actions
-        org-cite-follow-processor 'oc-bibtex-actions
-        org-cite-activate-processor 'oc-bibtex-actions)
-
-  (define-key oc-bibtex-actions-map (kbd "z") '("open in zotero" . aj/org-cite-zotxt-follow))
-  (define-key oc-bibtex-actions-map (kbd "F") '("open externally" . aj/bibtex-actions-open-files-externally))
-
-  (defun aj/bibtex-actions-open-files-externally (keys)
-    "Open citation KEYS in external program."
-    (let ((bibtex-actions-open-library-file-external t))
-      (bibtex-actions-open-library-files keys))))
-
-(defun aj/org-cite-zotxt-follow (key)
-  "Follow citation KEY to Zotero."
-  (request
-    (format "%s/select" zotxt-url-base)
-    :params `(("betterbibtexkey" . ,key))))
-
+  (setq org-cite-insert-processor 'citar
+        org-cite-follow-processor 'citar
+        org-cite-activate-processor 'citar))
 #+end_src
 
 *** Nice display (activation) with csl styles :ARCHIVE:
@@ -2673,7 +2724,7 @@ But putting the display property seems not to work, is that because of the org-f
   (setq org-cite-activate-processor 'csl-activate))
 #+end_src
 
-*** Activate using oc-basic
+*** Activate using oc-basic :ARCHIVE:
 #+begin_src emacs-lisp
 (require 'oc-basic)
 (setq org-cite-activate-processor 'basic)
@@ -2772,7 +2823,6 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 #+begin_src emacs-lisp
 (use-package zotxt
   :straight (:host gitlab :repo "egh/zotxt-emacs" :depth 'full
-                   ;; :local-repo "zotxt"
                    :fork (:host gitlab :repo "andersjohansson/zotxt-emacs" :branch "ajfixes"))
   :custom (zotxt-default-bibliography-style "apa")
   (zotxt-default-search-method :title-creator-year)
@@ -2783,8 +2833,7 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 	"http://127.0.0.1:23119/zotxt"
 	"Base URL to contact.")
   ;; funkar det inte med custom?
-  (setq zotxt-default-bibliography-style "apa")
-  )
+  (setq zotxt-default-bibliography-style "apa"))
 
 (use-package org-pdcite
   :straight (:depth full :host gitlab :repo "andersjohansson/org-pdcite"
@@ -2794,79 +2843,78 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 (use-package zotxt-extra
   :straight (:depth full :host gitlab :repo "andersjohansson/emacs-zotxt-extra" :files ("zotxt-extra.el"))
   :after zotxt
-  :demand t
+  :defer t
   :commands zotxt-extra-maybe-edit-description
-  zotxt-extra-link-parse-desc zotxt-extra--replace-consecutive
-  :config (zotxt-extra-complete-citation-help-echo-activate))
+  zotxt-extra-link-parse-desc zotxt-extra--replace-consecutive)
 
-(defvar-local zotxt-helm-citation-files nil)
-(put 'zotxt-helm-citation-files 'safe-local-variable
-	 #'orgqda--string-or-list-of-strings-p)
-(use-package zotxt-helm
-  :straight (:depth full :host gitlab :repo "andersjohansson/emacs-zotxt-extra" :files ("zotxt-helm.el"))
-  :after zotxt
-  :demand t
-  :init (setq zotxt-helm-method 'async)
-  :commands zotxt-helm-link-to-disp-real
-  :config
-  ;; this could be added to zotxt-helm, but it’s depending so much on
-  ;; orgqda and I don’t want to require or copy that to zotxt-helm
-  (require 'orgqda)
+;; (defvar-local zotxt-helm-citation-files nil)
+;; (put 'zotxt-helm-citation-files 'safe-local-variable
+;; 	 #'orgqda--string-or-list-of-strings-p)
+;; (use-package zotxt-helm
+;;   :straight (:depth full :host gitlab :repo "andersjohansson/emacs-zotxt-extra" :files ("zotxt-helm.el"))
+;;   :after zotxt
+;;   :demand t
+;;   :init (setq zotxt-helm-method 'async)
+;;   :commands zotxt-helm-link-to-disp-real
+;;   :config
+;;   ;; this could be added to zotxt-helm, but it’s depending so much on
+;;   ;; orgqda and I don’t want to require or copy that to zotxt-helm
+;;   (require 'orgqda)
 
-  (defun zotxt-helm-get-current-refs ()
-	(let* ((orgqda-tag-files zotxt-helm-citation-files)
-		   (manyfiles (and zotxt-helm-citation-files
-						   (orgqda-tag-files))))
-	  (cl-remove-duplicates
-	   (if manyfiles
-		   (cl-loop for file in manyfiles
-					append
-					(orgqda--inhibit-org-startups
-					 (with-current-buffer (find-file-noselect file)
-					   (zotxt-helm-get-current-refs-in-buffer))))
-		 (zotxt-helm-get-current-refs-in-buffer))
-	   :test 'equal)))
+;;   (defun zotxt-helm-get-current-refs ()
+;; 	(let* ((orgqda-tag-files zotxt-helm-citation-files)
+;; 		   (manyfiles (and zotxt-helm-citation-files
+;; 						   (orgqda-tag-files))))
+;; 	  (cl-remove-duplicates
+;; 	   (if manyfiles
+;; 		   (cl-loop for file in manyfiles
+;; 					append
+;; 					(orgqda--inhibit-org-startups
+;; 					 (with-current-buffer (find-file-noselect file)
+;; 					   (zotxt-helm-get-current-refs-in-buffer))))
+;; 		 (zotxt-helm-get-current-refs-in-buffer))
+;; 	   :test 'equal)))
 
-  (defun zotxt-helm-get-current-refs-in-buffer ()
-	(org-element-map
-		(if zotxt-helm-current-refs-in-widened-buffer
-			(save-restriction
-			  (widen)
-			  (org-element-parse-buffer))
-		  (org-element-parse-buffer))
-		'link #'zotxt-helm-link-to-disp-real))
+;;   (defun zotxt-helm-get-current-refs-in-buffer ()
+;; 	(org-element-map
+;; 		(if zotxt-helm-current-refs-in-widened-buffer
+;; 			(save-restriction
+;; 			  (widen)
+;; 			  (org-element-parse-buffer))
+;; 		  (org-element-parse-buffer))
+;; 		'link #'zotxt-helm-link-to-disp-real))
 
-  (setf (alist-get 'persistent-action zotxt-helm-current-refs-source)
-        #'aj/zotxt-helm-current-show-full-ref)
+;;   (setf (alist-get 'persistent-action zotxt-helm-current-refs-source)
+;;         #'aj/zotxt-helm-current-show-full-ref)
 
-  ;; Display full ref for "current" refs
-  (defun aj/zotxt-helm-current-show-full-ref (cand)
-    "Display complete citation of selected ref in helm"
-    (interactive)
-    (when-let
-        ((key (with-temp-buffer (insert cand) (org-zotxt-extract-link-id-at-point))))
-      (deferred:$
-        (zotxt-get-item-bibliography-deferred (list :key key))
-        (deferred:nextc it
-          (lambda (item)
-            (save-window-excursion
-              (select-window (active-minibuffer-window))
-              (when-let ((ov (car-safe (overlays-at 1))))
-                (overlay-put ov 'display (plist-get item :citation))
-                (overlay-put ov 'face 'default))
-              ))))))
-  )
+;;   ;; Display full ref for "current" refs
+;;   (defun aj/zotxt-helm-current-show-full-ref (cand)
+;;     "Display complete citation of selected ref in helm"
+;;     (interactive)
+;;     (when-let
+;;         ((key (with-temp-buffer (insert cand) (org-zotxt-extract-link-id-at-point))))
+;;       (deferred:$
+;;         (zotxt-get-item-bibliography-deferred (list :key key))
+;;         (deferred:nextc it
+;;           (lambda (item)
+;;             (save-window-excursion
+;;               (select-window (active-minibuffer-window))
+;;               (when-let ((ov (car-safe (overlays-at 1))))
+;;                 (overlay-put ov 'display (plist-get item :citation))
+;;                 (overlay-put ov 'face 'default))
+;;               ))))))
+;;   )
 
 (use-package org-zotxt
   :straight nil ;; already installed with zotxt-emacs above
   :hook (org-mode . org-zotxt-mode)
-  :demand t
+  :defer t
   :init (setq org-zotxt-link-description-style :citekey)
   :commands org-zotxt-extract-link-id-at-point org-zotxt-choose-path
   :config
   ;;prompt to add page references in quotes
-  (advice-add 'org-zotxt-insert-reference-link-to-item
-			  :after #'zotxt-extra-maybe-edit-description)
+  ;; (advice-add 'org-zotxt-insert-reference-link-to-item
+  ;;   		  :after #'zotxt-extra-maybe-edit-description)
 
   ;; Special fontification, I often manipulate rows of references,
   ;; and then it’s useful to display the outer brackets, for easy
@@ -2877,27 +2925,27 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
                            ;;invisibility is handled in the activate function
 						   :activate-func #'aj/org-zotxt-activate)
 
-  (defun aj/org-zotxt-activate (start end path bracketp)
-    "Add text properties to display zotxt citation links in a good way"
-    ;; it’s always 36 chars, I think: "[[zotero://select/items/1_EEIVB8QC]["
-    (org-fold-region start (1+ start) t 'org-link-description)
-    (org-fold-region (1+ start) (+ start 36) t 'org-link)
-    (org-fold-region (- end 2) (1- end)  t 'org-link)
-    (org-fold-region (1- end) end t 'org-link-description))
+  ;; (defun aj/org-zotxt-activate (start end _path _bracketp)
+  ;;   "Add text properties to display zotxt citation links in a good way"
+  ;;   ;; it’s always 36 chars, I think: "[[zotero://select/items/1_EEIVB8QC]["
+  ;;   (org-fold-region start (1+ start) t 'org-link-description)
+  ;;   (org-fold-region (1+ start) (+ start 36) t 'org-link)
+  ;;   (org-fold-region (- end 2) (1- end)  t 'org-link)
+  ;;   (org-fold-region (1- end) end t 'org-link-description))
 
 
-  (advice-add 'org-zotxt-insert-reference-links-to-items :override
-              #'aj/org-zotxt-insert-reference-links-to-items)
-  (defun aj/org-zotxt-insert-reference-links-to-items (items)
-    "Insert links to Zotero ITEMS in buffer.
-Just insert space between multiple links."
-    (cl-loop for i in items do
-             (org-zotxt-insert-reference-link-to-item i)
-             (insert " ")))
+  ;;   (advice-add 'org-zotxt-insert-reference-links-to-items :override
+  ;;               #'aj/org-zotxt-insert-reference-links-to-items)
+  ;;   (defun aj/org-zotxt-insert-reference-links-to-items (items)
+  ;;     "Insert links to Zotero ITEMS in buffer.
+  ;; Just insert space between multiple links."
+  ;;     (cl-loop for i in items do
+  ;;              (org-zotxt-insert-reference-link-to-item i)
+  ;;              (insert " ")))
   )
 #+end_src
 
-*** My own view attachment which parses page numbers and jumps to page
+*** My own view attachment which parses page numbers and jumps to page :ARCHIVE:
 Also a function to get all annotations in a pdf file
 #+begin_src emacs-lisp
 (with-eval-after-load "org-zotxt"
@@ -2913,16 +2961,16 @@ Also a function to get all annotations in a pdf file
                             :locator))
            (pagenum (if page (string-to-number page) 1)))
       (deferred:$
-        (aj/get-zotxt-item-path-deferred item-id)
-        (deferred:nextc it
-          (lambda (path)
-            (org-open-file path 1)
-            ;; Maybe the pagenumber is logical, hopefully it’s stored
-            ;; with pdf-zotxt-quote:
-            (if (pdf-zotxt-quote-acquire-variables)
-                (pdf-zotxt-quote-goto-page page)
-              (pdf-view-goto-page pagenum))))
-        (if zotxt--debug-sync (deferred:sync! it)))))
+       (aj/get-zotxt-item-path-deferred item-id)
+       (deferred:nextc it
+                       (lambda (path)
+                         (org-open-file path 1)
+                         ;; Maybe the pagenumber is logical, hopefully it’s stored
+                         ;; with pdf-zotxt-quote:
+                         (if (pdf-zotxt-quote-acquire-variables)
+                             (pdf-zotxt-quote-goto-page page)
+                           (pdf-view-goto-page pagenum))))
+       (if zotxt--debug-sync (deferred:sync! it)))))
 
 
   (bind-key "C-c \" a" #'aj/org-zotxt-open-attachment org-zotxt-mode-map)
@@ -2941,28 +2989,28 @@ Also a function to get all annotations in a pdf file
     (interactive)
     (let ((item-id (org-zotxt-extract-link-id-at-point)))
       (deferred:$
-        (aj/get-zotxt-item-path-deferred item-id)
-        (deferred:nextc it
-          (lambda (path)
-            (pdf-zotxt-quote-get-all-annots-in-buffer-or-file path)))
-        (deferred:sync! it))))
+       (aj/get-zotxt-item-path-deferred item-id)
+       (deferred:nextc it
+                       (lambda (path)
+                         (pdf-zotxt-quote-get-all-annots-in-buffer-or-file path)))
+       (deferred:sync! it))))
 
   (defun aj/get-zotxt-item-path-deferred (item-id)
     (let ((d (deferred:new)))
       (request
-       (format "%s/items" zotxt-url-base)
-       :params `(("key" . ,item-id) ("format" . "paths"))
-       :parser #'zotxt--json-read
-       :success (cl-function
-                 (lambda (&key data &allow-other-keys)
-                   (deferred:callback-post
+        (format "%s/items" zotxt-url-base)
+        :params `(("key" . ,item-id) ("format" . "paths"))
+        :parser #'zotxt--json-read
+        :success (cl-function
+                  (lambda (&key data &allow-other-keys)
+                    (deferred:callback-post
                      d (org-zotxt-choose-path
                         (cdr (assq 'paths (elt data 0))))))))
       d))
   )
 #+end_src
 
-*** Converting back from latex
+*** Converting back from latex :ARCHIVE:
 Some hackish functions
 #+begin_src emacs-lisp
 (use-package biblatex-to-zotxt
@@ -3157,7 +3205,6 @@ Named with org prefix to be preserved in org exports."
 
 (defvar aj/org-reveal-current-url nil)
 (defvar aj/org-reveal-last-url nil)
-(with-eval-after-load "savehist" (add-to-list 'savehist-additional-variables 'aj/org-reveal-last-url))
 (defvar aj/org-reveal-current-file nil)
 (defvar aj/org-reveal-current-slide-id nil)
 (defvar-local aj/org-reveal-url-parameters "")
@@ -3489,6 +3536,7 @@ For my university template, add a final slide with the logo.
   tree)
 
 #+end_src
+
 **** Exporting tree of notes
 #+begin_src emacs-lisp
 (defun aj/org-notes-export (async subtreep visible-only body-only)
@@ -3515,7 +3563,7 @@ For my university template, add a final slide with the logo.
   :translate-alist
   '((special-block . aj/org-notes-special-block)))
 
-(defun aj/org-notes-special-block (special-block contents info)
+(defun aj/org-notes-special-block (special-block contents _info)
   "Transcode a SPECIAL-BLOCK element from Org to Org if it is notes."
   (when (string= (downcase (org-element-property :type special-block))
                  "notes")
@@ -4424,7 +4472,9 @@ hacks working for async)"
 
 ***** Configuration and class loading my beamer customizations
 #+begin_src emacs-lisp
-(with-eval-after-load "ox-beamer"
+(use-package ox-beamer
+  :straight nil
+  :config
   (add-to-list 'org-beamer-environments-extra '("pnote" "m" "\\pnote{%h" "}"))
   (add-to-list 'org-beamer-environments-extra
                '("plainframe" "-" "\\begin{frame}%a%A[plain]" "\\end{frame}"))
@@ -4500,7 +4550,7 @@ I’m trying out ox-reveal, but they have different ways of adding notes (subtre
 (add-to-list 'org-export-filter-special-block-functions #'aj/org-export-reveal-note-to-beamer-note)
 #+end_src
 
-***** Hydra for templates
+***** Hydra for templates :ARCHIVE:
 #+begin_src emacs-lisp
 (with-eval-after-load 'ox-beamer
   (bind-key "C-c C-ö" #'hydra-beamer-templates/body org-beamer-mode-map)
@@ -4874,6 +4924,14 @@ and :select-tags in org export."
 #+end_src
 
 ** Cosmetics, display, faces
+
+*** Org-appear, for showing emphasis-markers etc. when inside
+#+begin_src emacs-lisp
+(use-package org-appear
+  :straight( :host github :repo "awth13/org-appear")
+  :hook (org-mode . org-appear-mode))
+#+end_src
+
 *** Pretty display of todo keywords
 #+begin_src emacs-lisp
 (add-hook 'org-font-lock-set-keywords-hook #'aj/org-prettify-todos)
@@ -4903,20 +4961,6 @@ and :select-tags in org export."
                       nil kw #'equal)))
 
 
-#+end_src
-
-*** [[https://github.com/integral-dw/org-superstar-mode/][org-superstar]] (successor to org-bullets)
-#+begin_src emacs-lisp
-(use-package org-superstar
-  :demand t
-  :hook (org-mode . org-superstar-mode)
-  :custom
-  (org-superstar-headline-bullets-list '(?♦))
-  (org-superstar-special-todo-items 'hide)
-  ;; (org-superstar-todo-bullet-alist '((default . ? )))
-  (org-superstar-prettify-item-bullets nil)
-  ;; when I would like to use plain bullets from time to time:
-  (org-superstar-item-bullet-alist '((?- . ?•) (?+ . ?‣))))
 #+end_src
 
 *** Fix org-indent :ARCHIVE:
@@ -5303,7 +5347,7 @@ https://gitlab.com/andersjohansson/org-outline-numbering
 * Local variables for lisp :org_async:
 #+begin_src emacs-lisp
 ;; Local Variables:
-;; byte-compile-warnings: (not make-local)
+;; byte-compile-warnings: (not make-local docstrings)
 ;; End:
 #+end_src
 

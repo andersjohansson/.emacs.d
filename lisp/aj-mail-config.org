@@ -300,7 +300,21 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 #+end_src
 
 ** View mode
+*** Avoid shr filling paragraphs
+In html emails, shr by default fills paragraph, and the column used is ~fill-column~, set in ~mm-shr~. I don’t want this, because I use ~visual-line-mode~ as well as ~visual-fill-column-mode~. Setting ~fill-column~ to 0 sets ~shr-width~ to 0, which avoids all filling.
+
+This is especially good for avoiding unneccesarily filled quoted original messages.
+#+begin_src emacs-lisp
+(advice-add 'mm-shr :around #'aj/mm-shr-fix-width)
+
+(defun aj/mm-shr-fix-width (fun &rest args)
+  (let ((fill-column 0)
+        (shr-use-fonts nil))
+    (apply fun args)))
+#+end_src
+
 *** Standard settings
+
 #+begin_src emacs-lisp
 (add-hook 'mu4e-view-mode-hook #'variable-pitch-mode)
 (add-hook 'mu4e-view-mode-hook #'visual-line-mode)
@@ -310,7 +324,6 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 ;; (add-to-list 'mu4e-view-actions '("Webkit-widget" . mu4e-action-view-with-xwidget))
 (setq mu4e-html2text-command 'mu4e-shr2text)
 #+end_src
-
 *** Clean up headers in gnus-view, shorten addresses
 It is good to be able to see that the address we get an email from is correct, but we don’t need to see the full address. This little patching to ~mu4e~view-construct-contacts-header~  displays the domain name or possibly a short symbol fetched from the list ~aj/mail-domain~.
 
@@ -735,7 +748,9 @@ Examples:
 (define-key mu4e-view-mode-map "o" #'aj/mu4e-view-open-attachments)
 
 (defun aj/mu4e-view-save-attachments (&optional arg open)
-  "Save mime parts from current mu4e gnus view buffer."
+  "Save mime parts from current mu4e gnus view buffer.
+Queries for directory to save in, or just saves to
+‘mu4e-attachment-dir’ if prefix ARG is given."
   (interactive "P")
   (cl-assert (and (eq major-mode 'mu4e-view-mode)
                   (derived-mode-p 'gnus-article-mode)))
@@ -753,8 +768,8 @@ Examples:
 	      (push fname files))))
     (if files
         (progn
-          (setq files (completing-read-multiple "Save part(s): " files)
-                dir (if arg (read-directory-name "Save to directory: ") mu4e-attachment-dir))
+          (setq files (if (= 1 (length files)) files (completing-read-multiple "Save part(s): " files))
+                dir (if arg mu4e-attachment-dir (read-directory-name "Save to directory: ")))
           (cl-loop for (f . h) in handles
                    when (member f files)
                    do (let* ((file (expand-file-name f dir))
@@ -776,7 +791,7 @@ Examples:
 
 (defun aj/mu4e-view-open-attachments (arg)
   (interactive "P")
-  (aj/mu4e-view-save-attachments arg t))
+  (aj/mu4e-view-save-attachments (not arg) t))
 #+end_src
 
 ** Command for quick check of new mails
@@ -1229,10 +1244,10 @@ If not at beginning of body, insert “Best, NN” greeting."
   (defun aj/message-insert-formatted-citation-line (&rest args)
     "Guess language and maybe force date formats to Swedish, else English"
     (let* ((sv (eq 'sv (guess-language-buffer)))
-           (system-time-locale (if sv "sv_SE" "C"))
+           (system-time-locale (if sv "sv_SE.UTF-8" "C"))
            (message-citation-line-format
             (if sv
-                "%a %-e %b %Y %R, skrev %f:\n"
+                "%A %-e %B %Y %R, skrev %f:\n"
               message-citation-line-format)))
       (apply #'message-insert-formatted-citation-line args))))
 #+end_src
@@ -1593,7 +1608,8 @@ attachment - should launch the no-attachment warning.")
          (:gmailtags . 5)
          ;; (:othermaildir . 10)
          ;; (:mailing-list . 7)
-         (:thread-subject))
+         ;; (:thread-subject)
+         )
         :chalmers
         (;;(:empty . 3)
          (:aj-human-date . 12)
@@ -1602,7 +1618,8 @@ attachment - should launch the no-attachment warning.")
          (:ajtags . 3)
          (:othermaildir . 5)
          (:ajlists . 8)
-         (:thread-subject))
+         ;; (:thread-subject)
+         )
         nil
         (;;(:empty . 2)
          (:aj-human-date . 12)
@@ -1612,14 +1629,15 @@ attachment - should launch the no-attachment warning.")
          (:gmailtags . 5)
          (:othermaildir . 10)
          (:mailing-list . 7)
-         (:thread-subject))))
+         ;; (:thread-subject)
+         )))
 
 (autoload 's-match-strings-all "s")
 (autoload '--all? "dash")
 (defun aj/mu4e-set-headers-fields (query)
   "Set ‘mu4e-headers-fields’ depending on which maildir is viewed."
-  (when (buffer-live-p mu4e-headers-buffer-name)
-    (with-current-buffer mu4e-headers-buffer-name
+  (when (buffer-live-p (mu4e-get-headers-buffer))
+    (with-current-buffer (mu4e-get-headers-buffer)
       (let* ((mdm
               (s-match-strings-all
                "maildir:\\(?2:\\\"\\(?1:[^\\\"]+\\)\\\"\\|\\(?1:[^[:space:]]+\\)\\)"
@@ -1634,16 +1652,21 @@ attachment - should launch the no-attachment warning.")
                   ((--all? (string-match-p "^/chalmers" it) maildirs)
                    :chalmers)
                   ((--all? (string-match-p "^/\\(mejla\\|ajf\\)" it) maildirs)
-                   :gmail))))))
-
-        (setq mu4e-headers-fields
+                   :gmail)))))
+             (headers-fields
               ;; If only a single maildir, no need for :othermaildir, remove it
               (if (and (= 1 (length maildirs))
                        (let ((md (car maildirs)))
                          (not (or (string-suffix-p "/" md)
                                   (string-suffix-p "*" md)))))
                   (assq-delete-all :othermaildir headers-fields)
-                headers-fields)
+                headers-fields)))
+
+        (setq mu4e-headers-fields
+              (append headers-fields
+                      `((,(if mu4e-headers-show-threads
+                              :thread-subject
+                            :subject))))
 
               ;; no need now that I don’t display it.
               ;; header-line-format (mu4e~header-line-format)
@@ -1881,8 +1904,7 @@ The most complex part is for choosing refile folders, depending on account and s
       mu4e-refile-folder #'aj/mu4e-refile-folder)
 
 
-(defvar aj/mu4e-refile-sender-hash (make-hash-table :test 'equal))
-(add-to-list 'savehist-additional-variables 'aj/mu4e-refile-sender-hash)
+(defvar aj/mu4e-refile-sender-hash (make-hash-table :test 'equal)) ;; (added to ‘additional-variables’)
 
 (defun aj/mu4e-refile-guess-by-sender (msg)
   (cl-loop with current-max = 0
@@ -1973,11 +1995,13 @@ No automatic guess if FORCE-CHOICE is non-nil."
   (let* ((subject (mu4e-message-field msg :subject))
          (subject (substring subject 0 (min 18 (length subject))))
          (case-fold-search t)
-         (dir (completing-read (format "Refile \"%s\":" subject)
+         (dir (completing-read (format "Refile \"%s\": " subject)
                                (mu4e-get-maildirs)
                                nil
                                t
-                               startdir)))
+                               startdir
+                               nil
+                               (aj/mu4e-default-refile-folder msg))))
     (unless (string= " " dir)
       dir)))
 

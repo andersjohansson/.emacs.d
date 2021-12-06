@@ -320,7 +320,7 @@ Some variables are not suitable to keep in the init-file, I add these via custom
                              ;; (every small change), and
                              ;; compiling mu is slow!!! I’ll do it
                              ;; manually when needed
-                             ;; :pre-build (("./autogen.sh") ("make"))
+                             ;; :pre-build (("meson build") ("ninja -C build"))
                              ))
 
 ;; Don’t do any stupid options saving for eudc, my options are defined in mail-config.org
@@ -370,38 +370,31 @@ Some variables are not suitable to keep in the init-file, I add these via custom
   :demand t)
 #+end_src
 
-*** Save-hist (don't use session, but save many useful history variables)
+*** Savehist (don't use session, but save many useful history variables)
 #+begin_src emacs-lisp
 (setq history-delete-duplicates t)
 
-(setq savehist-additional-variables
-      '(kill-ring search-ring regexp-search-ring
-                  ;; extended-command-history
+;; ‘savehist-additional-variables’, is set via customize so it is
+;; loaded before this
 
-                  ;; all these should be added automatically when minibuffer is used in savehist-minibuffer-history-variables
-                  ;; helm-M-x-input-history
-                  ;; helm-adaptive-history helm-build-regexp-history
-                  ;; helm-eshell-command-on-file-input-history
-                  ;; helm-external-command-history helm-ff-history
-                  ;; helm-file-name-history helm-grep-history
-                  ;; helm-surfraw-engines-history
-                  ;; helm-surfraw-input-history Info-history
-                  ;; Info-search-history compile-history
-                  ;; dired-regexp-history dired-shell-command-history
-                  ;; face-name-history grep-files-history
-                  ;; grep-find-history grep-history grep-regexp-history
-                  ;; org-agenda-search-history org-insert-link-history
-                  ;; org-refile-history org-tags-history
-                  ;; pdf-occur-history query-replace-history
-                  ;; shell-command-history
-                  ))
 (savehist-mode)
 
-;; No properties in kill-ring saved by savehist, makes it much smaller
-(defun aj/unpropertize-kill-ring ()
-  (setq kill-ring (mapcar 'substring-no-properties kill-ring)))
+(defun aj/unpropertize-hist-vars (oldfun &rest args)
+  "Remove text properties for some history variables for smaller savehist."
+  (let ((vars-to-mod
+         (seq-filter
+          (lambda (el) (and (boundp el)
+                       (listp (symbol-value el))
+                       (stringp (car (symbol-value el)))))
+          (append savehist-additional-variables
+                  savehist-minibuffer-history-variables))))
+    (cl-progv
+        vars-to-mod
+        (cl-loop for var in vars-to-mod
+                 collect (mapcar 'substring-no-properties (symbol-value var)))
+      (apply oldfun args))))
 
-(add-hook 'kill-emacs-hook 'aj/unpropertize-kill-ring -90)
+(advice-add 'savehist-save :around #'aj/unpropertize-hist-vars)
 #+end_src
 
 
@@ -455,7 +448,7 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 
 *** Completion
 **** New completion frameworks
-***** Selectrum for the interface and prescient for matching
+***** Selectrum for the interface and prescient for matching :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package selectrum
   :custom
@@ -486,6 +479,47 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   :init
   (selectrum-prescient-mode +1)
   (prescient-persist-mode +1))
+#+end_src
+
+***** Vertico for the interface and orderless as completion style
+#+begin_src emacs-lisp
+(use-package vertico
+  :straight (vertico :includes (vertico-directory vertico-repeat)
+                     :files (:defaults
+                             "extensions/vertico-directory.el"
+                             "extensions/vertico-repeat.el"))
+  :bind (("M-r" . #'vertico-repeat)
+         :map vertico-map
+         ("<backspace>" . #'vertico-directory-delete-char)
+         ("C-<backspace>" . #'vertico-directory-delete-word))
+  :init
+  (vertico-mode)
+  (add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
+  :custom
+  (vertico-count 20)
+  (vertico-count-format (cons "%-7s " "%s/%s"))
+  (vertico-cycle t))
+
+(use-package orderless
+  :custom (orderless-component-separator #'orderless-escapable-split-on-space)
+  :init
+  (setq completion-styles '(orderless)
+        completion-category-defaults nil
+        ;; completion-category-overrides '((file (styles partial-completion)))
+
+        ;; we do have ‘orderless-smart-case’, but it doesn‘t seem to apply to
+        ;; file-name completion for some reason
+        read-file-name-completion-ignore-case t
+        read-buffer-completion-ignore-case t))
+
+;; Configure a custom style dispatcher (see the Consult wiki)
+  ;; (setq orderless-style-dispatchers '(+orderless-dispatch))
+
+
+;; Do not allow the cursor in the minibuffer prompt
+(setq minibuffer-prompt-properties
+      '(read-only t cursor-intangible t face minibuffer-prompt))
+(add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
 
 #+end_src
 
@@ -512,8 +546,9 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
          ("<f2>" . consult-org-heading))
   :custom
   (consult-ripgrep-args
-   "rg --no-ignore --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --line-number .")
+   "rg --no-ignore --null --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --line-number .")
 
+  (consult-preview-key (kbd "C-å"))
   :init
   (advice-add #'completing-read-multiple :override #'consult-completing-read-multiple)
 
@@ -528,11 +563,11 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
     (consult-ripgrep (file-name-directory file)))
 
   ;; disable automatic preview for some commands
-  (consult-customize
-   consult-ripgrep consult-git-grep consult-grep
-   consult-bookmark consult-recent-file consult-xref
-   consult--source-file consult--source-project-file consult--source-bookmark
-   :preview-key (kbd "M-."))
+  ;; (consult-customize
+  ;;  consult-ripgrep consult-git-grep consult-grep
+  ;;  consult-bookmark consult-recent-file consult-xref
+  ;;  consult--source-file consult--source-project-file consult--source-bookmark
+  ;;  :preview-key (kbd "M-."))
 
 
   ;; https://github.com/minad/consult/wiki#cycle-through-narrowing-keys
@@ -793,6 +828,8 @@ https://www.freedesktop.org/wiki/Specifications/desktop-bookmark-spec/"
 (defun aj/open-zoterofile-new-frame ()
   (let ((selectrum-display-action '(selectrum-display-full-frame)))
     (aj/run-cmd-in-small-frame 100 20 #'aj/open-zoterofile "Zotero file" t)))
+
+(autoload #'consult--multi "consult")
 
 (defun aj/open-zoterofile ()
   (interactive)
@@ -1339,6 +1376,7 @@ Use ~fd~ for searching instead of ~find~. Faster and easier.
   (defun aj/orgqda-remove-filename-num (filename)
     "Clean up initial numbers from FILENAME."
     (replace-regexp-in-string "^[0-9]+-" "" filename))
+
   (add-to-list 'orgqda-tagcount-files-transform-functions
                #'aj/orgqda-remove-filename-num
                t)
@@ -1371,9 +1409,7 @@ Use ~fd~ for searching instead of ~find~. Faster and easier.
                                     'shadow))))))
 
   ;; Special function for inserting or modifying tags
-  (with-eval-after-load 'orgqda-completion-annotations
-    (define-key orgqda-completion-annotations-mode-map [remap org-set-tags-command]
-      #'aj/orgqda-tag-or-code))
+  (define-key orgqda-mode-map [remap org-set-tags-command] #'aj/orgqda-tag-or-code)
 
   (defun aj/orgqda-tag-or-code (arg)
     "Insert inlinetask and tag, except if on headline, then add tag
@@ -1405,7 +1441,7 @@ ARG is passed through."
 
 #+end_src
 
-***** Org-pomodoro
+***** Org-pomodoro :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package org-pomodoro
   :after org)
@@ -1428,6 +1464,7 @@ For exporting and converting to zotero.
 #+begin_src emacs-lisp
 (use-package citeproc)
 #+end_src
+
 **** org init
 #+begin_src emacs-lisp
 (use-package org
@@ -1740,7 +1777,7 @@ Use mu4e, the extensive config is in an [[file:lisp/aj-mail-config.org][external
          ("C-x i" . mu4e~headers-jump-to-maildir)
          ("C-x å" . mu4e-headers-search-bookmark))
   :defer 10
-  :custom ((mu4e-mu-binary (expand-file-name "mu/mu" (straight--repos-dir "mu")))
+  :custom ((mu4e-mu-binary (expand-file-name "build/mu/mu" (straight--repos-dir "mu")))
            (mu4e-confirm-quit nil)
            (mu4e-context-policy 'pick-first)
            (mu4e-compose-context-policy 'ask-if-none)
@@ -2022,7 +2059,6 @@ Store visited directories in a list
   (run-at-time "16:10" nil #'dired-recent-cleanup)
 
   ;;add source to consult-dir
-
   (with-eval-after-load 'consult-dir
     (defun aj/consult-dir-dired-recent ()
       (consult-dir--filter-hashed dired-recent-directories))
@@ -2036,10 +2072,7 @@ Store visited directories in a list
          :items ,#'aj/consult-dir-dired-recent)
       "Dired recent source for `consult-dir--pick'.")
 
-    (add-to-list 'consult-dir-sources 'aj/consult-dir--source-dired-recent 'append)
-    )
-
-  )
+    (add-to-list 'consult-dir-sources 'aj/consult-dir--source-dired-recent 'append)))
 #+end_src
 
 *** Ignore more files for normal completion
@@ -3621,6 +3654,11 @@ Dims parentheses in lisp modes.
 #+end_src
 
 *** Elisp
+
+**** Bind ~pp-eval-last-sexp~.
+#+begin_src emacs-lisp
+(bind-key "C-x C-S-e" #'pp-eval-last-sexp)
+#+end_src
 **** Some settings from ESK
 #+begin_src emacs-lisp
 (add-hook 'emacs-lisp-mode-hook 'aj/remove-elc-on-save)
@@ -4574,7 +4612,6 @@ DIR."
 pdf-loader handles deferred loading. Then settings are applied after loading pdf-view.
 #+begin_src emacs-lisp
 (use-package pdf-tools
-  :straight (pdf-tools :fork (:host github :repo "vedang/pdf-tools"))
   :commands pdf-loader-install ;; TODO (fel?)
   :init (pdf-loader-install)
   :custom (pdf-annot-tweak-tooltips . nil)
@@ -4932,7 +4969,8 @@ fi
 ;;   )
 
 (use-package mini-modeline
-  :straight (mini-modeline :fork (:host github :repo "andersjohansson/mini-modeline" :branch "buffer-local-formats"))
+  :straight (:host 'github :repo "kiennq/emacs-mini-modeline")
+  ;; :straight (mini-modeline :fork (:host github :repo "andersjohansson/mini-modeline" :branch "buffer-local-formats"))
   ;; :after doom-modeline
   :demand t
   :hook (window-setup . mini-modeline-mode)
@@ -4944,7 +4982,7 @@ fi
   ;; (doom-modeline-format--minibuffer-line))
 
   (defsubst aj/modeline-column (pos)
-    "Get the column of the position `POS'."
+    "Get the column of the position POS."
     (save-excursion (goto-char pos)
                     (current-column)))
 
@@ -4982,10 +5020,10 @@ fi
   (defun aj/mini-modeline-faces (theme)
     (set-face-attribute 'mode-line nil :box t)
     (when (member theme '(modus-operandi modus-vivendi))
+      (set-face-attribute 'mini-modeline-mode-line-inactive nil
+                          :background (modus-themes-color 'bg-active) :height 0.14)
       (set-face-attribute 'mini-modeline-mode-line nil
-                          :background (modus-themes-color 'blue-fringe-bg) :height 0.14))
-    (set-face-attribute 'mini-modeline-mode-line-inactive nil
-                        :background (face-background 'fringe) :height 0.14))
+                          :background (modus-themes-color 'blue-fringe-bg) :height 0.14)))
 
 
   ;; no need for bars
@@ -5031,23 +5069,24 @@ fi
   ;; (advice-add #'helm-display-mode-line :after #'doom-modeline-set-helm-modeline)
 
   ;; (remove-hook 'helm-after-initialize-hook #'aj/visible-helm-modeline)
-  (add-hook 'helm-window-configuration-hook #'aj/visible-helm-modeline)
-  (defun aj/visible-helm-modeline (&rest _)
-    (with-helm-buffer
-      (setq-local face-remapping-alist
-                  (cl-delete
-                   'mode-line
-                   face-remapping-alist
-                   :key #'car)
-                  ;; (cons '(doom-modeline . mode-line)
-                  ;;       (cl-delete
-                  ;;        'doom-modeline
-                  ;;        (cl-delete
-                  ;;         'mode-line
-                  ;;         face-remapping-alist
-                  ;;         :key #'car)
-                  ;;        :key #'car))
-                  )))
+
+  ;; (add-hook 'helm-window-configuration-hook #'aj/visible-helm-modeline)
+  ;; (defun aj/visible-helm-modeline (&rest _)
+  ;;   (with-helm-buffer
+  ;;     (setq-local face-remapping-alist
+  ;;                 (cl-delete
+  ;;                  'mode-line
+  ;;                  face-remapping-alist
+  ;;                  :key #'car)
+  ;;                 ;; (cons '(doom-modeline . mode-line)
+  ;;                 ;;       (cl-delete
+  ;;                 ;;        'doom-modeline
+  ;;                 ;;        (cl-delete
+  ;;                 ;;         'mode-line
+  ;;                 ;;         face-remapping-alist
+  ;;                 ;;         :key #'car)
+  ;;                 ;;        :key #'car))
+  ;;                 )))
 
 
   ;; show modeline for some other special buffers. Currently
@@ -5113,6 +5152,7 @@ Load my own face customizations after enabling a theme.
 #+begin_src emacs-lisp
 (defface aj/goto-address-mail-face '((t :inherit (shadow italic)))
   "" :group 'aj)
+(setq goto-address-mail-face 'aj/goto-address-mail-face)
 
 (defun aj/apply-face-definitions (&optional theme)
   "Do face definition stuff after loading theme.
@@ -5122,11 +5162,11 @@ Also runs hook aj/face-definitions-hook."
     ;; (set-face-attribute 'scroll-bar nil :foreground (face-attribute
     ;; 'widget-field :background))
 
-    (setq goto-address-mail-face 'aj/goto-address-mail-face)
-
-
-    (set-face-attribute 'internal-border nil :background "#CCCCCC")
-
+    ;; don’t inherit bold for these:
+    (set-face-attribute 'orderless-match-face-0 nil :inherit nil)
+    (set-face-attribute 'orderless-match-face-1 nil :inherit nil)
+    (set-face-attribute 'orderless-match-face-2 nil :inherit nil)
+    (set-face-attribute 'orderless-match-face-3 nil :inherit nil)
 
     (with-eval-after-load 'org-indent
       ;; modus-operandi sets it to inherit fixed-pitch, but that is
@@ -5144,17 +5184,10 @@ Also runs hook aj/face-definitions-hook."
       (set-face-attribute 'org-document-title nil :height 1.5 :weight 'bold)
       ;; ;; (set-face-attribute 'org-meta-line nil :inherit 'org-drawer)
 
-      (set-face-attribute 'org-block-begin-line nil :overline (modus-themes-color 'bg-active))
-      (set-face-attribute 'org-block-end-line nil :underline (modus-themes-color 'bg-active) :overline nil)
-
-
-      (set-face-attribute 'org-block-begin-line nil :height 0.9)
-      (set-face-attribute 'org-block-end-line nil :height 0.9)
-      ;; (set-face-attribute 'org-block nil :extend nil)
+      (set-face-attribute 'org-block-begin-line nil :overline (modus-themes-color 'bg-active) :height 0.9)
+      (set-face-attribute 'org-block-end-line nil :underline (modus-themes-color 'bg-active) :overline nil :height 0.9)
 
       (set-face-attribute 'org-quote nil :weight 'light :height 0.95 :background nil)
-
-      ;; ;; (set-face-attribute 'org-special-keyword nil :weight 'normal :inherit 'shadow)
 
       ;; ;; Use fixed-pitch for checkbox, compressed font for table
       (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
@@ -5163,13 +5196,13 @@ Also runs hook aj/face-definitions-hook."
       (set-face-attribute 'org-agenda-date-today nil :background nil)
 
       (when (eq theme 'modus-operandi)
-        ;; (set-face-attribute 'org-block nil :background "#f8f8f8")
+        (set-face-attribute 'org-block nil :background "#f8f8f8")
         (dolist (n '("1" "2" "3" "4" "5" "6" "7" "8"))
           (set-face-attribute (intern (concat "org-level-" n)) nil :weight 'light))
 
-        ;; avoid tags inheriting headline color, make them bold but subdued.
-        ;; (set-face-attribute 'org-tag nil :foreground (modus-themes-color 'magenta-nuanced-fg)
-        ;;                     :weight 'light)
+        ;; avoid tags inheriting headline color
+        (set-face-attribute 'org-tag nil :foreground (modus-themes-color 'magenta-nuanced-fg)
+                            :weight 'light)
 
         (defface aj/org-todo `((t :foreground ,(modus-themes-color 'red) :bold t)) "Face for todo org-state" :group 'org-faces)
         (defface aj/org-waiting `((t :foreground ,(modus-themes-color 'yellow) :bold t)) "Face for waiting org-state" :group 'org-faces)
@@ -5182,60 +5215,19 @@ Also runs hook aj/face-definitions-hook."
                 ("STARTAD" . aj/org-started)
                 ("VÄNTAR" . aj/org-waiting)
                 ("AVFÖRD" . aj/org-done)
-                ("DONE" . aj/org-done)))
+                ("DONE" . aj/org-done)))))
 
-        )
-      ;; level colors in gruvbox are bad... (I don’t like the red...)
-      ;; (when (eq theme 'gruvbox-light-hard)
-      ;;   (gruvbox-light-hard-with-palette
-      ;;    (set-face-attribute 'org-level-1 nil :foreground gruvbox-bright_blue)
-      ;;    (set-face-attribute 'org-level-2 nil :foreground gruvbox-bright_aqua)
-      ;;    (set-face-attribute 'org-level-3 nil :foreground gruvbox-bright_purple)
-      ;;    (set-face-attribute 'org-level-4 nil :foreground gruvbox-bright_green)
-      ;;    (set-face-attribute 'org-level-5 nil :foreground gruvbox-bright_yellow)
-      ;;    (set-face-attribute 'org-level-6 nil :foreground gruvbox-bright_orange)
-      ;;    (set-face-attribute 'org-level-7 nil :foreground gruvbox-faded_blue)
-      ;;    (set-face-attribute 'org-level-8 nil :foreground gruvbox-faded_aqua)))
-
-      ;; specific for solarized
-      ;; level colors in solarized are bad (demote red)
-      ;; (when (aj/solarized-theme-p)
-      ;;   (solarized-with-color-variables 'dark
-      ;;                                   (set-face-attribute 'org-level-1 nil :foreground violet)
-      ;;                                   (set-face-attribute 'org-level-2 nil :foreground blue)
-      ;;                                   (set-face-attribute 'org-level-3 nil :foreground cyan)
-      ;;                                   (set-face-attribute 'org-level-4 nil :foreground green)
-      ;;                                   (set-face-attribute 'org-level-5 nil :foreground yellow)
-      ;;                                   (set-face-attribute 'org-level-6 nil :foreground orange)
-      ;;                                   (set-face-attribute 'org-level-7 nil :foreground red)
-      ;;                                   (set-face-attribute 'org-level-8 nil :foreground magenta)))
-      )
-
-    ;; (cond
-    ;;  ((eq theme 'solarized-light)
-    ;;   (setq org-n-level-faces 8))
-    ;;  ((eq theme 'solarized-dark)
-    ;;   ;; the yellow-red ones are garish contrast-colors to the background
-    ;;   (setq org-n-level-faces 4)))
-
-    ;; the thing solarized does with mode-line underline is bad.
-    ;; (when (member theme '(solarized-dark solarized-light))
-    ;;   (set-face-attribute 'mode-line nil :underline nil :overline nil)
-    ;;   (set-face-attribute 'mode-line-inactive nil :underline nil :overline nil)
-    ;;   (set-face-attribute 'header-line nil :underline nil :overline nil))
 
     (with-eval-after-load 'idle-highlight-mode
       (set-face-attribute 'idle-highlight nil :inherit nil :underline t))
 
-    ;; (with-eval-after-load 'org-inlinetask
-    ;;   (set-face-attribute 'org-inlinetask nil :inherit 'org-level-5))
 
     (run-hook-with-args 'aj/face-definitions-hook theme)))
 
 (advice-add 'enable-theme :after #'aj/apply-face-definitions)
 #+end_src
 
-**** Gruvbox
+**** Gruvbox :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package gruvbox
   :straight (gruvbox-theme
@@ -5243,17 +5235,17 @@ Also runs hook aj/face-definitions-hook."
              :fork (:host github :repo "andersjohansson/emacs-theme-gruvbox" :branch "ajfixes2")))
 #+end_src
 
-**** Modus-themes (I always use the light modus-operandi theme)
+**** Modus-themes (I almost always use the light modus-operandi theme)
 #+begin_src emacs-lisp
 (use-package modus-themes
   :custom
-  (modus-themes-syntax 'yellow-comments)
-  (modus-themes-links 'neutral-underline)
+  (modus-themes-syntax '(yellow-comments))
+  (modus-themes-links '(faint neutral-underline))
   (modus-themes-fringes 'subtle)
   (modus-themes-diffs 'desaturated)
   (modus-themes-org-blocks 'gray-background)
   (modus-themes-mail-citations 'faint)
-  (modus-themes-region 'bg-only-no-extend)
+  (modus-themes-region '(bg-only no-extend))
   (modus-themes-org-agenda '((header-date . (bold-all))))
   (modus-themes-variable-pitch-ui t)
   (modus-themes-completions 'moderate)
@@ -5277,7 +5269,9 @@ From modus-themes manual
 (defvar aj/light-theme 'modus-operandi
   ;; 'gruvbox-light-hard
   )
-(defvar aj/dark-theme 'gruvbox-dark-medium)
+(defvar aj/dark-theme 'modus-vivendi
+  ;; gruvbox-dark-medium
+  )
 
 (load-theme aj/light-theme)
 ;; I’m not loading dark theme here, since I seldom use it.
@@ -5296,21 +5290,36 @@ From modus-themes manual
       (load-theme aj/dark-theme t t))
     (enable-theme aj/dark-theme)
     (call-process-shell-command
-     "xfconf-query -c xsettings -p /Net/ThemeName -s \"Arc-Dark\""
+     ;; "xfconf-query -c xsettings -p /Net/ThemeName -s \"Arc-Dark\""
      ;; for gnome:
-     ;; "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc-Dark'\""
+     "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc-Dark'\""
      ))
    ((custom-theme-enabled-p aj/dark-theme)
     (disable-theme aj/dark-theme)
     (enable-theme aj/light-theme)
     (call-process-shell-command
-     "xfconf-query -c xsettings -p /Net/ThemeName -s \"Arc\""
-     ;; "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc'\""
+     ;; "xfconf-query -c xsettings -p /Net/ThemeName -s \"Arc\""
+     "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc'\""
      ))
    (t
     (enable-theme 'aj/light-theme))))
 
 (bind-key "S-<f11>" #'aj/toggle-light-dark)
+#+end_src
+
+*** Lin-mode
+More prominent line highlighting where it is suitable.
+#+begin_src emacs-lisp
+(use-package lin
+  :straight (:host gitlab :repo "protesilaos/lin")
+  :hook ((dired-mode
+          mu4e-headers-mode
+          elfeed-search-mode-hook)
+         . lin-mode)
+  :config
+  (set-face-attribute
+   'lin-hl nil
+   :background (modus-themes-color 'cyan-nuanced-bg)))
 #+end_src
 *** Hl-line for prog-mode
 #+begin_src emacs-lisp
@@ -5439,6 +5448,7 @@ Also at: https://gitlab.com/andersjohansson/orgqda
   :straight   :straight (:depth full :host gitlab :repo "andersjohansson/orgqda" :files ("orgqda-transcript.el"))
   :defer t
   :custom
+  (orgqda-transcript-encode-filename-in-links nil)
   (orgqda-transcript-bind-fn-keys t)
   (orgqda-transcript-bind-1-4-keys t)
   (orgqda-transcript-set-up-speaker-keys t)
@@ -5468,16 +5478,6 @@ Also at: https://gitlab.com/andersjohansson/orgqda
     ("C" (progn (zap-to-char -1 ?q) (insert "[city]"))))
 
   (define-key orgqda-transcript-mode-map "q" #'aj/q-hydra/body)
-
-  ;; (defun aj/say-yeah (&optional arg)
-  ;;   (interactive "P")
-  ;;   (zap-to-char -1 ?q)
-  ;;   (orgqda-transcript-insert-parenthesis-other-speaker
-  ;;    (pcase arg
-  ;;      ('(4) "yeah yeah")
-  ;;      ('(16) "yeah yeah yeah")
-  ;;      ((pred integerp) (s-repeat arg "yeah "))
-  ;;      (_ "yeah"))))
 
   (defhydra aj/hydra-mplayer (:color blue)
     ("SPC"     #'mplayer-toggle-pause "pause")
