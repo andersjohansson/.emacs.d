@@ -46,7 +46,8 @@
     (org-level-8 . (:weight bold :height 1.0))
     ;;(org-block (:background ,base02))
     (org-link . (:underline t :weight normal))
-    (org-special-keyword . (:height 0.9)))
+    (org-special-keyword . (:height 0.9))
+    (org-table . (:height 0.6))) ;; means most tables may fit.
   "Faces to remap, with attributes to remap."
   :type '(alist :key-type face :value-type (plist :value-type sexp)))
 
@@ -65,11 +66,16 @@
     mu4e-header-value-face mu4e-link-face
     mu4e-contact-face
     mu4e-compose-separator-face
-    mu4e-compose-header-face org-block
-    org-block-begin-line org-block-end-line
-    org-document-info-keyword org-code
-    org-latex-and-related org-checkbox
-    org-meta-line org-table org-verbatim)
+    mu4e-compose-header-face
+    org-block
+    org-block-begin-line
+    org-block-end-line
+    org-document-info-keyword
+    org-code
+    org-latex-and-related
+    org-checkbox
+    org-meta-line
+    org-verbatim)
   "Faces to avoid remapping.
 
 Height and family is kept from the “default” ‘default’ face."
@@ -80,11 +86,21 @@ Height and family is kept from the “default” ‘default’ face."
   :type '(choice (const :tag "No extra space" nil)
                  (float :tag "Scale to default spacing")))
 
+(defcustom doc-font-modify-parspace 'vertical
+  "Replace double line breaks via font-lock.
+When 'vertical, use small vertical space between paragraphs, when
+'indent, use paragraph indents."
+  :type '(choice (const :tag "No modification" nil)
+                 (const :tag "Small vertical space" vertical)
+                 (const :tag "Indent" indent)))
+
 (defvar-local doc-font-cookies nil)
 (defvar-local doc-font-cookies-def nil)
 (defvar-local doc-font-variable-cookies nil)
 (defvar-local doc-font-variable-cookies-nokill nil)
 
+(defface doc-font-small-parspace '((nil (:height 0.1)))
+  "Face for small vertical paragraph spaces.")
 
 (defmacro doc-font--store-old-val (var)
   "Store value of VAR in ‘doc-font-variable-cookies-nokill’."
@@ -100,7 +116,8 @@ Old value is stored in ‘doc-font-variable-cookies’."
 
 ;;;###autoload
 (define-minor-mode doc-font-mode
-  "Change the default face of the current buffer to a “nice” serif font"
+  "Change the default face of the current buffer to a “nice” serif font.
+Along with some other changes."
   :lighter ""
   (if doc-font-mode
       (let ((default-family (face-attribute 'default :family))
@@ -129,7 +146,17 @@ Old value is stored in ‘doc-font-variable-cookies’."
             (doc-font--set-and-store-old-val 'org-superstar-headline-bullets-list
                                              '(?\N{ZERO WIDTH SPACE}))
             (doc-font--set-and-store-old-val 'org-superstar-prettify-item-bullets t)
-            (org-superstar-restart))))
+            (org-superstar-restart)))
+
+        (when (eq 'indent doc-font-modify-parspace)
+          (make-local-variable 'font-lock-extra-managed-props)
+          (add-to-list 'font-lock-extra-managed-props 'display)
+          (font-lock-add-keywords nil '(("\\(\n\n\\)[^*]" 1
+                                         (list 'face 'default
+                                               'display (concat "\n\t\t"))))))
+        (when (eq 'vertical doc-font-modify-parspace)
+          (font-lock-add-keywords nil '(("\\(\n\n\\)[^*]" 1 'doc-font-small-parspace)))))
+
     ;; DISABLE:
     (cl-loop for c in (append doc-font-cookies doc-font-cookies-def) do
              (face-remap-remove-relative c))
