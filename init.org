@@ -1357,16 +1357,15 @@ Use ~fd~ for searching instead of ~find~. Faster and easier.
 
 (use-package orgqda
   :straight ( :depth full :host gitlab :repo "andersjohansson/orgqda"
-              :files ("orgqda.el" "orgqda-completion-annotations.el"))
+              :files ("orgqda.el" "orgqda-completion.el"))
   :defer t
   :after org
   :init (put 'orgqda-csv-dir 'safe-local-variable #'file-directory-p)
-  :hook (orgqda-mode . orgqda-completion-annotations-mode)
+  :hook (orgqda-mode . orgqda-completion-mode)
   :custom
-  (orgqda-keep-tags-sorted 'a-z)
   (orgqda-tagcount-show-files t)
-  (orgqda-completion-annotations-include-excluded t)
-  (orgqda-completion-annotations-include-persistent t)
+  (orgqda-completion-include-excluded t)
+  (orgqda-completion-include-persistent t)
   :config (setq orgqda-exclude-tags
                 (append (mapcar #'car org-tag-persistent-alist)
                         '("ARCHIVE" "Reflektion" "Observation" "Forskningsdagbok")))
