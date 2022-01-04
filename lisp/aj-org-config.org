@@ -16,13 +16,14 @@
   :custom
   (org-roam-directory "/home/aj/jobb/anteckningar")
   (org-roam-db-update-on-save nil)
-  ;; :bind (("C-c n l" . org-roam-buffer-toggle)
-  ;;        ("C-c n f" . org-roam-node-find)
-  ;;        ("C-c n g" . org-roam-graph)
-  ;;        ("C-c n i" . org-roam-node-insert)
-  ;;        ("C-c n c" . org-roam-capture)
-  ;;        ;; Dailies
-  ;;        ("C-c n j" . org-roam-dailies-capture-today))
+  :bind (("C-c n l" . org-roam-buffer-toggle)
+         ("C-c n f" . org-roam-node-find)
+         ("C-c n g" . org-roam-graph)
+         ("C-c n i" . org-roam-node-insert)
+         ("C-c n c" . org-roam-capture)
+         ;; Dailies
+         ;; ("C-c n j" . org-roam-dailies-capture-today)
+         )
   :config
   (org-roam-db-autosync-mode)
   )
@@ -401,6 +402,24 @@ have `org-warning' face."
 (advice-add 'org-activate-tags :override #'aj/org-activate-tags)
 #+end_src
 
+** Sort tags
+#+begin_src emacs-lisp
+(setq org-tags-sort-function #'aj/org-tag-sort-lessp)
+
+(defun aj/org-tag-sort-lessp (a b)
+  "Return non-nil if S1 is less than S2 in collation order.
+Sort symbols _@#% first, ignore case and collate depending on current locale."
+  (let* ((fa (string-to-char a))
+         (fb (string-to-char b))
+         (fas (< fa 65))
+         (fbs (< fb 65)))
+    (cond
+     ((and fas (not fbs)) t)
+     ((and fbs (not fas)) nil)
+     ((and fas fbs (not (= fa fb))) (< fa fb))
+     (t (string-collate-lessp a b nil t)))))
+#+end_src
+
 ** Keybindings and templates
 *** Special C-a, C-e
 #+begin_src emacs-lisp
@@ -598,30 +617,30 @@ I think this patch makes it work better (correct, that is). Trying it out for a 
 #+begin_src emacs-lisp
 (setq org-table-header-line-p t)
 
-(el-patch-feature org-table)
-(with-eval-after-load 'org-table
-  (el-patch-defun org-table-header-set-header ()
-    "Display the header of the table at point."
-    (when (overlayp org-table-header-overlay)
-      (delete-overlay org-table-header-overlay))
-    (let* ((ws (window-start))
-	       (beg (save-excursion
-                  (el-patch-add (goto-char ws))
-                  (goto-char (org-table-begin))
-		          (while (or (org-at-table-hline-p)
-			                 (looking-at-p ".*|\\s-+<[rcl]?\\([0-9]+\\)?>"))
-		            (move-beginning-of-line 2))
-		          (point)))
-	       (end (save-excursion (goto-char beg) (point-at-eol))))
-      (if (pos-visible-in-window-p beg)
-	      (when (overlayp org-table-header-overlay)
-	        (delete-overlay org-table-header-overlay))
-        (setq org-table-header-overlay
-	          (make-overlay ws (+ ws (- end beg))))
-        (org-overlay-display
-         org-table-header-overlay
-         (org-table-row-get-visible-string beg)
-         'org-table-header)))))
+;; (el-patch-feature org-table)
+;; (with-eval-after-load 'org-table
+;;   (el-patch-defun org-table-header-set-header ()
+;;     "Display the header of the table at point."
+;;     (when (overlayp org-table-header-overlay)
+;;       (delete-overlay org-table-header-overlay))
+;;     (let* ((ws (window-start))
+;; 	       (beg (save-excursion
+;;                   (el-patch-add (goto-char ws))
+;;                   (goto-char (org-table-begin))
+;; 		          (while (or (org-at-table-hline-p)
+;; 			                 (looking-at-p ".*|\\s-+<[rcl]?\\([0-9]+\\)?>"))
+;; 		            (move-beginning-of-line 2))
+;; 		          (point)))
+;; 	       (end (save-excursion (goto-char beg) (point-at-eol))))
+;;       (if (pos-visible-in-window-p beg)
+;; 	      (when (overlayp org-table-header-overlay)
+;; 	        (delete-overlay org-table-header-overlay))
+;;         (setq org-table-header-overlay
+;; 	          (make-overlay ws (+ ws (- end beg))))
+;;         (org-overlay-display
+;;          org-table-header-overlay
+;;          (org-table-row-get-visible-string beg)
+;;          'org-table-header)))))
 #+end_src
 
 ** Agenda, todo, scheduling etc.
@@ -2056,6 +2075,74 @@ https://gitlab.com/andersjohansson/org-archive-hierarchically
 #+end_src
 
 ** Org capture
+
+*** Capture in new frame
+#+begin_src emacs-lisp
+(define-key global-map [remap org-capture] #'aj/org-capture-in-popout-frame)
+
+(add-hook 'org-capture-after-finalize-hook #'aj/org-capture-delete-capture-frame)
+
+(defun aj/org-capture-in-popout-frame (&optional goto keys)
+  "As `org-capture', but do all work in a new frame.
+
+    This function by itself doesn't clean up the frame following
+    capture.  To do that, add `aj/org-capture-delete-capture-frame'
+    to `org-capture-after-finalize-hook'."
+  (interactive "P")
+  (if goto
+      (org-capture goto keys)
+    (let ((display-buffer-alist
+           (cons '("\\*Org Select\\*\\|\\*Capture\\*\\|CAPTURE-.*"
+                   aj/display-buffer-in-named-frame
+                   (named-frame . "Capture"))
+                 display-buffer-alist)))
+      (cl-letf
+          (;; Make Org-mode respect `display-buffer-alist'.
+           ((symbol-function 'org-switch-to-buffer-other-window)
+            #'pop-to-buffer
+            ;; And stop Org-mode from messing with our window configuration.
+            (symbol-function 'delete-other-windows)
+            #'ignore))
+        (condition-case err
+            (org-capture goto keys)
+          (error (aj/org-capture-delete-capture-frame)
+                 (signal (car err) (cdr err))))))))
+
+(defun aj/org-capture-delete-capture-frame ()
+  "Delete a frame named \"Capture\".
+For use in `org-capture-after-finalize-hook' to clean up after
+`aj/org-capture-in-popout-frame'."
+  (when-let ((frame (aj/get-frame-by-name "Capture")))
+    (delete-frame frame)))
+
+
+(defun aj/get-frame-by-name (name)
+  (cl-loop for frame being the frames
+           when (equal (frame-parameter frame 'name) name)
+           return frame))
+
+
+(defun aj/display-buffer-in-named-frame (buffer alist)
+  "Display BUFFER in frame with specific name.
+The name to use is the value associated with the 'named-frame key
+in ALIST.  If a frame with that name already exists, use it.
+Otherwise, call `display-buffer-in-pop-up-frame' to create it.
+
+If ALIST does not contain the key 'named-frame, use the name of BUFFER."
+  (let* ((fname  (or (cdr (assq 'named-frame alist))
+                     (buffer-name buffer)))
+         (frame  (aj/get-frame-by-name fname)))
+    (if frame
+        (window--display-buffer buffer
+                                (frame-selected-window frame)
+                                'reuse)
+      (display-buffer-pop-up-frame
+       buffer
+       (cons `(pop-up-frame-parameters
+               (name . ,fname))
+             alist)))))
+#+end_src
+
 *** Save files after capturing and refiling
 I almost always finish capturing by refiling, and while ~org-capture-finalize~ does normally save the file, this doesn’t apply in ~org-capture-refile~. Additionally, we can’t be sure if we are still in the same buffer, so we just save all open org-buffer.
 #+begin_src emacs-lisp
@@ -2236,12 +2323,18 @@ Don’t use it now
 
 **** Return citations
 #+begin_src emacs-lisp
+;; To use it for ROAM_REFS in capture
+(defvar aj/org-last-returned-citation-keys nil)
+(defun aj/org-last-returned-citation-keys ()
+  aj/org-last-returned-citation-keys)
+
 (defun aj/org-return-citation ()
-  "Fetch an org-zotxt link and return it as a string"
-  (with-temp-buffer
-    (let ((major-mode 'org-mode))
-      (org-cite-insert nil)
-      (buffer-string))))
+  "Fetch an citation and return it as a string"
+  (let* ((refs (citar-select-refs))
+         (keys (mapconcat (lambda (ref) (concat "@" (car ref))) refs "; ")))
+    (setq aj/org-last-returned-citation-keys keys)
+    (concat "[cite:" keys "]")))
+
 #+end_src
 
 **** Capture in new frame.
@@ -2672,15 +2765,18 @@ List of prefix strings or regex."
   (bibtex-completion-pdf-field "file")
   (citar-at-point-function 'embark-act)
   (citar-file-open-function #'find-file-other-window)
-  (citar-insert-reference-function #'aj/citar-get-csl-references)
+  (citar-format-reference-function #'citar-citeproc-format-reference)
+  (citar-citeproc-csl-styles-dir org-cite-csl-styles-dir)
+  (citar-citeproc-csl-locales-dir org-cite-csl-locales-dir)
+  (citar-citeproc-csl-style "apa.csl")
   :config
   (citar-filenotify-setup nil)
   (define-key citar-citation-map (kbd "z") (cons "open in zotero" #'aj/org-cite-zotxt-follow))
-  (define-key citar-citation-map (kbd "F") (cons "open externally" #'aj/citar-open-files-externally))
-  (defun aj/citar-open-files-externally (keys)
+  (define-key citar-citation-map (kbd "F") (cons "open externally" #'aj/citar-open-file-externally))
+  (defun aj/citar-open-file-externally (key)
     "Open citation KEYS in external program."
     (let ((citar-file-open-function #'citar-file-open-external))
-      (citar-open-library-files keys)))
+      (citar-open-library-file key)))
 
   (defun aj/org-cite-zotxt-follow (key)
     "Follow citation KEY to Zotero."
@@ -2688,17 +2784,17 @@ List of prefix strings or regex."
       (format "%s/select" zotxt-url-base)
       :params `(("betterbibtexkey" . ,key))))
 
-  (defun aj/citar-get-csl-references (keys)
-    (let ((proc (citeproc-create "/home/aj/.zotero-profile/styles/apa.csl"
-                                 ;; (lambda (_)
-                                 ;;   (cl-loop for (k . v) in keys
-                                 ;;            collect
-                                 ;;            (list k v)))
-                                 (citeproc-hash-itemgetter-from-any citar-bibliography)
-                                 (org-cite-csl--locale-getter))))
+  ;; (defun aj/citar-get-csl-references (keys)
+  ;;   (let ((proc (citeproc-create "/home/aj/.zotero-profile/styles/apa.csl"
+  ;;                                ;; (lambda (_)
+  ;;                                ;;   (cl-loop for (k . v) in keys
+  ;;                                ;;            collect
+  ;;                                ;;            (list k v)))
+  ;;                                (citeproc-hash-itemgetter-from-any citar-bibliography)
+  ;;                                (org-cite-csl--locale-getter))))
 
-      (citeproc-add-uncited (mapcar #'car keys) proc)
-      (insert (car (citeproc-render-bib proc 'plain)))))
+  ;;     (citeproc-add-uncited (mapcar #'car keys) proc)
+  ;;     (insert (car (citeproc-render-bib proc 'plain)))))
   )
 
 (use-package citar-org
@@ -2920,10 +3016,10 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
   ;; and then it’s useful to display the outer brackets, for easy
   ;; killing and yanking.
 
-  (org-link-set-parameters "zotero"
-						   :face 'org-scheduled-today
-                           ;;invisibility is handled in the activate function
-						   :activate-func #'aj/org-zotxt-activate)
+  ;; (org-link-set-parameters "zotero"
+  ;;   					   :face 'org-scheduled-today
+  ;;                          ;;invisibility is handled in the activate function
+  ;;   					   :activate-func #'aj/org-zotxt-activate)
 
   ;; (defun aj/org-zotxt-activate (start end _path _bracketp)
   ;;   "Add text properties to display zotxt citation links in a good way"
@@ -3556,6 +3652,7 @@ For my university template, add a final slide with the logo.
 
 (add-to-list 'org-export-filter-parse-tree-functions #'aj/org-notes-filter-parse-tree)
 
+(require 'ox-org)
 (org-export-define-derived-backend 'org-notes 'org
   :menu-entry '(?v 3
                    ((?n "As notes"
@@ -4714,6 +4811,45 @@ is defined the subtree during org subtree export."
 
 #+end_src
 
+*** Export and discard contents of headlines but keep headline (alternative to noexport)
+#+begin_src emacs-lisp
+(defcustom org-aj-ignore-below-tags nil
+  "Tags where the contents of trees should be discarded on export.
+Can be set as local variable, but not bound with BIND keyword,
+since that is read in to late."
+  :group 'aj
+  :group 'org-export
+  :type '(repeat string)
+  :safe #'orgqda--list-of-strings-p)
+
+(defun aj/org-ignore-below-tags (_backend)
+  "Clean all contents of trees tagged with any of ‘org-aj-ignore-below-tags’.
+Run in `org-export-before-parsing-hook'."
+  (org-map-entries 'aj/org-clean-subtree-contents-tag))
+
+(defun aj/org-clean-subtree-contents-tag ()
+  "Clean contents of headline if tagged with any of ‘org-aj-ignore-below-tags’."
+  (when (cl-intersection org-scanner-tags org-aj-ignore-below-tags :test #'string=)
+	(end-of-line)
+	(let ((sp (point)))
+      (org-end-of-subtree t)
+	  (delete-region sp (point)))))
+
+(add-hook 'org-export-before-parsing-hook #'aj/org-ignore-below-tags)
+
+;; This should give the same result but doesn’t:
+
+;; (defun aj/org-ignore-below-tags-pt (tree _backend _info)
+;;   (org-element-map tree 'headline
+;;     (lambda (hl)
+;;       (when (cl-intersection org-aj-ignore-below-tags
+;;                              (org-element-property :tags hl)
+;;                              :test #'string=)
+;;         (org-element-set-contents hl "")))))
+
+;; (add-to-list 'org-export-filter-parse-tree-functions #'aj/org-ignore-below-tags-pt)
+#+end_src
+
 
 *** Export and ignore everyting below a specific level, for some backends
 I don’t really use this now, but I keep these variable definitions around since I have them in some old files and don’t want to hear the safe-local-variable complaints
@@ -4946,6 +5082,7 @@ and :select-tags in org export."
                   (format "^\\(\\*+\\)\\( +%s\\)\\(?: +\\(.*?\\)\\)?[ 	]*$"
 			              org-todo-regexp)
 		          '(2 (list 'face
+                            ;; 3 is the group from org-todo-regexp
                             (org-get-todo-face 3)
                             'display
                             (aj/org-prettify-todos-display (match-string 3)))
@@ -4958,9 +5095,7 @@ and :select-tags in org export."
                         ("STARTAD" . "◧")
                         ("DONE" . "☑")
                         ("TODO" . "☐"))
-                      nil kw #'equal)))
-
-
+                      kw nil #'equal)))
 #+end_src
 
 *** Fix org-indent :ARCHIVE:
