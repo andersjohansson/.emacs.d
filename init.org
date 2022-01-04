@@ -398,7 +398,7 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 #+end_src
 
 
-*** Center frame (used for helm)
+*** Center frame (but doesn’t work with pgtk under Wayland anyway)
 Code adapted from ime-frame
 #+begin_src emacs-lisp
 (defun aj/center-frame (&optional frame)
@@ -1047,305 +1047,6 @@ overriding it, but you should know before you do.
                helm-launcher-recentf-mime-source
                aj/helm-source-favourite-files))
     (helm-all-the-icons-add-transformer #'helm-all-the-icons-files-add-icons (symbol-value s))))
-#+end_src
-
-**** Helm
-***** Loading helm
-(Really too much in config section here. Should probably move it to another file)
-#+begin_src emacs-lisp
-(defcustom aj/shortened-helm-paths nil
-  "List of replacements to do in `helm-recentf-source' and
-`helm-source-files-in-current-dir' lists of files
-Order is important! Only the first matching entry will be replaced.
-
-Example of alist entry:
-\(\"^~/my/favorite/path\" . \"MFP\"\)"
-  :group 'aj
-  :type '(alist :key-type regexp :value-type string))
-
-(use-package helm
-  ;; :bind (("<f2>" . helm-imenu))
-  ;; :demand t
-  :custom
-  ;; disabling some things
-  (helm-minibuffer-history-key nil)
-  (helm-command-prefix-key nil)
-
-  ;; Setting this to nil seems to avoid a memory leak
-  ;; https://debbugs.gnu.org/cgi/bugreport.cgi?bug=43389
-  (helm-ff-keep-cached-candidates . nil)
-  ;; don’t want to do it too early:
-  (helm-turn-on-recentf nil)
-  :config
-  ;; (setq-default helm-command-prefix-key "C-c h")
-  ;; (helm-mode)
-
-  ;; (define-key global-map [remap execute-extended-command] #'helm-M-x)
-  ;; (bind-keys
-  ;;  ("<f1> a" . helm-apropos)
-  ;;  ("M-y" . helm-show-kill-ring)
-  ;;  ("C-x C-b" . helm-mini)
-  ;;  ("C-x b" . helm-mini)
-  ;;  ("C-x C-f" . helm-find-files))
-
-  ;; (global-set-key (kbd "C-c h g") 'helm-google-suggest)
-
-  ;; (bind-keys :map 'helm-find-files-map
-  ;;            ("C-i" . helm-ff-TAB)
-  ;;            ("C-<dead-diaeresis>" . aj/helm-ff-home-dir)
-  ;;            ("C-å" . aj/helm-ff-jobb-dir))
-  ;; (bind-keys :map 'helm-read-file-map
-  ;;            ("C-i" . helm-ff-TAB)
-  ;;            ("C-<dead-diaeresis>" . aj/helm-ff-home-dir)
-  ;;            ("C-å" . aj/helm-ff-jobb-dir)
-  ;;            ;; We want to be able to sort when completing filenames is invoked
-  ;;            ;; by ‘read-file-name’ etc. This seems to work flawlessly, so I wonder
-  ;;            ;; why it’s not bound by default (these keys are bound in ‘helm-find-files-map’)
-  ;;            ("S-<f1>" . helm-ff-sort-alpha)
-  ;;            ("S-<f2>" . helm-ff-sort-by-newest)
-  ;;            ("S-<f3>" . helm-ff-sort-by-size))
-
-  ;; (defun aj/helm-ff-home-dir ()
-  ;;   (interactive)
-  ;;   (helm-set-pattern (expand-file-name "~/")))
-  ;; (defun aj/helm-ff-jobb-dir ()
-  ;;   (interactive)
-  ;;   (helm-set-pattern (expand-file-name "~/jobb/")))
-
-  ;; (when (executable-find "curl")
-  ;;   (setq helm-net-prefer-curl-p t))
-
-  ;; (setq
-  ;;  helm-M-x-always-save-history t ; save also crashed commands
-  ;;  helm-ff-search-library-in-sexp t ; search for library in `require' and `declare-function' sexp.
-  ;;  helm-scroll-amount 8 ; scroll 8 lines other window using M-<next>/M-<prior>
-  ;;  helm-ff-file-name-history-use-recentf t)
-  ;;fuzzy matching
-  (setq helm-buffers-fuzzy-matching t
-	    helm-recentf-fuzzy-match t
-	    helm-locate-fuzzy-match t
-	    helm-file-cache-fuzzy-match t
-	    helm-mode-fuzzy-match t
-	    helm-M-x-fuzzy-match t
-	    helm-semantic-fuzzy-match t
-	    helm-imenu-fuzzy-match t
-	    helm-apropos-fuzzy-match t
-	    helm-lisp-fuzzy-completion t)
-  (helm-adaptive-mode 1)
-
-  ;; display
-  ;; Input in header line
-  (setq helm-echo-input-in-header-line t)
-  (add-hook 'helm-minibuffer-set-up-hook #'helm-hide-minibuffer-maybe)
-
-  ;; split like I want it
-  (setq helm-split-window-preferred-function #'aj/helm-split-window-fn)
-  (defun aj/helm-split-window-fn (window)
-    "Reuse a window below or split window below"
-    (let* (split-width-threshold
-	       (win (if (and (fboundp 'window-in-direction)
-			             (not (minibufferp helm-current-buffer)))
-		            (or (helm-window-in-direction 'below)
-			            (split-window (selected-window) nil 'below))
-		          (split-window-sensibly window))))
-      (setq helm-persistent-action-window-buffer (window-buffer win))
-      win))
-
-  ;; (setq helm-display-function
-  ;;       ;; #'aj/helm-display-child-frame
-  ;;       #'helm-default-display-buffer
-  ;;       helm-display-buffer-reuse-frame nil
-  ;;       helm-display-buffer-width 120
-  ;;       helm-display-buffer-height 35
-  ;;       )
-
-
-  ;; Only show headers if several sources
-  ;; https://www.reddit.com/r/emacs/comments/2z7nbv/lean_helm_window/
-  (defun helm-toggle-header-line ()
-    (if (eq 1 (length (ignore-errors (with-helm-buffer helm-sources))))
-	    (set-face-attribute 'helm-source-header nil :height 1)
-      (set-face-attribute 'helm-source-header nil :height 1.0)))
-
-  (add-hook 'helm-before-initialize-hook #'helm-toggle-header-line)
-
-  ;;; variable-pitch
-  (defun aj/helm-vp ()
-    (with-helm-buffer
-      (variable-pitch-mode)
-      (visual-fill-column-mode -1)))
-
-  (add-hook 'helm-after-initialize-hook #'aj/helm-vp)
-
-  ;; Redefine ‘helm-highlight-buffers’ for alignment with variable-pitch
-  ;; (use ‘display’ ‘space’ and ‘:align-to’)
-
-  (setq-default helm-buffer-max-length 28)
-
-
-  ;; ;;; mark-ring extra
-  ;; (defun aj/pop-to-mark-invoke-helm (fun)
-  ;;   (interactive)
-  ;;   (if (eq last-command 'pop-to-mark-command)
-  ;;       (helm-all-mark-rings)
-  ;;     (funcall fun)))
-
-  ;; (defvar helm-mark-ring-map
-  ;;   (let ((map (make-sparse-keymap)))
-  ;;     (set-keymap-parent map helm-map)
-  ;;     (define-key map (kbd "C-<SPC>") 'helm-next-line) map)
-  ;;   "Keymap for `helm-all-mark-rings'.")
-
-  ;; (setq set-mark-command-repeat-pop t)
-  ;; (with-eval-after-load 'helm-ring
-  ;;   (add-to-list 'helm-source-mark-ring `(keymap . ,helm-mark-ring-map)))
-  ;; (advice-add 'pop-to-mark-command :around #'aj/pop-to-mark-invoke-helm)
-
-
-  ;; Don’t want launched processes lying around being children to
-  ;; emacs (and being killed when I have to kill emacs). Therefore I
-  ;; use ‘call-process-shell-command’ instead of
-  ;; ‘start-process-shell-command’ (and don’t care about the "raising"
-  ;; behaviour using ‘helm-raise-command’ of the original function)
-
-  ;; (defun aj/helm-run-or-raise (exe &optional file)
-  ;;   (let ((real-com (car (split-string exe))))
-  ;;     (when (member real-com helm-external-commands-list)
-  ;;       (message "Starting %s..." real-com)
-  ;;       (if file
-  ;;           (call-process-shell-command
-  ;;            (format "%s %s"
-  ;;   	             real-com
-  ;;   	             (shell-quote-argument
-  ;;   	              (if (eq system-type 'windows-nt)
-  ;;   		              (helm-w32-prepare-filename file)
-  ;;   		            (expand-file-name file))))
-  ;;            nil 0)
-  ;;         (call-process-shell-command real-com nil 0)))))
-
-  ;; (advice-add 'helm-run-or-raise :override #'aj/helm-run-or-raise)
-
-  ;;; add externally opened files to recentf
-  ;; (advice-add 'helm-open-file-externally :after #'aj/helm-add-external-file-to-recentf)
-  ;; (defun aj/helm-add-external-file-to-recentf (file)
-  ;;   (let ((fname (expand-file-name file)))
-  ;;     (when (file-exists-p fname)
-  ;;       (recentf-add-file fname))))
-
-  ;;; helm-apropos, mark out custom-variables
-
-  ;; (defun helm-def-source--emacs-variables-aj (&optional default)
-  ;;   (helm-build-in-buffer-source "Variables"
-  ;;     :init (lambda ()
-  ;;             (helm-apropos-init
-  ;;              (lambda (x) (and (boundp x) (not (keywordp x)))) default))
-  ;;     :fuzzy-match helm-apropos-fuzzy-match
-  ;;     :filtered-candidate-transformer
-  ;;     (lambda (cands source)
-  ;;       (when (null helm-apropos-fuzzy-match)
-  ;;         (setq cands (helm-apropos-default-sort-fn cands source)))
-  ;;       (cl-loop for c in cands
-  ;;   	         collect
-  ;;   	         (if (custom-variable-p (intern c))
-  ;;   	             (cons (concat c " ⚙") c)
-  ;;   	           c)))
-  ;;     :nomark t
-  ;;     :persistent-action (lambda (candidate)
-  ;;   		               (helm-elisp--persistent-help
-  ;;   		                candidate 'helm-describe-variable))
-  ;;     :persistent-help "Toggle describe variable"
-  ;;     :action '(("Describe variable" . helm-describe-variable)
-  ;;   	        ("Find variable" . helm-find-variable)
-  ;;   	        ("Info lookup" . helm-info-lookup-symbol)
-  ;;   	        ("Set variable" . helm-set-variable))
-  ;;     :action-transformer 'helm-apropos-action-transformer))
-
-  ;; (setq helm-apropos-function-list
-  ;;       '(helm-def-source--emacs-commands
-  ;;         helm-def-source--emacs-variables-aj
-  ;;         helm-def-source--emacs-functions
-  ;;         helm-def-source--eieio-classes
-  ;;         helm-def-source--eieio-generic
-  ;;         helm-def-source--emacs-faces))
-  )
-#+end_src
-***** Custom sort defaults for helm-list-directory :ARCHIVE:
-#+begin_src emacs-lisp
-
-(defcustom aj/helm-sort-method-for-dir '()
-  "Alist of dirs and sort methods"
-  :group 'aj
-  :type '(repeat
-          (cons (directory :tag "Dir")
-                (choice
-                 (const :tag "Newest" newest)
-                 (const :tag "Size" size)
-                 (const :tag "Default" t)))))
-
-(advice-add 'helm-list-directory :override #'aj/helm-list-directory)
-(defun aj/helm-list-directory (directory)
-  "List directory DIRECTORY.
-
-If DIRECTORY is remote use `helm-list-directory-function',
-otherwise use `directory-files'."
-  (let* ((remote (file-remote-p directory 'method))
-         (helm-list-directory-function
-          (if (and remote (not (string= remote "ftp")))
-              helm-list-directory-function
-            #'helm-list-dir-lisp))
-         (remote-fn-p (eq helm-list-directory-function
-                          'helm-list-dir-external))
-         (helm-ff-initial-sort-method (alist-get directory aj/helm-sort-method-for-dir t))
-         (sort-method (cl-case helm-ff-initial-sort-method
-                        (newest (if (and remote remote-fn-p)
-                                    "-t" #'file-newer-than-file-p))
-                        (size (if (and remote remote-fn-p)
-                                  "-S" #'helm-ff-file-larger-that-file-p))
-                        (t nil))))
-    (if remote
-        (funcall helm-list-directory-function directory sort-method)
-      (if sort-method
-          (sort (directory-files directory t directory-files-no-dot-files-regexp)
-                sort-method)
-        (directory-files directory t directory-files-no-dot-files-regexp)))))
-
-
-#+end_src
-
-***** Helm-fuz :ARCHIVE:
-For modern fuzzy matching with a binary module built on Rust libraries.
-We need to add "target" to the fuz recipe so that it isn’t removed by straight (we don’t want to rebuild the fuz module every time we start Emacs).
-#+begin_src emacs-lisp
-(use-package fuz
-  :straight (fuz :repo "rustify-emacs/fuz.el" :host github
-                 :files ("fuz*.el" "Cargo.toml" "Cargo.lock" "src" "target")))
-
-(use-package helm-fuz
-  :after helm
-  :config (helm-fuz-mode t))
-#+end_src
-
-
-***** helm-fd :ARCHIVE:
-Use ~fd~ for searching instead of ~find~. Faster and easier.
-#+begin_src emacs-lisp
-(use-package helm-fd
-  :bind (:map helm-command-map
-              ("/" . helm-fd)))
-#+end_src
-
-***** helm-all-the-icons :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package helm-all-the-icons
-  :straight (:type git :host gitlab :repo "andersjohansson/helm-all-the-icons")
-  :custom (helm-all-the-icons-files-sources
-           '(helm-source-recentf
-             helm-source-find-files
-             helm-source-locate
-             helm-source-files-in-current-dir
-             aj/helm-source-dired-recent))
-  :commands (helm-all-the-icons-enable)
-  :init (helm-all-the-icons-enable))
 #+end_src
 
 *** Org init
@@ -2143,18 +1844,18 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
 
   (advice-add 'password-store-generate :around #'aj/password-store-generate)
 
-  (defun aj/password-store-generate-and-copy (&optional replace)
+  (defun aj/password-store-generate-and-copy ()
     (interactive "P")
-    (let ((entry (aj/password-store-get-new-entry-with-completion replace)))
+    (let ((entry (aj/password-store-get-new-entry-with-completion)))
       (password-store--run-generate entry 37 replace)
       (password-store-copy entry))
     ;; (password-store-copy
     ;;  (call-interactively #'password-store-generate))
     )
 
-  (defun aj/password-store-generate-and-copy-simpler (&optional replace)
+  (defun aj/password-store-generate-and-copy-simpler ()
     (interactive "P")
-    (let ((entry (aj/password-store-get-new-entry-with-completion replace)))
+    (let ((entry (aj/password-store-get-new-entry-with-completion)))
       (password-store--run-generate entry 19 replace t)
       (password-store-copy entry)))
 
@@ -2182,37 +1883,10 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
                finally return
                (string-join words "-"))))
 
-  (defun aj/password-store-get-new-entry-with-completion (&optional replace)
-    (helm
-     :prompt: "Password entry:"
-     :sources
-     (if replace
-         (list (helm-build-sync-source "Pass files"
-                 :candidates (aj/password-store-list-dirs nil t)
-                 :persistent-action #'aj/password-helm-complete-persistent))
-       (list (helm-build-sync-source "Pass dirs"
-               :candidates #'aj/password-store-list-dirs
-               :persistent-action #'aj/password-helm-complete-persistent)
-             (helm-build-dummy-source "Insert")))))
-
-  (defun aj/password-helm-complete-persistent (candidate)
-    (with-selected-window (or (active-minibuffer-window)
-                              (minibuffer-window))
-      (delete-minibuffer-contents)
-      (insert (substring-no-properties candidate))))
-
-  (defun aj/password-store-list-dirs (&optional subdir include-files)
-    "List password entries under SUBDIR."
-    (unless subdir (setq subdir ""))
-    (let ((dir (f-join (password-store-dir) subdir)))
-      (when (f-directory-p dir)
-        (-reject
-         (lambda (d) (string-match-p "\\(/\\.\\|^\\.\\)" d))
-         (if include-files
-             (mapcar #'password-store--file-to-entry
-                     (f-entries dir nil t))
-           (mapcar (lambda (f) (file-name-as-directory (password-store--file-to-entry f)))
-                   (f-directories dir nil t))))))))
+  (defun aj/password-store-get-new-entry-with-completion ()
+    (thread-last (read-file-name "Test: " "~/.password-store/")
+                 (string-remove-prefix "~/.password-store/")
+                 (string-remove-suffix ".gpg"))))
 
 (use-package pass
   :defer t
@@ -2239,7 +1913,7 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
   (defun aj/pass-display-qr ()
     (interactive)
     (pass--with-closest-entry entry
-      (password-store--run "show" "-q" entry)))
+                              (password-store--run "show" "-q" entry)))
 
   (defun aj/pass-display-header-extra ()
     (pass--display-keybindings
@@ -3610,7 +3284,6 @@ This is the new thing, and it is good, because it knows a lot about the code and
   (set-face-attribute 'lsp-ui-sideline-code-action nil :foreground nil :inherit 'font-lock-function-name-face)
   (set-face-attribute 'lsp-ui-sideline-current-symbol nil :foreground nil :weight 'light :inherit 'highlight))
 (use-package company-lsp :commands company-lsp)
-(use-package helm-lsp :commands helm-lsp-workspace-symbol)
 
 #+end_src
 
@@ -3876,11 +3549,6 @@ cperl instead of perl-mode
   (add-hook 'cperl-mode-hook
             (lambda () (setq-local eldoc-documentation-function
                               'aj/cperl-eldoc-documentation-function))))
-
-;; ;; helm-perldoc:setup takes long time on low power platform
-;; (helm-perldoc:setup)
-;; (add-hook 'cperl-mode-hook 'helm-perldoc:carton-setup)
-
 #+end_src
 
 *** Notifications while compiling
@@ -5061,36 +4729,6 @@ fi
   ;; (add-hook 'git-timemachine-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'timemachine)))
   ;; (add-hook 'xwidget-webkit-mode-hook (lambda () (aj/mini-modeline-set-doom-special 'minimal)))
 
-
-  ;; show modeline for helm, it displays some needed info, like when
-  ;; grep is finished running etc. Use doom-modeline for this.
-
-  ;; (advice-add #'helm-display-mode-line :after #'aj/visible-helm-modeline)
-  ;; (advice-remove #'helm-display-mode-line
-  ;; #'aj/visible-helm-modeline)
-  ;; (advice-add #'helm-display-mode-line :after #'doom-modeline-set-helm-modeline)
-
-  ;; (remove-hook 'helm-after-initialize-hook #'aj/visible-helm-modeline)
-
-  ;; (add-hook 'helm-window-configuration-hook #'aj/visible-helm-modeline)
-  ;; (defun aj/visible-helm-modeline (&rest _)
-  ;;   (with-helm-buffer
-  ;;     (setq-local face-remapping-alist
-  ;;                 (cl-delete
-  ;;                  'mode-line
-  ;;                  face-remapping-alist
-  ;;                  :key #'car)
-  ;;                 ;; (cons '(doom-modeline . mode-line)
-  ;;                 ;;       (cl-delete
-  ;;                 ;;        'doom-modeline
-  ;;                 ;;        (cl-delete
-  ;;                 ;;         'mode-line
-  ;;                 ;;         face-remapping-alist
-  ;;                 ;;         :key #'car)
-  ;;                 ;;        :key #'car))
-  ;;                 )))
-
-
   ;; show modeline for some other special buffers. Currently
   ;; ispell-choices-buffer is one good candidate.
   ;; (defvar aj/buffers-with-modeline nil)
@@ -5433,25 +5071,6 @@ I use my fork, available here: https://github.com/andersjohansson/mplayer-mode/t
 				mplayer-default-seek-step 3))
 #+end_src
 
-*** orgqda-helm-tags :ARCHIVE:
-Available at: https://gitlab.com/andersjohansson/orgqda
-#+begin_src emacs-lisp
-(use-package orgqda-helm-tags
-  :straight (:depth full :host gitlab :repo "andersjohansson/orgqda" :files ("orgqda-helm-tags.el"))
-  :after orgqda
-  :hook (org-mode . orgqda-helm-tags-mode)
-  :custom
-  ;; this is useful when using it outside research projects, in
-  ;; projects I use dir-local variables to customize
-  (orgqda-helm-tags-include-excluded t)
-  (orgqda-helm-tags-include-persistent t)
-  (orgqda-helm-tags-fuzzy-sort-fn #'helm-fuz-fuzzy-matching-sort-fn-preserve-ties-order!)
-
-  ;; since I use a variable-width font in helm:
-  (orgqda-helm-tags-display-align t)
-  )
-#+end_src
-
 *** orgqda-transcript
 Also at: https://gitlab.com/andersjohansson/orgqda
 #+begin_src emacs-lisp
@@ -5548,25 +5167,6 @@ Also at: https://gitlab.com/andersjohansson/orgqda
 
   (bind-key "C-+" #'aj/repeat-last-words orgqda-transcript-mode-map))
 #+end_src
-
-*** Org data handling :ARCHIVE:
-A few functions and settings for database functionality in org.
-#+begin_src emacs-lisp
-(setq org-property-set-functions-alist
-      '(("ämne" . aj/helm-comp-read-merge-marked)
-        ("målgrupp" . aj/helm-comp-read-merge-marked)))
-
-(defun aj/helm-comp-read-merge-marked
-    (prompt coll &optional pred _require-match initial-input hist def _inherit-input-method)
-  (string-join (helm-comp-read prompt coll
-                               :test pred
-                               :initial-input initial-input
-                               :history hist
-                               :default def
-                               :marked-candidates t)
-               " "))
-#+end_src
-
 
 *** Edit only whitespace
 A mode that enables editing of only whitespace. Useful in my transcript files for avoiding accidental edits while adding codes with orgqda.
@@ -5782,39 +5382,6 @@ A function for reverting all opened files, even remote files (because auto-rever
              return t))
 
   (recentf-mode 1))
-#+end_src
-
-** Helm for recent org files at startup :ARCHIVE:
-#+begin_src emacs-lisp
-(require 'helm-for-files)
-(defclass aj/helm-recentf-org-source (helm-source-sync helm-type-file)
-  ((init :initform (lambda ()
-                     (require 'recentf)
-                     (recentf-mode 1)))
-   (candidates :initform (seq-filter
-                          (lambda (it) (and (string-match "\\.org$" it)
-                                       (not (org-agenda-file-p it))
-                                       (not (string-match "\\.emacs\\.d" it))))
-                          recentf-list))
-   (match-part :initform (lambda (candidate)
-                           (if (or helm-ff-transformer-show-only-basename
-                                   helm-recentf--basename-flag)
-                               (helm-basename candidate) candidate)))
-   (pattern-transformer :initform 'helm-recentf-pattern-transformer)
-   (filtered-candidate-transformer :initform '(aj/helm-recentf-filtered-candidates-shorten))
-   (persistent-action :initform 'helm-ff-kill-or-find-buffer-fname)
-   (fuzzy-match :initform t)))
-
-(defvar aj/helm-source-recentf-org
-  (helm-make-source "Recentf org" 'aj/helm-recentf-org-source))
-
-(defun aj/helm-recentf-org ()
-  (interactive)
-  (helm :sources aj/helm-source-recentf-org
-        :buffer "*helm-recentf-org*"
-        :ff-transformer-show-only-basename nil))
-
-(add-hook 'window-setup-hook #'aj/helm-recentf-org 95)
 #+end_src
 
 * Final

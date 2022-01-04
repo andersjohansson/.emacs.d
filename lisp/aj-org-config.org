@@ -532,14 +532,7 @@ Org emphasize: _b_old  _i_talic _u_nderline _c_ode _v_erbatim _s_trikethrough  _
   (insert
    (format
     "{{{%s}}}"
-    (helm-comp-read
-     "Macro: "
-     (cl-loop for (m . e) in org-macro-templates
-              collect
-              (cons
-               (concat m (propertize (concat " (" e ")") 'face 'shadow))
-               m))
-     :multiline t))))
+    (completing-read "Macro: " (cl-loop for (m . _e) in org-macro-templates collect m)))))
 #+end_src
 
 *** CHECK Template inserting (hydra)
@@ -2596,34 +2589,11 @@ List of prefix strings or regex."
   (defvar aj/org-annotate-name-history nil)
   (defun aj/org-annotate-name (&optional name)
     (interactive
-     (let ((enable-recursive-minibuffers t))
-       (list (helm :sources '(aj/org-annotate-names-source
-                              aj/org-annotate-names-fallback-source)
-                   :buffer "*aj helm choose oic-names*"
-                   :resume 'noresume
-                   :history 'aj/org-annotate-name-history))))
+     (list (completing-read "Name: " aj/org-annotate-name-history
+                            nil nil nil aj/org-annotate-name-history)))
     (save-excursion
       (beginning-of-line)
       (insert (concat "{" name "} "))))
-
-  (defvar aj/org-annotate-names-source
-    (helm-build-sync-source "Inline comment names"
-      :candidates 'aj/org-annotate-name-history
-      :fuzzy-match t
-      :action (helm-make-actions "Insert" #'identity "Delete" #'aj/org-annotate-remove-name)
-      :persistent-action 'aj/org-annotate-remove-name)
-    "Source for inline comment names")
-
-  (defvar aj/org-annotate-names-fallback-source
-    (helm-build-dummy-source "New"
-      :action '(("Insert" . identity))))
-
-  (defun aj/org-annotate-remove-name (_cand)
-    (let ((marked (helm-marked-candidates)))
-      (dolist (el marked)
-        (setq aj/org-annotate-name-history
-              (delete el aj/org-annotate-name-history))))
-    (helm-force-update))
 
   ;; with author
   (defun aj/org-annotate-activate-note (start end _path _bracketp)
