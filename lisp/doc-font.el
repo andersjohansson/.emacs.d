@@ -34,16 +34,16 @@
   :group 'faces)
 
 (defcustom doc-font-attributes
-  '((default . (:family "Crimson" :height 1.4))
+  '((default . (:family "EBGaramond" :height 1.2))
     (org-document-title . (:height 1.2))
-    (org-level-1 . (:height 1.4))
-    (org-level-2 . (:height 1.3 :slant italic))
-    (org-level-3 . (:weight normal :slant italic :height 1.2))
-    (org-level-4 . (:slant italic :height 1.1))
-    (org-level-5 . (:weight bold :height 1.0))
-    (org-level-6 . (:weight bold :height 1.0))
-    (org-level-7 . (:weight bold :height 1.0))
-    (org-level-8 . (:weight bold :height 1.0))
+    (org-level-1 . (:height 1.4 :weight normal ))
+    (org-level-2 . (:height 1.3 :weight normal :slant italic))
+    (org-level-3 . (:height 1.2 :weight normal :slant italic))
+    (org-level-4 . (:height 1.1 :slant italic))
+    (org-level-5 . (:height 1.0 :weight semibold))
+    (org-level-6 . (:height 1.0 :weight semibold))
+    (org-level-7 . (:height 1.0 :weight semibold))
+    (org-level-8 . (:height 1.0 :weight semibold))
     ;;(org-block (:background ,base02))
     (org-link . (:underline t :weight normal))
     (org-special-keyword . (:height 0.9))
@@ -102,6 +102,13 @@ When 'vertical, use small vertical space between paragraphs, when
 (defface doc-font-small-parspace '((nil (:height 0.1)))
   "Face for small vertical paragraph spaces.")
 
+(defvar doc-font-parspace-vertical-keyword
+  '(("\\(\n\\(\n\\)\\)[^*]" 2 'doc-font-small-parspace)))
+(defvar doc-font-parspace-indent-keyword
+  '(("\\(\n\n\\)[^*#]" 1
+     (list 'face 'default
+           'display (concat "\n\t\t")))))
+
 (defmacro doc-font--store-old-val (var)
   "Store value of VAR in ‘doc-font-variable-cookies-nokill’."
   `(push (cons ,var (symbol-value ,var)) doc-font-variable-cookies-nokill))
@@ -146,16 +153,16 @@ Along with some other changes."
             (doc-font--set-and-store-old-val 'org-superstar-headline-bullets-list
                                              '(?\N{ZERO WIDTH SPACE}))
             (doc-font--set-and-store-old-val 'org-superstar-prettify-item-bullets t)
+            (doc-font--set-and-store-old-val 'org-cycle-level-faces nil)
             (org-superstar-restart)))
 
         (when (eq 'indent doc-font-modify-parspace)
           (make-local-variable 'font-lock-extra-managed-props)
           (add-to-list 'font-lock-extra-managed-props 'display)
-          (font-lock-add-keywords nil '(("\\(\n\n\\)[^*]" 1
-                                         (list 'face 'default
-                                               'display (concat "\n\t\t"))))))
+          (font-lock-add-keywords nil doc-font-parspace-indent-keyword))
+
         (when (eq 'vertical doc-font-modify-parspace)
-          (font-lock-add-keywords nil '(("\\(\n\n\\)[^*]" 1 'doc-font-small-parspace)))))
+          (font-lock-add-keywords nil doc-font-parspace-vertical-keyword)))
 
     ;; DISABLE:
     (cl-loop for c in (append doc-font-cookies doc-font-cookies-def) do
@@ -170,7 +177,13 @@ Along with some other changes."
     (cl-loop for (c . v) in doc-font-variable-cookies do
              (kill-local-variable c))
     (when (bound-and-true-p org-superstar-mode)
-      (org-superstar-restart))))
+      (org-superstar-restart))
+
+    (font-lock-remove-keywords nil doc-font-parspace-indent-keyword)
+    (font-lock-remove-keywords nil doc-font-parspace-vertical-keyword)
+    (when (eq 'indent doc-font-modify-parspace)
+      (setq font-lock-extra-managed-props (delete 'display font-lock-extra-managed-props)))
+    ))
 
 
 (provide 'doc-font)

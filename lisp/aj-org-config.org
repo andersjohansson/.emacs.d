@@ -9,24 +9,73 @@
 #+end_src
 
 * Org-config
-
 ** Org-roam
 #+begin_src emacs-lisp
 (use-package org-roam
+  :demand t
   :custom
   (org-roam-directory "/home/aj/jobb/anteckningar")
   (org-roam-db-update-on-save nil)
+  (org-roam-link-auto-replace nil) ;; have never had any "roam:" links
+  (org-roam-node-display-template (concat "${title:*} " (propertize "${tags:40}" 'face 'org-tag)))
+                                        ; I don’t like all the displayed # for tags, so let’s use a hidden “query language”
+  (org-roam-node-template-prefixes
+   `(("tags" . ,(propertize "#" 'display ""))))
+  (org-roam-node-template-prefixes nil)
   :bind (("C-c n l" . org-roam-buffer-toggle)
          ("C-c n f" . org-roam-node-find)
          ("C-c n g" . org-roam-graph)
          ("C-c n i" . org-roam-node-insert)
          ("C-c n c" . org-roam-capture)
-         ;; Dailies
+         ;; Dailies, I don’t use it.
          ;; ("C-c n j" . org-roam-dailies-capture-today)
          )
   :config
   (org-roam-db-autosync-mode)
+
+  ;; we know that the completions will be full frame-width, in
+  ;; minibuffer (vertico), so patch this:
+  (el-patch-defun org-roam-node-read--to-candidate (node template)
+    "Return a minibuffer completion candidate given NODE.
+TEMPLATE is the processed template used to format the entry."
+    (let ((candidate-main (org-roam-node--format-entry
+                           template
+                           node
+                           (1- (el-patch-swap (if (bufferp (current-buffer))
+                                                  (window-width) (frame-width))
+                                              (frame-width))))))
+      (cons (propertize candidate-main 'node node) node)))
+
+  (defun aj/org-roam-add-citar-ref ()
+    "Add citekey as roam ref to current node."
+    (interactive)
+    (org-roam-ref-add (concat "@" (car (citar-select-ref)))))
   )
+
+
+(use-package org-roam-ui
+  :straight
+  (:host github :repo "org-roam/org-roam-ui" :files ("*.el" "out"))
+  :after org-roam
+  ;;         normally we'd recommend hooking orui after org-roam, but since org-roam does not have
+  ;;         a hookable mode anymore, you're advised to pick something yourself
+  ;;         if you don't care about startup time, use
+  ;;  :hook (after-init . org-roam-ui-mode)
+  :custom
+  (org-roam-ui-sync-theme t)
+  ;; (org-roam-ui-follow t)
+  (org-roam-ui-update-on-save t)
+  ;; (org-roam-ui-open-on-start t)
+  )
+
+(use-package org-roam-timestamps
+  :after org-roam
+  :custom
+  (org-roam-timestamps-remember-timestamps t)
+  (org-roam-timestamps-timestamp-parent-file nil)
+  :init
+  (org-roam-timestamps-mode))
+
 #+end_src
 
 ** Transclusion
@@ -68,7 +117,14 @@ Avoid colons for syncing to windows systems (onedrive)"
   :hook (org-mode . org-superstar-mode)
   :custom
   (org-superstar-headline-bullets-list '(?♦))
-  (org-superstar-special-todo-items 'hide)
+  (org-superstar-special-todo-items t)
+  (org-superstar-todo-bullet-alist
+   '(("AVFÖRD" . ?☒)
+     ("VÄNTAR" . ?◫)
+     ("STARTAD" . ?◧)
+     ("DONE" . ?☑)
+     ("TODO" . ?☐)
+     (default . ?▣)))
   ;; (org-superstar-todo-bullet-alist '((default . ? )))
   (org-superstar-prettify-item-bullets nil)
   ;; when I would like to use plain bullets from time to time:
@@ -112,8 +168,10 @@ for more information."
   (add-to-list 'aj/org-prettify-symbols kw))
 #+end_src
 
-*** Do org-indent indentation with display spaces and indent quote blocks.
-With a special "thin" space for org-indent, we can have lines with low line-height even when we have indent. But the indent then has to be set with a space ~:align-to~ property. For this we do some patching of the org-indent machinery
+*** Do org-indent indentation with display spaces
+With a special "thin" space for org-indent, we can have lines with low line-height (creating lines) even when we have indent. But the indent then has to be set with a space ~:align-to~ property. For this we do some patching of the org-indent machinery
+
+Commented code for also indenting quote-blocks
 
 #+begin_src emacs-lisp
 (defface aj/org-quote-beg-end-face `((t . (:height 0.1 :foreground "#f0e0d4" :background "#f0e0d4" :extend t)))
@@ -418,6 +476,12 @@ Sort symbols _@#% first, ignore case and collate depending on current locale."
      ((and fbs (not fas)) nil)
      ((and fas fbs (not (= fa fb))) (< fa fb))
      (t (string-collate-lessp a b nil t)))))
+
+(with-eval-after-load 'orgqda
+  (add-to-list 'orgqda-sort-parameters
+               '(symbols-first :description "Sort symbols first"
+                               :compare aj/org-tag-sort-lessp))
+  (setq orgqda-keep-tags-sorted 'symbols-first))
 #+end_src
 
 ** Keybindings and templates
@@ -431,8 +495,6 @@ Sort symbols _@#% first, ignore case and collate depending on current locale."
 (bind-keys :map org-mode-map
            ("C-a" . org-beginning-of-line)
            ("C-e" . org-end-of-line))
-
-
 #+end_src
 
 *** Disable some disturbing keybindings
@@ -679,7 +741,7 @@ Two prefixes let’s you choose the state."
            100))
         (state (if (equal '(16) arg)
                    (completing-read "State: " org-todo-keywords-1 nil t)
-                 "TODO")))
+                 (car org-todo-keywords-1))))
     (save-restriction
       (save-excursion
         (org-narrow-to-subtree)
@@ -1542,6 +1604,13 @@ Doesn’t care at all about ‘org-odd-levels-only’, because I don’t use it.
       org-outline-path-complete-in-steps nil)
 #+end_src
 
+*** Refile targets --- org files in same buffer
+Useful for ~org-roam-directory~ for example.
+#+begin_src emacs-lisp
+(defun aj/org-refile-targets-same-dir ()
+  (directory-files default-directory t ".*\\.org$" t))
+#+end_src
+
 *** Refile with helm :ARCHIVE:
 Present a nicer-looking helm buffer for ~org-refile~
 This doesn’t use the functions defined above at all.
@@ -2317,17 +2386,24 @@ Don’t use it now
 **** Return citations
 #+begin_src emacs-lisp
 ;; To use it for ROAM_REFS in capture
-(defvar aj/org-last-returned-citation-keys nil)
-(defun aj/org-last-returned-citation-keys ()
-  aj/org-last-returned-citation-keys)
+(defvar aj/org-last-returned-citation-key nil)
+(defun aj/org-last-returned-citation-key ()
+  aj/org-last-returned-citation-key)
 
-(defun aj/org-return-citation ()
-  "Fetch an citation and return it as a string"
-  (let* ((refs (citar-select-refs))
-         (keys (mapconcat (lambda (ref) (concat "@" (car ref))) refs "; ")))
-    (setq aj/org-last-returned-citation-keys keys)
-    (concat "[cite:" keys "]")))
+(defun aj/org-return-citation (&optional initial-input)
+  "Fetch a citation and return it as a string.
+Possibly passss INITIAL-INPUT"
+  (let* ((ref (citar-select-ref :initial-input initial-input))
+         (key (car ref)))
+    (setq aj/org-last-returned-citation-key key)
+    (concat "[cite:@" key "]")))
 
+(defun aj/org-return-reference-author-year-title (&optional initial-input)
+  "Fetch a simply formatted reference and return it as a string.
+Possibly passss INITIAL-INPUT"
+  (let* ((ref (citar-select-ref :initial-input initial-input)))
+    (setq aj/org-last-returned-citation-key (car ref))
+    (citar--format-entry-no-widths ref "${author editor} (${year issued date}) “${title}”")))
 #+end_src
 
 **** Capture in new frame.
@@ -2387,6 +2463,7 @@ I keep some notes for papers in org-mode, but sort my papers in Zotero. With thi
   (interactive)
   (if-let ((link (aj/get-org-protocol-link))
            (id (or
+                (org-roam-node-refs (org-roam-node-at-point))
                 (citar-org-key-at-point)
                 (save-excursion
                   (org-back-to-heading)
@@ -2485,13 +2562,16 @@ Can be passed any ox BACKEND in a non-interactive call"
   :custom
   (org-annotate-special-brackets '("{" ":" "}"))
   ;; functions defined below
-  (org-annotate-latex-export-function #'aj/org-annotate-export-latex-fixme-and-inline)
-  (org-annotate-odt-export-function #'aj/org-annotate-export-odt-annotation-or-inline)
+  (org-annotate-export-functions
+   '((html . org-annotate-export-html-tooltip)
+     (latex . aj/org-annotate-export-latex-fixme-and-inline)
+     (odt . aj/org-annotate-export-odt-annotation-or-inline)
+     (md . aj/org-annotate-export-md-pandoc-odt)))
+
 
   :config
   (set-face-attribute 'org-annotate-bracket-face nil :inherit 'font-lock-variable-name-face :weight 'bold)
   (set-face-attribute 'org-annotate-face nil :weight 'bold :underline nil :inherit 'font-lock-comment-face)
-
 
   (defun aj/org-annotate-extract-author (note)
     (if (string-match "{\\([^}]+\\)} *" note)
@@ -2514,6 +2594,12 @@ Can be passed any ox BACKEND in a non-interactive call"
             (format "\\fxnote*%s{%s}{%s}" optstring path
                     (org-export-data-with-backend desc 'latex nil))
           (format "\\fxnote%s{%s}" optstring path)))))
+
+  (defun aj/org-annotate-export-md-pandoc-odt (path desc)
+    (concat
+     "`"
+     (aj/org-annotate-export-odt-annotation-or-inline path desc)
+     "`{=opendocument}"))
 
   (defun aj/org-annotate-export-odt-annotation-or-inline (path desc)
     "Let notes prefixed with \"inline:\" just be set in italics.
@@ -2724,6 +2810,8 @@ List of prefix strings or regex."
    (goto-char (point-min))
    (when (search-forward "[[note:" nil t)
      (aj/org-annotate-add-right-margin))))
+
+
 #+end_src
 
 ** Cite with new org-cite
@@ -2739,6 +2827,8 @@ List of prefix strings or regex."
   (citar-citeproc-csl-styles-dir org-cite-csl-styles-dir)
   (citar-citeproc-csl-locales-dir org-cite-csl-locales-dir)
   (citar-citeproc-csl-style "apa.csl")
+  (citar-notes-paths '("~/jobb/anteckningar/"))
+  (citar-open-note-function #'aj/citar-open-roam-note)
   :config
   (citar-filenotify-setup nil)
   (define-key citar-citation-map (kbd "z") (cons "open in zotero" #'aj/org-cite-zotxt-follow))
@@ -2754,6 +2844,18 @@ List of prefix strings or regex."
       (format "%s/select" zotxt-url-base)
       :params `(("betterbibtexkey" . ,key))))
 
+  (defun aj/citar-fetch-zotero-json ()
+    (call-process-shell-command
+     (format "curl http://127.0.0.1:23119/better-bibtex/export/library?/1/library.json -o %s"
+             (car citar-bibliography))))
+
+  (add-hook 'citar-force-refresh-hook #'aj/citar-fetch-zotero-json)
+
+  (defun aj/citar-open-roam-note (key _entry)
+    (org-roam-ref-find key))
+
+
+
   ;; (defun aj/citar-get-csl-references (keys)
   ;;   (let ((proc (citeproc-create "/home/aj/.zotero-profile/styles/apa.csl"
   ;;                                ;; (lambda (_)
@@ -2765,6 +2867,7 @@ List of prefix strings or regex."
 
   ;;     (citeproc-add-uncited (mapcar #'car keys) proc)
   ;;     (insert (car (citeproc-render-bib proc 'plain)))))
+
   )
 
 (use-package citar-org
@@ -2776,17 +2879,31 @@ List of prefix strings or regex."
   :config
   (setq org-cite-insert-processor 'citar
         org-cite-follow-processor 'citar
-        org-cite-activate-processor 'citar))
+        org-cite-activate-processor 'citar)
+
+  (setf (alist-get
+         'key-at-point
+         (alist-get '(org-mode) citar-major-mode-functions nil nil #'equal))
+        #'aj/citar-org-key-at-point)
+
+  (defun aj/citar-org-key-at-point ()
+    "Return key at point for org-cite citation-reference or citekey."
+    (or (citar-org-key-at-point)
+        (when (org-in-regexp org-element-citation-key-re)
+          (cons (substring (match-string 0) 1)
+                (cons (match-beginning 0)
+                      (match-end 0)))))))
 #+end_src
 
-*** Nice display (activation) with csl styles :ARCHIVE:
+*** Nice display (activation) with csl styles
 But putting the display property seems not to work, is that because of the org-fold branch?
 #+begin_src emacs-lisp
 (use-package citeproc)
 
 (use-package oc-csl-activate
   :straight (:host github :repo "andras-simonyi/org-cite-csl-activate")
-  :config
+  :hook (org-mode . cursor-sensor-mode)
+  :init
   (setq org-cite-activate-processor 'csl-activate))
 #+end_src
 
@@ -2973,7 +3090,7 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
 
 (use-package org-zotxt
   :straight nil ;; already installed with zotxt-emacs above
-  :hook (org-mode . org-zotxt-mode)
+  ;; :hook (org-mode . org-zotxt-mode)
   :defer t
   :init (setq org-zotxt-link-description-style :citekey)
   :commands org-zotxt-extract-link-id-at-point org-zotxt-choose-path
@@ -5038,34 +5155,41 @@ and :select-tags in org export."
   :hook (org-mode . org-appear-mode))
 #+end_src
 
-*** Pretty display of todo keywords
+*** Pretty display of todo keywords :ARCHIVE:
 #+begin_src emacs-lisp
-(add-hook 'org-font-lock-set-keywords-hook #'aj/org-prettify-todos)
+;; (add-hook 'org-font-lock-set-keywords-hook #'aj/org-prettify-todos)
 
-(defun aj/org-prettify-todos ()
-  (make-local-variable 'font-lock-extra-managed-props)
-  (add-to-list 'font-lock-extra-managed-props 'display)
-  (setq org-font-lock-extra-keywords
-        (append org-font-lock-extra-keywords
-                (list
-                 (list
-                  (format "^\\(\\*+\\)\\( +%s\\)\\(?: +\\(.*?\\)\\)?[ 	]*$"
-			              org-todo-regexp)
-		          '(2 (list 'face
-                            ;; 3 is the group from org-todo-regexp
-                            (org-get-todo-face 3)
-                            'display
-                            (aj/org-prettify-todos-display (match-string 3)))
-                      prepend))))))
+;; (defun aj/org-prettify-todos ()
+;;   ;; (make-local-variable 'font-lock-extra-managed-props)
 
-(defun aj/org-prettify-todos-display (kw)
-  (when kw (alist-get kw
-                      '(("AVFÖRD" . "☒")
-                        ("VÄNTAR" . "◫")
-                        ("STARTAD" . "◧")
-                        ("DONE" . "☑")
-                        ("TODO" . "☐"))
-                      kw nil #'equal)))
+;;   ;; bad idea to let font-lock manage display. this makes oc-csl-activate
+;;   ;; not work at all.
+
+;;   ;; (add-to-list 'font-lock-extra-managed-props 'display)
+
+;;   (setq org-font-lock-extra-keywords
+;;         (append org-font-lock-extra-keywords
+;;                 (list
+;;                  (list
+;;                   (format "^\\(\\*+\\)\\( +%s\\)\\(?: +\\(.*?\\)\\)?[ 	]*$"
+;; 			              org-todo-regexp)
+;; 		          '(2 (list 'face
+;;                             ;; 3 is the group from org-todo-regexp
+;;                             (org-get-todo-face 3)
+;;                             'display
+;;                             (aj/org-prettify-todos-display (match-string 3)))
+;;                       prepend))))))
+
+;; (defun aj/org-prettify-todos-display (kw)
+;;   (when kw (alist-get kw
+;;                       '(("AVFÖRD" . "☒")
+;;                         ("VÄNTAR" . "◫")
+;;                         ("STARTAD" . "◧")
+;;                         ("DONE" . "☑")
+;;                         ("TODO" . "☐"))
+;;                       kw nil #'equal)))
+
+
 #+end_src
 
 *** Fix org-indent :ARCHIVE:
@@ -5294,21 +5418,18 @@ Add special tag faces, add for file-local select/exclude-tags. Highlight the ent
 #+end_src
 
 *** Tags column at 0, align tags with display property
-I use variable-width fonts, so trying to align tags to the right using spaces is useless. But in the agenda (which uses fixed-width fonts) we want them right aligned and setting it in the hook means we can adapt to the current window.
+I use variable-width fonts, so trying to align tags to the right using spaces is useless.
 
-However, we can also use the display text property to align tags to the right.
+However, we can also use the display text property to align tags to the right of the window. This is already done in the agenda when setting ~org-agenda-tags-column~ is ~auto~, the default.
 
 #+begin_src emacs-lisp
 (setq org-tags-column 0
       org-auto-align-tags nil)
 
-(add-hook 'org-agenda-mode-hook #'aj/org-set-agenda-tags-column)
+;; avoid unneccesary calculations, I never need it.
+(defalias 'org-align-tags #'ignore)
 
-(defun aj/org-set-agenda-tags-column ()
-  (setq org-agenda-tags-column (- (window-width))))
-
-
-;; Inspired by: https://orgmode.org/list/87lfh745ch.fsf@localhost/
+;; Inspired by Ihor Radchenko’s code at: https://orgmode.org/list/87lfh745ch.fsf@localhost/
 
 (add-hook 'org-font-lock-set-keywords-hook #'aj/org-set-tag-align-keywords)
 
@@ -5318,7 +5439,6 @@ However, we can also use the display text property to align tags to the right.
         (append
          org-font-lock-extra-keywords
          '((yant/org-align-tags t)))))
-
 
 (defun aj/string-pixel-width (string &optional mode)
   "Calculate pixel width of STRING.
@@ -5364,12 +5484,8 @@ Optional MODE specifies major mode used for display."
 Experimental mode for folding together paragraphs with one sentence per line (good for version control) to make them look nicer when displaying. Works with an overlay per line, so perhaps not so efficient.
 
 #+begin_src emacs-lisp
-
-;; depends on auto-overlays:
-(use-package auto-overlays)
-
 (use-package org-fold-linebreaks
-  :straight nil
+  :straight (:host 'gitlab :repo "andersjohansson/org-fold-linebreaks")
   :commands (org-fold-linebreaks org-fold-linebreaks-mode))
 #+end_src
 
@@ -5434,7 +5550,7 @@ https://gitlab.com/andersjohansson/org-outline-numbering
 #+begin_src emacs-lisp
 (use-package org-num
   :straight nil
-  :custom (org-num-skip-tags '("ignoreheading" "ignoreheadinglocal" "ARCHIVE"))
+  :custom (org-num-skip-tags '("ARCHIVE" "noexport"))
   (org-num-skip-unnumbered t)
   (org-num-skip-commented t))
 #+end_src
