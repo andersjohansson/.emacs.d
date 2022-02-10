@@ -1,6 +1,6 @@
 ;;; doc-font.el --- Use a special font for documents  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2019  Anders Johansson
+;; Copyright (C) 2019-2022  Anders Johansson
 
 ;; Author: Anders Johansson <mejlaandersj@gmail.com>
 ;; Keywords: wp
