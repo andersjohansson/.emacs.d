@@ -719,6 +719,20 @@ I think this patch makes it work better (correct, that is). Trying it out for a 
 
 ** Agenda, todo, scheduling etc.
 *** Todo stuff
+**** Todo on chosen date
+#+begin_src emacs-lisp
+(defun aj/org-todo-choose-date (arg)
+  "Call ‘org-todo’ with prompted date. ARG is passed on."
+  (interactive "P")
+  (cl-letf ((todofn (if (eq major-mode 'org-agenda-mode)
+                        #'org-agenda-todo
+                      #'org-todo))
+            (org-use-last-clock-out-time-as-effective-time t)
+            ((symbol-function #'org-clock-get-last-clock-out-time)
+             (lambda () (org-read-date nil t nil "Todo at: "))))
+    (apply todofn arg)))
+
+#+end_src
 **** Todo keywords, Todo states
 Special faces for these states are also defined, but in [[file:~/.emacs.d/init.org::*My own face definitions][init.org]].
 #+begin_src emacs-lisp
@@ -1262,6 +1276,93 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
  '("Effort_ALL" . "0:15 1p 2p 3p 4p 1h 2h 3h 4h 6h 1d 2d 3d 4d 1w 2w 3w :ETC"))
 #+end_src
 
+**** Org clock select task. Return agenda tasks to clock in to
+#+begin_src emacs-lisp
+(advice-add 'org-clock-select-task :override #'aj/org-clock-select-task)
+
+(defun aj/org-clock-select-task (&optional _prompt)
+  "Select a task for clocking"
+  (interactive)
+  (let ((targets (aj/org-get-clock-targets)))
+    (or
+     (when-let
+         ((sel (consult--multi
+                `((:name "Recent" :category org-entry :items ,(aj/org-clock-history))
+                  (:name "Agenda entries" :category org-entry :items ,targets))))
+          (m (get-text-property 0 :marker (car sel))))
+       (prog1
+           (copy-marker m)
+         (cl-loop for e in targets do
+                  (set-marker (get-text-property 0 :marker e) nil))))
+     (user-error "No clock in task chosen"))))
+
+;; (defun aj/org-get-clock-targets ()
+;;   (cl-loop for f in (aj/org-agenda-refile-targetfiles) append
+;;            (with-current-buffer (org-get-agenda-file-buffer f)
+;;              (org-element-cache-map
+;;               (lambda (el)
+;;                 (when (eq 'todo (org-element-property :todo-type el))
+;;                   (aj/org-clock-history-candidate (set-marker (make-marker) (org-element-property :begin el)))))
+;;               :granularity 'headline
+;;               :restrict-elements '(headline)))))
+
+(defun aj/org-get-clock-targets ()
+  (cl-loop for f in (aj/org-agenda-refile-targetfiles) append
+           (with-current-buffer (org-get-agenda-file-buffer f)
+             (org-element-cache-map
+              (lambda (el)
+                (when (eq 'todo (org-element-property :todo-type el))
+                  (propertize (aj/org-element-parents-outline el)
+                              :marker
+                              (set-marker (make-marker) (org-element-property :begin el)))))
+              :granularity 'headline
+              :restrict-elements '(headline)))))
+
+(defun aj/org-element-parents-outline (child)
+  (let ((parent (org-element-property :parent child)))
+    (if (eq 'headline (org-element-type parent))
+        (concat
+         (aj/org-element-parents-outline parent)
+         "/"
+         (org-element-property :raw-value child))
+      (file-name-base (buffer-file-name)))))
+
+(defun aj/org-clock-history ()
+  (let (och)
+    ;; Remove successive dups from the clock history to consider
+    (dolist (c org-clock-history)
+      (unless (equal c (car och))
+        (push c och)))
+    (cl-loop for m in (reverse och)
+             when (marker-buffer m)
+             collect (aj/org-clock-history-candidate m))))
+
+(defun aj/org-clock-history-candidate (marker)
+  (with-temp-buffer
+    (let ((cm (org-clock-insert-selection-line 0 marker)))
+      (goto-char (point-min))
+      (propertize (buffer-substring 4 (point-at-eol)) :marker (cdr cm)))))
+
+;; TODO add sources for
+;; org-clock-default task, interrupted-task, current clocking task
+;; (when (marker-buffer org-clock-default-task)
+;;   (insert (org-add-props "Default Task\n" nil 'face 'bold))
+;;   (setq s (org-clock-insert-selection-line ?d org-clock-default-task))
+;;   (push s sel-list))
+;; (when (marker-buffer org-clock-interrupted-task)
+;;   (insert (org-add-props "The task interrupted by starting the last one\n" nil 'face 'bold))
+;;   (setq s (org-clock-insert-selection-line ?i org-clock-interrupted-task))
+;;   (push s sel-list))
+;; (when (org-clocking-p)
+;;   (insert (org-add-props "Current Clocking Task\n" nil 'face 'bold))
+;;   (setq s (org-clock-insert-selection-line ?c org-clock-marker))
+;;   (push s sel-list))
+
+
+
+
+#+end_src
+
 **** Org clock with helm                                         :ARCHIVE:
 #+begin_src emacs-lisp
 (advice-add 'org-clock-select-task :override #'aj/helm-org-clock-select-task)
@@ -1462,13 +1563,13 @@ That is, always create a new buffer. (Is there anything more changed?)
       (setq beg (point)
             heading (org-get-heading 'no-tags))
       (org-end-of-subtree t t)
-      (when (org-at-heading-p) (backward-char 1))
+      (when (and (not (eobp)) (org-at-heading-p)) (backward-char 1))
       (setq end (point)))
     (setq ibuf (org-get-indirect-buffer cbuf heading)
           org-last-indirect-buffer ibuf)
     (pop-to-buffer ibuf)
     (narrow-to-region beg end)
-    (outline-show-all)
+    (org-fold-show-all '(headings drawers blocks))
     (goto-char pos)
     (run-hook-with-args 'org-cycle-hook 'all)
     (and (window-live-p cwin) (select-window cwin))))
@@ -1665,6 +1766,25 @@ This doesn’t use the functions defined above at all.
 ;;             collect (propertize p 'face (nth (mod i n) org-level-faces)) into l
 ;;             finally return (cons (string-join l "/") outline-path))))
 #+end_src
+
+** Navigation (consult-org)
+Loaded already in init.el, but configuration here:
+#+begin_src emacs-lisp
+(embark-define-keymap aj/org-heading-map
+  "Keymap for org mode headings"
+  ("i"  aj/embark-org-clone-indirect-heading))
+
+(setf (alist-get 'consult-org-heading embark-keymap-alist) 'aj/org-heading-map)
+
+(defun aj/embark-org-clone-indirect-heading (heading)
+  (when-let ((m (car-safe (get-text-property 0 'consult-org--heading heading))))
+    (let ((consult-after-jump-hook nil))
+      (save-excursion
+        (save-restriction
+          (consult--jump-nomark m)
+          (aj/org-tree-to-indirect-buffer))))))
+#+end_src
+
 
 ** Navigation etc. (helm-org) :ARCHIVE:
 *** helm-org :ARCHIVE:
@@ -2677,7 +2797,7 @@ List of prefix strings or regex."
   (advice-add 'org-annotate-add-note :around #'aj/org-annotate-add-note-advice)
 
   (org-link-set-parameters "note" :follow #'org-insert-link ; following should just edit!
-                           :activate-func #'aj/org-annotate-activate-note ; highlight author as well
+                           :activate-func#'aj/org-annotate-activate-note ; highlight author as well
                            )
 
   ;; ascii-export
@@ -2852,10 +2972,12 @@ List of prefix strings or regex."
   (citar-filenotify-setup nil)
   (define-key citar-citation-map (kbd "z") (cons "open in zotero" #'aj/org-cite-zotxt-follow))
   (define-key citar-citation-map (kbd "F") (cons "open externally" #'aj/citar-open-file-externally))
-  (defun aj/citar-open-file-externally (key)
+  (defun aj/citar-open-file-externally (key-entry)
     "Open citation KEYS in external program."
+    (interactive (list (citar-select-ref
+                        :rebuild-cache current-prefix-arg)))
     (let ((citar-file-open-function #'citar-file-open-external))
-      (citar-open-library-file key)))
+      (citar-open-library-file key-entry)))
 
   (defun aj/org-cite-zotxt-follow (key)
     "Follow citation KEY to Zotero."
@@ -2872,8 +2994,6 @@ List of prefix strings or regex."
 
   (defun aj/citar-open-roam-note (key _entry)
     (org-roam-ref-find key))
-
-
 
   ;; (defun aj/citar-get-csl-references (keys)
   ;;   (let ((proc (citeproc-create "/home/aj/.zotero-profile/styles/apa.csl"
@@ -2912,6 +3032,14 @@ List of prefix strings or regex."
           (cons (substring (match-string 0) 1)
                 (cons (match-beginning 0)
                       (match-end 0)))))))
+
+
+#+end_src
+*** Add extra group for current refs to citar
+#+begin_src emacs-lisp
+(use-package citar-current-refs
+  :straight (:host 'gitlab :repo "andersjohansson/citar-current-refs")
+  :demand t)
 #+end_src
 
 *** Nice display (activation) with csl styles
@@ -5450,14 +5578,18 @@ However, we can also use the display text property to align tags to the right of
 
 ;; Inspired by Ihor Radchenko’s code at: https://orgmode.org/list/87lfh745ch.fsf@localhost/
 
-(add-hook 'org-font-lock-set-keywords-hook #'aj/org-set-tag-align-keywords)
+;; (add-hook 'org-font-lock-set-keywords-hook #'aj/org-set-tag-align-keywords)
 
+(add-hook 'org-modern-mode-hook #'aj/org-set-tag-align-keywords)
 (defun aj/org-set-tag-align-keywords ()
   (add-to-list 'font-lock-extra-managed-props 'org-tag-aligned)
-  (setq org-font-lock-extra-keywords
-        (append
-         org-font-lock-extra-keywords
-         '((yant/org-align-tags t)))))
+  (font-lock-add-keywords nil '((yant/org-align-tags t)) 'append))
+;; (defun aj/org-set-tag-align-keywords ()
+;;   (add-to-list 'font-lock-extra-managed-props 'org-tag-aligned)
+;;   (setq org-font-lock-extra-keywords
+;;         (append
+;;          org-font-lock-extra-keywords
+;;          '((yant/org-align-tags t)))))
 
 (defun aj/string-pixel-width (string &optional mode)
   "Calculate pixel width of STRING.
@@ -5475,28 +5607,32 @@ Optional MODE specifies major mode used for display."
         (set-window-buffer nil (current-buffer))
         (car (window-text-pixel-size nil (line-beginning-position) (point)))))))
 
+
 (defun yant/org-align-tags (limit &optional force)
   "Align all the tags in org buffer."
   (save-match-data
     (when (eq major-mode 'org-mode)
-	  (while (re-search-forward "^\\*+ \\(.+?\\)\\([ \t]+\\)\\(:\\(?:[^ \n]+:\\)+\\)$" limit t)
-	    (when (and (match-string 2)
-		           (or force
-			           (not (get-text-property (match-beginning 2) 'org-tag-aligned))))
-	      (with-silent-modifications
-            (put-text-property (match-beginning 2) (match-end 2) 'org-tag-aligned t)
-	        (put-text-property
-             (if (>= 2 (- (match-end 2) (match-beginning 2)))
-				 (match-beginning 2)
-			   ;; multiple whitespaces may mean that we are in process of typing
-			   (1+ (match-beginning 2)))
-			 (match-end 2)
-			 'display
-			 `(space . (:align-to
-                        (- right
-						   (,(+ 3 ;; no idea, but otherwise it is sometimes not enough
-							    (aj/string-pixel-width org-ellipsis)
-							    (aj/string-pixel-width (or (match-string 3) ""))))))))))))))
+      (let ((ellw (aj/string-pixel-width org-ellipsis)))
+	    (while (re-search-forward "^\\*+ \\(.+?\\)\\([ \t]+\\)\\(:\\(?:[^ \n]+:\\)+\\)$" limit t)
+	      (when (and (match-string 2)
+		             (or force
+			             (not (get-text-property (match-beginning 2) 'org-tag-aligned))))
+	        (with-silent-modifications
+              (put-text-property (match-beginning 2) (match-end 2) 'org-tag-aligned t)
+	          (put-text-property
+               (if (>= 2 (- (match-end 2) (match-beginning 2)))
+				   (match-beginning 2)
+			     ;; multiple whitespaces may mean that we are in process of typing
+			     (1+ (match-beginning 2)))
+			   (match-end 2)
+			   'display
+			   `(space . (:align-to
+                          (- right
+						     (,(+ 3 ;; no idea, but otherwise it is sometimes not enough
+							      ellw
+                                  (if (match-beginning 3)
+                                      (car (window-text-pixel-size nil (match-beginning 3) (match-end 3)))
+                                    0))))))))))))))
 #+end_src
 
 *** org-fold-linebreaks-mode

@@ -2355,8 +2355,11 @@ Some of the functions are redefined.
 #+begin_src emacs-lisp
 (defvar aj/mu4e-contacts-exclude-pattern
   (regexp-opt
-   '("no-reply" "noreply" "github.com" "donotreply" "newsletter" "launchpad.net"
-     "notification")))
+   (append (with-temp-buffer
+             (insert-file-contents "~/contacts-exclude")
+             (split-string (buffer-substring (point-min) (point-max)) "\n" t))
+           '("no-reply" "noreply" "github.com" "donotreply" "newsletter" "launchpad.net"
+             "notification"))))
 
 (setq mu4e-contact-process-function #'aj/mu4e-contact-process-function)
 

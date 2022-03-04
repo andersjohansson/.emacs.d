@@ -241,7 +241,7 @@ When using the experimental ~feature/native-comp~ branch of emacs, loaded librar
 *** Fontset stuff, color emojis (emacs 27, yay!)
 #+begin_src emacs-lisp
 ;; Not needed.
-;; (set-fontset-font ft nil (font-spec :name "Symbola") nil 'append)
+;;(set-fontset-font t nil (font-spec :name "Noto Sans") nil 'append)
 ;; (set-fontset-font ft 'cjk-misc (font-spec :name "Noto Sans CJK") nil)
 
 ;; Fonts for some emojis:
@@ -794,9 +794,9 @@ https://www.freedesktop.org/wiki/Specifications/desktop-bookmark-spec/"
 (setq consult-buffer-sources
       '(consult--source-hidden-buffer
         consult--source-buffer
-        consult--source-file
+        consult--source-recent-file
         consult--source-project-buffer
-        consult--source-project-file
+        consult--source-project-recent-file
         ;; aj/consult--source-dired-recent
         aj/consult--source-system-file
         ))
@@ -828,9 +828,7 @@ https://www.freedesktop.org/wiki/Specifications/desktop-bookmark-spec/"
        :face consult-file
        :history file-name-history
        :items ,#'aj/consult-dir-xdg-directories)
-    "Xdg directory source for `consult-dir--pick'.")
-
-  )
+    "Xdg directory source for `consult-dir--pick'."))
 #+end_src
 
 ****** Pre-select nearest heading for ~consult-org-heading~ and ~consult-outline~ using vertico
@@ -909,31 +907,38 @@ Used to preselect nearest headings and imenu items.")
 
 (defun aj/open-zoterofile-new-frame ()
   (let ((selectrum-display-action '(selectrum-display-full-frame)))
-    (aj/run-cmd-in-small-frame 100 20 #'aj/open-zoterofile "Zotero file" t)))
+    (aj/run-cmd-in-small-frame 100 20 #'aj/zoterofile "Zotero file" t)))
 
 (autoload #'consult--multi "consult")
 
-(defun aj/open-zoterofile ()
+(defun aj/zoterofile-open (file)
+  "Open FILE in emacs or externally."
+  (if aj/running-cmd-in-small-frame
+      #'consult-file-externally
+    #'find-file))
+
+(defvar aj/zoterofile-options
+  '( :category file
+     :history aj/zoterofile-history
+     :action aj/zoterofile-open))
+
+(defun aj/zoterofile ()
+  "Act on a zotero file."
   (interactive)
-  (let* ((common (list :category 'file
-                       :history 'aj/zoterofile-history
-                       :action (if aj/running-cmd-in-small-frame
-                                   #'consult-file-externally
-                                 #'find-file))))
-    (consult--multi
-     (list (append (list :name "Zotero recently modified"
-                         :items #'aj/zotero-recently-modified
-                         :narrow ?m)
-                   common)
-           (append (list :name "Zotero recentf"
-                         :items #'aj/zotero-recentf
-                         :narrow ?r)
-                   common)
-           (append (list :name "Zotero files"
-                         :items #'aj/zotero-files
-                         :narrow ?f)
-                   common))
-     :prompt "Zoterofil: ")))
+  (consult--multi
+   (list (append (list :name "Zotero recently modified"
+                       :items #'aj/zotero-recently-modified
+                       :narrow ?m)
+                 aj/zoterofile-options)
+         (append (list :name "Zotero recentf"
+                       :items #'aj/zotero-recentf
+                       :narrow ?r)
+                 aj/zoterofile-options)
+         (append (list :name "Zotero files"
+                       :items #'aj/zotero-files
+                       :narrow ?f)
+                 aj/zoterofile-options))
+   :prompt "Zotero file: "))
 
 (defun aj/zotero-recently-modified ()
   (when (file-accessible-directory-p aj/zotero-library)
@@ -1193,7 +1198,7 @@ overriding it, but you should know before you do.
                                     'shadow))))))
 
   ;; Special function for inserting or modifying tags
-  (define-key orgqda-mode-map [remap org-set-tags-command] #'orgqda-tag-or-code)
+  (define-key orgqda-mode-map [remap org-set-tags-command] #'orgqda-code-headline-or-paragraph)
 
   ;; (defun aj/orgqda-tag-or-code (arg)
   ;;     "Insert inlinetask and tag, except if on headline, then add tag
@@ -1220,6 +1225,8 @@ overriding it, but you should know before you do.
           :map orgqda-codebook-mode-map
           ("C-c C-ö" . #'orgqda-transient)
           :map orgqda-list-mode-map
+          ("C-c C-ö" . #'orgqda-transient)
+          :map orgqda-view-mode-map
           ("C-c C-ö" . #'orgqda-transient)))
 
 
@@ -1404,11 +1411,11 @@ For exporting and converting to zotero.
     (org-agenda-clock-in))
    (t (message "Not in org file or agenda"))))
 
-(defun aj/helm-org-clock-in (marker)
-  (save-window-excursion
-    (switch-to-buffer (marker-buffer marker))
-    (goto-char (marker-position marker))
-    (org-clock-in)))
+;; (defun aj/helm-org-clock-in (marker)
+;;   (save-window-excursion
+;;     (switch-to-buffer (marker-buffer marker))
+;;     (goto-char (marker-position marker))
+;;     (org-clock-in)))
 
 (defun aj/org-mark-current-clocking-done ()
   (interactive)
@@ -1423,7 +1430,20 @@ For exporting and converting to zotero.
 
 #+end_src
 
-*** Flycheck
+*** Flymake
+#+begin_src emacs-lisp
+(use-package flymake
+  :hook
+  (prog-mode . flymake-mode)
+  ;; (org-src-mode . aj/flymake-remove-checkdoc)
+  :config
+  ;; (defun aj/flymake-remove-checkdoc ()
+  ;;   (remove-hook 'flymake-diagnostic-functions #'elisp-flymake-checkdoc t)
+  ;;   )
+  )
+#+end_src
+
+*** Flycheck :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package flycheck
   :commands (global-flycheck-mode)
@@ -4025,13 +4045,15 @@ personal dictionaries into a combined personal dictionary."
                                    (sv . ("sv_SE" "Swedish")))
         guess-language-languages '(en sv)
         guess-language-min-paragraph-length 45)
-  (add-to-list 'guess-language-after-detection-functions
-               #'aj/set-langtool-language)
 
-  (defun aj/set-langtool-language (lang _beg _end)
-    (cl-case lang
-      (sv (setq-local langtool-default-language "sv-SE"))
-      (en (setq-local langtool-default-language "en-GB")))))
+  ;; (add-to-list 'guess-language-after-detection-functions
+  ;;              #'aj/set-langtool-language)
+
+  ;; (defun aj/set-langtool-language (lang _beg _end)
+  ;;   (cl-case lang
+  ;;     (sv (setq-local langtool-default-language "sv-SE"))
+  ;;     (en (setq-local langtool-default-language "en-GB"))))
+  )
 
 
 (defvar aj/flyspell-modes '(org-mode))
@@ -4061,16 +4083,17 @@ Enable it for buffers in ‘aj/flyspell-modes’ with defined
                   (member major-mode aj/flyspell-modes)
                   ispell-local-dictionary)
              (flyspell-mode)
-             (aj/set-langtool-language-from-ispell-dict))
+             ;; (aj/set-langtool-language-from-ispell-dict)
+             )
             ((eq major-mode 'mu4e-compose-mode)
              (flyspell-mode)
              (guess-language-mode))))))
 
-(defun aj/set-langtool-language-from-ispell-dict ()
-  (when (and ispell-local-dictionary
-             (< (length ispell-local-dictionary) 7))
-    (setq-local langtool-default-language
-                (replace-regexp-in-string "\_" "-" ispell-local-dictionary))))
+;; (defun aj/set-langtool-language-from-ispell-dict ()
+;;   (when (and ispell-local-dictionary
+;;              (< (length ispell-local-dictionary) 7))
+;;     (setq-local langtool-default-language
+;;                 (replace-regexp-in-string "\_" "-" ispell-local-dictionary))))
 #+end_src
 
 **** Extra flyspell bindings :ARCHIVE:
@@ -4146,7 +4169,29 @@ For doing smart (curly) quotes, mainly in emails since org has it’s own mechan
   (bind-key "C-c C-ö" #'aj/toggle-en-sv-typo mu4e-compose-mode-map))
 #+end_src
 
-*** [[https://github.com/mhayashi1120/Emacs-langtool][Language tool]]
+*** eglot-ltex
+#+begin_src emacs-lisp
+(use-package eglot
+  :config
+  (add-to-list 'eglot-server-programs
+               '((text-mode latex-mode org-mode markdown-mode) . ("ltex-ls"))))
+#+end_src
+
+*** Flymake-languagetool :ARCHIVE:
+#+begin_src emacs-lisp
+(use-package flymake-languagetool
+  :hook ((text-mode       . flymake-languagetool-load)
+         (latex-mode      . flymake-languagetool-load)
+         (org-mode        . flymake-languagetool-load)
+         (markdown-mode   . flymake-languagetool-load))
+  :custom
+  (flymake-languagetool-server-port 8003)
+  (flymake-languagetool-language "auto")
+  :init
+  (setq flymake-languagetool-server-jar "/usr/share/languagetool:/usr/share/java/languagetool/*"))
+#+end_src
+
+*** [[https://github.com/mhayashi1120/Emacs-langtool][Language tool]], :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package langtool
   :bind (("C-x 4 w" . langtool-check)
@@ -4161,6 +4206,7 @@ For doing smart (curly) quotes, mainly in emails since org has it’s own mechan
   (langtool-java-classpath "/usr/share/languagetool:/usr/share/java/languagetool/*")
   (langtool-mother-tongue "sv")
   (langtool-disabled-rules '("WHITESPACE_RULE" "EN_QUOTES")))
+
 #+end_src
 
 *** Word lookups (definition, translation, synonyms). Use define-word for online word definitions and SDCV for Webster's dictionary installed locally
@@ -4561,6 +4607,7 @@ Save viewed page, like saveplace
 **** Functions for clearing annotations in pdfs
 #+begin_src emacs-lisp
 (defun aj/dired-pdf-delete-all-annotations-in-files ()
+  "Delete all annotations in marked dired files."
   (interactive)
   (cl-loop for f in (dired-get-marked-files)
            do
@@ -4570,6 +4617,7 @@ Save viewed page, like saveplace
            (kill-buffer)))
 
 (defun aj/pdf-delete-all-annotations-in-buffer ()
+  "Delete all pdf annotations in current buffer."
   (interactive)
   (cl-loop for a in (pdf-annot-getannots) do
            (pdf-annot-delete a)))
@@ -4578,7 +4626,26 @@ Save viewed page, like saveplace
 **** Get annotations from Sony PRS e-reader
 #+begin_src emacs-lisp
 (use-package prs-pdf-annotations
-  :straight (:host 'gitlab :repo "andersjohansson/prs-pdf-annotations"))
+  :straight (:host 'gitlab :repo "andersjohansson/prs-pdf-annotations")
+  :config
+  (defun aj/zotero-to-prs ()
+    "Copy a zotero pdf to Sony PRS."
+    (interactive)
+    (let ((aj/zoterofile-options (append '(:action aj/zotero-to-prs--copy) aj/zoterofile-options)))
+      (aj/zoterofile)))
+
+  (defun aj/zotero-to-prs--copy (file)
+    "Do the copy of file to the Sony PRS."
+    (copy-file
+     file
+     (expand-file-name "Sony_Reader/media/books/" prs-pdf-annotations-reader-path))))
+
+
+
+
+
+
+
 #+end_src
 
 ** Display customizations: theme, modeline, etc.
@@ -4791,7 +4858,7 @@ fi
     (when (member theme '(modus-operandi modus-vivendi))
       (set-face-attribute 'mini-modeline-mode-line-inactive nil
                           :background (modus-themes-color 'bg-active) :height 0.14)
-      (set-face-attribute 'mini-modeline-mode-line nil
+      (set-face-attribute 'mini-modeline-mode-line-active nil
                           :background (modus-themes-color 'blue-fringe-bg) :height 0.14)))
 
 
