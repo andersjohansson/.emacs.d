@@ -110,7 +110,20 @@ Avoid colons for syncing to windows systems (onedrive)"
 #+end_src
 
 ** Cosmetics, early definitions
-*** [[https://github.com/integral-dw/org-superstar-mode/][org-superstar]] (successor to org-bullets)
+
+*** [[https://github.com/minad/org-modern][org-modern]]
+#+begin_src emacs-lisp
+(use-package org-modern
+  :demand t
+  :hook (org-mode . org-modern-mode)
+  :custom
+  (org-modern-block nil) ;; doesn’t work with org-indent
+  (org-modern-hide-stars nil)
+  (org-modern-star '["♦"])
+  (org-modern-table-vertical 1))
+#+end_src
+
+*** [[https://github.com/integral-dw/org-superstar-mode/][org-superstar]] (successor to org-bullets) :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package org-superstar
   :demand t
@@ -174,6 +187,11 @@ With a special "thin" space for org-indent, we can have lines with low line-heig
 Commented code for also indenting quote-blocks
 
 #+begin_src emacs-lisp
+;; do org-indent late so that it happens after we have variable-pitch
+;; etc. (org-startup-indented is nil)
+
+(add-hook 'org-mode-hook #'org-indent-mode 50)
+
 (defface aj/org-quote-beg-end-face `((t . (:height 0.1 :foreground "#f0e0d4" :background "#f0e0d4" :extend t)))
   "Face for begin and end line of org quotes"
   :group 'aj)
@@ -257,7 +275,8 @@ Commented code for also indenting quote-blocks
                (headerstring (if (< 0 n)
                                  (concat
                                   (make-string (+ n indentation -1) ?*)
-                                  (char-to-string (car org-superstar-headline-bullets-list))
+                                  (seq-first org-modern-star)
+                                  ;; (char-to-string (car org-superstar-headline-bullets-list))
                                   (char-to-string org-indent-boundary-char))
                                ""))
                (headerstringwidth (aj/string-pixel-width-line pbuf headerstring)))
@@ -275,7 +294,7 @@ Commented code for also indenting quote-blocks
                 (if (<= org-inlinetask-min-level n)
                     (aj/org-make-indent-string
                      (concat (make-string (- n 2) ?*)
-                             (make-string 2 (car org-superstar-headline-bullets-list))
+                             (make-string 2 (string-to-char (seq-first org-modern-star)))
                              " ")
                      nil pbuf)
                   ""))

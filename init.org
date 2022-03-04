@@ -1304,7 +1304,7 @@ For exporting and converting to zotero.
   (org-M-RET-may-split-line '((headline . t) (default . t)))
 
   (org-startup-folded nil)
-  (org-startup-indented t)
+  (org-startup-indented nil)
   (org-indent-indentation-per-level 2)
 
   ;;refile
@@ -4947,12 +4947,13 @@ Also runs hook aj/face-definitions-hook."
                             :weight 'light)
 
 
-        (set-face-attribute 'org-todo nil :height 0.8 :inherit 'fixed-pitch)
+        (set-face-attribute 'org-todo nil ;; :height 1.0
+                            :inherit 'fixed-pitch)
 
-        (defface aj/org-todo `((t :inherit 'org-todo :foreground ,(modus-themes-color 'red))) "Face for todo org-state" :group 'org-faces)
-        (defface aj/org-waiting `((t :inherit 'aj/org-todo :foreground ,(modus-themes-color 'yellow) :inherit fixed-pitch)) "Face for waiting org-state" :group 'org-faces)
+        (defface aj/org-todo `((t :inherit org-modern-todo :foreground ,(modus-themes-color 'red))) "Face for todo org-state" :group 'org-faces)
+        (defface aj/org-waiting `((t :inherit 'aj/org-todo :foreground ,(modus-themes-color 'yellow))) "Face for waiting org-state" :group 'org-faces)
         (defface aj/org-started `((t :inherit 'aj/org-todo :foreground ,(modus-themes-color 'blue))) "Face for started org-state" :group 'org-faces)
-        (defface aj/org-done `((t :inherit 'aj/org-todo :foreground ,(modus-themes-color 'green) :inherit fixed-pitch)) "Face for done org-state" :group 'org-faces)
+        (defface aj/org-done `((t :inherit org-modern-done)) "Face for done org-state" :group 'org-faces)
 
         (setq org-todo-keyword-faces
               '(("TODO" . aj/org-todo)
@@ -4960,7 +4961,6 @@ Also runs hook aj/face-definitions-hook."
                 ("VÄNTAR" . aj/org-waiting)
                 ("AVFÖRD" . aj/org-done)
                 ("DONE" . aj/org-done)))
-
 
 
         ;; (setq org-todo-keyword-faces
