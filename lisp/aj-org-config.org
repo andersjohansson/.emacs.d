@@ -2279,69 +2279,10 @@ https://gitlab.com/andersjohansson/org-archive-hierarchically
 
 *** Capture in new frame
 #+begin_src emacs-lisp
-(define-key global-map [remap org-capture] #'aj/org-capture-in-popout-frame)
-
-(add-hook 'org-capture-after-finalize-hook #'aj/org-capture-delete-capture-frame)
-
-(defun aj/org-capture-in-popout-frame (&optional goto keys)
-  "As `org-capture', but do all work in a new frame.
-
-    This function by itself doesn't clean up the frame following
-    capture.  To do that, add `aj/org-capture-delete-capture-frame'
-    to `org-capture-after-finalize-hook'."
-  (interactive "P")
-  (if goto
-      (org-capture goto keys)
-    (let ((display-buffer-alist
-           (cons '("\\*Org Select\\*\\|\\*Capture\\*\\|CAPTURE-.*"
-                   aj/display-buffer-in-named-frame
-                   (named-frame . "Capture"))
-                 display-buffer-alist)))
-      (cl-letf
-          (;; Make Org-mode respect `display-buffer-alist'.
-           ((symbol-function 'org-switch-to-buffer-other-window)
-            #'pop-to-buffer
-            ;; And stop Org-mode from messing with our window configuration.
-            (symbol-function 'delete-other-windows)
-            #'ignore))
-        (condition-case err
-            (org-capture goto keys)
-          (error (aj/org-capture-delete-capture-frame)
-                 (signal (car err) (cdr err))))))))
-
-(defun aj/org-capture-delete-capture-frame ()
-  "Delete a frame named \"Capture\".
-For use in `org-capture-after-finalize-hook' to clean up after
-`aj/org-capture-in-popout-frame'."
-  (when-let ((frame (aj/get-frame-by-name "Capture")))
-    (delete-frame frame)))
-
-
-(defun aj/get-frame-by-name (name)
-  (cl-loop for frame being the frames
-           when (equal (frame-parameter frame 'name) name)
-           return frame))
-
-
-(defun aj/display-buffer-in-named-frame (buffer alist)
-  "Display BUFFER in frame with specific name.
-The name to use is the value associated with the 'named-frame key
-in ALIST.  If a frame with that name already exists, use it.
-Otherwise, call `display-buffer-in-pop-up-frame' to create it.
-
-If ALIST does not contain the key 'named-frame, use the name of BUFFER."
-  (let* ((fname  (or (cdr (assq 'named-frame alist))
-                     (buffer-name buffer)))
-         (frame  (aj/get-frame-by-name fname)))
-    (if frame
-        (window--display-buffer buffer
-                                (frame-selected-window frame)
-                                'reuse)
-      (display-buffer-pop-up-frame
-       buffer
-       (cons `(pop-up-frame-parameters
-               (name . ,fname))
-             alist)))))
+;; in /lisp
+(use-package org-capture-new-frame
+  :bind ([remap org-capture] . org-capture-new-frame-open)
+  :straight nil)
 #+end_src
 
 *** Save files after capturing and refiling
