@@ -74,10 +74,34 @@ TEMPLATE is the processed template used to format the entry."
   (org-roam-timestamps-remember-timestamps t)
   (org-roam-timestamps-timestamp-parent-file nil)
   :init
-  (org-roam-timestamps-mode))
-
+  (org-roam-timestamps-mode)
+  :config
+  (defun aj/org-roam-timestamps-cleanup ()
+    "Remove erronous mtime/ctime properties from buffer."
+    (interactive)
+    (org-map-entries
+     (lambda ()
+       (let* ((org-trust-scanner-tags t)
+              (props (org-entry-properties (point))))
+         (unless (assoc "ID" props)
+           (when (assoc "MTIME" props)
+             (org-entry-delete (point) "MTIME"))
+           (when (assoc "CTIME" props)
+             (org-entry-delete (point) "CTIME"))))))))
 #+end_src
-
+** [[https://github.com/nullman/emacs-org-visibility][org-visibility]]
+Automatically save and restore previous visibility, very useful.
+#+begin_src emacs-lisp
+(use-package org-visibility
+  :after (org)
+  :hook (org-mode . org-visibility-mode)
+  :custom
+  ;; no need for doing other folding work:
+  (org-startup-folder 'showeverything)
+  ;; all org files
+  (org-visibility-include-regexps '("\\.org\\'"))
+  (org-visibility-state-file (no-littering-expand-var-file-name "org-visibility")))
+#+end_src
 ** Transclusion
 #+begin_src emacs-lisp
 (use-package org-transclusion
@@ -144,7 +168,7 @@ Avoid colons for syncing to windows systems (onedrive)"
   (org-superstar-item-bullet-alist '((?- . ?•) (?+ . ?‣))))
 #+end_src
 
-*** Prettify-symbols replacements
+*** Prettify-symbols replacements :ARCHIVE:
 **** Use prettify-symbols
 Define a variable where symbols can be added for use later and enable prettify-symbols-mode for org
 #+begin_src emacs-lisp
@@ -181,16 +205,19 @@ for more information."
   (add-to-list 'aj/org-prettify-symbols kw))
 #+end_src
 
-*** Do org-indent indentation with display spaces
+
+*** Activate org-indent
+activate org-indent late so that it happens after we have variable-pitch etc. (org-startup-indented is nil)
+#+begin_src emacs-lisp
+(add-hook 'org-mode-hook #'org-indent-mode 50)
+#+end_src
+
+*** Do org-indent indentation with display spaces :ARCHIVE:
 With a special "thin" space for org-indent, we can have lines with low line-height (creating lines) even when we have indent. But the indent then has to be set with a space ~:align-to~ property. For this we do some patching of the org-indent machinery
 
 Commented code for also indenting quote-blocks
 
 #+begin_src emacs-lisp
-;; do org-indent late so that it happens after we have variable-pitch
-;; etc. (org-startup-indented is nil)
-
-(add-hook 'org-mode-hook #'org-indent-mode 50)
 
 (defface aj/org-quote-beg-end-face `((t . (:height 0.1 :foreground "#f0e0d4" :background "#f0e0d4" :extend t)))
   "Face for begin and end line of org quotes"
@@ -686,10 +713,9 @@ Otherwise hydra for template insertion.
            ("C-c S-C-l" . org-store-link))
 #+end_src
 
-** Org-table-header-line-mode
-I think this patch makes it work better (correct, that is). Trying it out for a while.
+** Org-table-header-line-mode :ARCHIVE:
 #+begin_src emacs-lisp
-(setq org-table-header-line-p t)
+(setq org-table-header-line-p nil)
 
 ;; (el-patch-feature org-table)
 ;; (with-eval-after-load 'org-table
@@ -1593,9 +1619,10 @@ That is, always create a new buffer. (Is there anything more changed?)
 ** File-associations, opening links externally :org_async:
 #+begin_src emacs-lisp
 (add-to-list 'org-file-apps '("\\.pdf\\'" . emacs)) ; open pdfs in emacs
+(add-to-list 'org-file-apps '("\\.odt\\'" . system)) ; force odt to system
 ;;use xdg-open instead of mailcap
 ;; this won’t work in a real console, but I won’t open files from org in a real console
-(setq org-file-apps-gnu '((remote . emacs) (system . "aj-open %s") (t . "aj-open %s")))
+(setq org-file-apps-gnu '((remote . emacs) (system . "xdg-open %s") (t . "xdg-open %s")))
 
 ;; disassociates started processes so they wont get killed if emacs is killed.
 (advice-add 'org-open-file :around  #'aj/org-open-file-around-advice)
@@ -1669,6 +1696,31 @@ A local variables comment block that is placed at the end of the file may be los
 #+end_src
 
 ** Structure editing
+
+*** Display name of invisible parent when promoting/demoting
+#+begin_src emacs-lisp
+(add-hook 'org-after-demote-entry-hook #'aj/org-show-parent-for-demote-promote)
+(add-hook 'org-after-promote-entry-hook #'aj/org-show-parent-for-demote-promote)
+
+(defun aj/org-show-parent-for-demote-promote ()
+  (when
+      (eq (selected-window) (get-buffer-window))
+    (when-let ((prev (save-excursion
+                       (when (org-up-heading-safe)
+                         (cons (point) (propertize
+                                        (substring-no-properties
+                                         (org-get-heading t t t t))
+                                        'face 'fringe))))))
+      (unless (pos-visible-in-window-p (car prev))
+        (momentary-string-display (concat
+                                   (propertize " "
+                                               'display
+                                               '(space . (:align-to
+                                                          (- right (+ 30)))))
+                                   (concat "⇧ " (cdr prev)))
+                                  (point-at-eol))))))
+
+#+end_src
 *** Sorting by last name
 I often have lists of names for headlines. Nice to be able to sort them by last name. Here is a function to be used for creating a sort key that sorts on last name for ~org-sort-entries~ or ~org-sort-list~.
 #+begin_src emacs-lisp
@@ -2486,7 +2538,7 @@ Possibly passss INITIAL-INPUT"
     (citar--format-entry-no-widths ref "${author editor} (${year issued date}) “${title}”")))
 #+end_src
 
-**** Capture in new frame.
+**** Capture in new frame.                                       :ARCHIVE:
 Useful for launching a small capture frame from window manager with a call like:
 ~emacsclient --eval "(aj/org-capture-new-frame \"$1\" $2)"~
 #+begin_src emacs-lisp
@@ -2646,12 +2698,13 @@ Can be passed any ox BACKEND in a non-interactive call"
    '((html . org-annotate-export-html-tooltip)
      (latex . aj/org-annotate-export-latex-fixme-and-inline)
      (odt . aj/org-annotate-export-odt-annotation-or-inline)
-     (md . aj/org-annotate-export-md-pandoc-odt)))
+     (md . aj/org-annotate-export-md-pandoc-odt)
+     (pandoc . aj/org-annotate-export-org-pandoc-odt)))
 
 
   :config
   (set-face-attribute 'org-annotate-bracket-face nil :inherit 'font-lock-variable-name-face :weight 'bold)
-  (set-face-attribute 'org-annotate-face nil :weight 'bold :underline nil :inherit 'font-lock-comment-face)
+  (set-face-attribute 'org-annotate-face nil :underline nil :inherit 'font-lock-comment-face)
 
   (defun aj/org-annotate-extract-author (note)
     (if (string-match "{\\([^}]+\\)} *" note)
@@ -2674,6 +2727,12 @@ Can be passed any ox BACKEND in a non-interactive call"
             (format "\\fxnote*%s{%s}{%s}" optstring path
                     (org-export-data-with-backend desc 'latex nil))
           (format "\\fxnote%s{%s}" optstring path)))))
+
+  (defun aj/org-annotate-export-org-pandoc-odt (path desc)
+    (concat
+     "@@opendocument:" ;; for pandoc, in real org should be “odt”
+     (aj/org-annotate-export-odt-annotation-or-inline path desc)
+     "@@"))
 
   (defun aj/org-annotate-export-md-pandoc-odt (path desc)
     (concat
@@ -2950,12 +3009,21 @@ List of prefix strings or regex."
 
   )
 
+
+;;Nice display (activation) with csl styles
+(use-package citeproc)
+(use-package oc-csl-activate
+  :straight (:host github :repo "andras-simonyi/org-cite-csl-activate")
+  :demand t
+  :hook (org-mode . cursor-sensor-mode))
+
 (use-package citar-org
   :after (embark org oc citar)
   :straight nil
   :demand t
   :bind ( :map org-mode-map
           ("C-c C-å" . org-cite-insert))
+  :custom (citar-org-activation-functions '(org-cite-csl-activate citar-org-activate-keymap))
   :config
   (setq org-cite-insert-processor 'citar
         org-cite-follow-processor 'citar
@@ -2981,24 +3049,6 @@ List of prefix strings or regex."
 (use-package citar-current-refs
   :straight (:host 'gitlab :repo "andersjohansson/citar-current-refs")
   :demand t)
-#+end_src
-
-*** Nice display (activation) with csl styles
-But putting the display property seems not to work, is that because of the org-fold branch?
-#+begin_src emacs-lisp
-(use-package citeproc)
-
-(use-package oc-csl-activate
-  :straight (:host github :repo "andras-simonyi/org-cite-csl-activate")
-  :hook (org-mode . cursor-sensor-mode)
-  :init
-  (setq org-cite-activate-processor 'csl-activate))
-#+end_src
-
-*** Activate using oc-basic :ARCHIVE:
-#+begin_src emacs-lisp
-(require 'oc-basic)
-(setq org-cite-activate-processor 'basic)
 #+end_src
 
 *** Follow, with three choices. :ARCHIVE:
@@ -3063,13 +3113,16 @@ I just override ~org-cite-follow~, because these choices are what I always want.
 *** Exporting
 **** Setting up
 #+begin_src emacs-lisp
-(require 'oc-biblatex) ;; processor registration can’t be autoloaded ...
+;; processor registration can’t be autoloaded ... or?
+(require 'oc-biblatex)
+
 (setq org-cite-export-processors
       '((latex biblatex)
+        (pandoc pandoc)
         (t basic)))
 #+end_src
 
-**** Oc-pandoc, export to markdown with pandoc citations.
+**** Oc-pandoc, export to markdown with pandoc citations. :ARCHIVE:
 See also [[file:../init.org::*ox-md-pandoc-zotero]] for the zotero-conversion export
 #+begin_src emacs-lisp
 (use-package oc-pandoc
@@ -3183,6 +3236,9 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
   :init (setq org-zotxt-link-description-style :citekey)
   :commands org-zotxt-extract-link-id-at-point org-zotxt-choose-path
   :config
+  ;; don’t try to export:
+  (org-link-set-parameters "zotero"
+                           :export #'ignore)
   ;;prompt to add page references in quotes
   ;; (advice-add 'org-zotxt-insert-reference-link-to-item
   ;;   		  :after #'zotxt-extra-maybe-edit-description)
@@ -3697,50 +3753,51 @@ Fungerar inte på grund av relativiseringen av sökvägar i slutet av org-insert
 #+end_src
 
 **** Enable citations in quote blocks captions
-Kind of messy, but does the job of making org-zotxt links in cite-attributes to correct citations.
+Now we can add captions to quote blocks. They are added to the cite attribute (which I have css for displaying). Works well with citations!
 #+begin_src emacs-lisp
-;; (with-eval-after-load 'ox
-;;   (add-to-list 'org-export-filter-quote-block-functions #'aj/org-html-citations-in-code-blocks)
-;;   (defun aj/org-html-citations-in-code-blocks (qb backend info)
-;;     (if (and
-;;          (org-export-derived-backend-p backend 'html)
-;;          (string-match "cite=\"\\(\\[cite[^]]+\\]\\)\"" qb))
-;;         (let ((ms (match-string 1 qb)))
-;;           (replace-match
-;;            (save-match-data
-;;              (org-export-data
-;;               (org-element-parse-secondary-string ms '(cite)) info))
-;;            ;; (save-match-data
-;;            ;;   (string-trim
-;;            ;;    (replace-regexp-in-string
-;;            ;;     "</?\\(span\\|p\\)[^>]*?>"
-;;            ;;     ""
-;;            ;;     )))
-;;            t t qb 1))
-;;       qb)))
+(defun aj/org-html-quote-block (quote-block contents info)
+  "Transcode a QUOTE-BLOCK element from Org to HTML.
+CONTENTS holds the contents of the block.  INFO is a plist
+holding contextual information.
+We also allow for a caption, which will be put in a cite attribute."
+  (format "<blockquote%s>\n%s</blockquote>"
+	      (let* ((reference (org-html--reference quote-block info t))
+		         (attributes (org-export-read-attribute :attr_html quote-block))
+                 (caption (org-export-get-caption quote-block))
+                 (attributes (if (or (not reference) (plist-member attributes :id))
+			                     attributes
+		                       (plist-put attributes :id reference)))
+                 (attributes (if caption
+                                 (plist-put attributes :cite (org-trim (org-export-data caption info)))
+                               attributes))
+		         (attr (org-html--make-attribute-string attributes)))
+	        (if (org-string-nw-p attr) (concat " " attr) ""))
+	      contents))
 
-
-;; Alternativ. Kanske modifiera org-cite-list-citations? Oklart om det
-;; kommer fungera.
-
-
-;; (defun aj/org-html-citations-in-quote-blocks (tree backend info)
-;;   (when (org-export-derived-backend-p backend 'html)
-;;     (org-element-map tree 'quote-block
-;;       (lambda (qb)
-;;         (when-let (;; (citearg (org-element-property :attr_html qb))
-;;                    (cite (org-export-read-attribute :attr_html qb :cite))
-;;                    (citation (org-element-parse-secondary-string cite '(citation))))
-;;           (plist-put info :citations (push citation (plist-get info :citations)))
-;;           (let ((formatted "den formaterade";; (org-cite-export-citation citation nil info)
-;;                            ))
-;;             (org-element-put-property qb :attr_html (concat ":cite " formatted)))))
-;;       info)))
-
-;; (add-to-list 'org-export-filter-parse-tree-functions #'aj/org-html-citations-in-quote-blocks)
-
+;; Let’s just redefine the transcoder for the html backend.
+(setf (alist-get 'quote-block
+                 (org-export-backend-transcoders (org-export-get-backend 'html)))
+      #'aj/org-html-quote-block)
 #+end_src
 
+**** Let center have attributes
+#+begin_src emacs-lisp
+(defun aj/org-html-center-block (center-block contents _info)
+  "Transcode a CENTER-BLOCK element from Org to HTML.
+CONTENTS holds the contents of the block.  INFO is a plist
+holding contextual information."
+  (let* ((attributes (org-export-read-attribute :attr_html center-block))
+         (attributes (plist-put attributes :class (concat (plist-get attributes :class) " org-center")))
+         (attr (org-html--make-attribute-string attributes)))
+    (format "<div%s>\n%s</div>"
+            (if (org-string-nw-p attr) (concat " " attr) "")
+            contents)))
+
+;; Let’s just redefine the transcoder for the html backend.
+(setf (alist-get 'center-block
+                 (org-export-backend-transcoders (org-export-get-backend 'html)))
+      #'aj/org-html-center-block)
+#+end_src
 
 **** Bibliograhy -- and splitting
 
@@ -5236,11 +5293,12 @@ and :select-tags in org export."
 
 ** Cosmetics, display, faces
 
-*** Org-appear, for showing emphasis-markers etc. when inside
+*** Org-appear, for showing emphasis-markers etc. when inside :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package org-appear
   :straight( :host github :repo "awth13/org-appear")
-  :hook (org-mode . org-appear-mode))
+  :hook (org-mode . org-appear-mode)
+  :custom (org-appear-delay 0.2))
 #+end_src
 
 *** Pretty display of todo keywords :ARCHIVE:
@@ -5376,7 +5434,7 @@ argument, reset to default."
                              0.8)))))))
 #+end_src
 
-*** Special tag faces and highlighting of special headlines
+*** CHECK Special tag faces and highlighting of special headlines
 Add special tag faces, add for file-local select/exclude-tags. Highlight the entire headline for some tags.
 #+begin_src emacs-lisp
 (defface aj/org-special-tags-face '((t . (:inherit org-tag :underline t)))
@@ -5508,7 +5566,7 @@ Add special tag faces, add for file-local select/exclude-tags. Highlight the ent
 *** Tags column at 0, align tags with display property
 I use variable-width fonts, so trying to align tags to the right using spaces is useless.
 
-However, we can also use the display text property to align tags to the right of the window. This is already done in the agenda when setting ~org-agenda-tags-column~ is ~auto~, the default.
+However, we can also use the display text property to align tags to the right of the window. This is already done in the agenda when setting ~org-agenda-tags-column~ to ~auto~, the default.
 
 #+begin_src emacs-lisp
 (setq org-tags-column 0
@@ -5532,28 +5590,29 @@ However, we can also use the display text property to align tags to the right of
 ;;          org-font-lock-extra-keywords
 ;;          '((yant/org-align-tags t)))))
 
-(defun aj/string-pixel-width (string &optional mode)
-  "Calculate pixel width of STRING.
-Optional MODE specifies major mode used for display."
-  (let ((fra face-remapping-alist))
-    (with-temp-buffer
-      (with-silent-modifications
-        (setf (buffer-string) string))
-      (when (fboundp mode)
-        (funcall mode)
-        (font-lock-ensure))
-      (setq-local face-remapping-alist fra)
-      (if (get-buffer-window (current-buffer))
-	      (car (window-text-pixel-size nil (line-beginning-position) (point)))
-        (set-window-buffer nil (current-buffer))
-        (car (window-text-pixel-size nil (line-beginning-position) (point)))))))
+;; (defun aj/string-pixel-width (string &optional mode)
+;;   "Calculate pixel width of STRING.
+;; Optional MODE specifies major mode used for display."
+;;   (let ((fra face-remapping-alist))
+;;     (with-temp-buffer
+;;       (with-silent-modifications
+;;         (setf (buffer-string) string))
+;;       (when (fboundp mode)
+;;         (funcall mode)
+;;         (font-lock-ensure))
+;;       (setq-local face-remapping-alist fra)
+;;       (if (get-buffer-window (current-buffer))
+;; 	      (car (window-text-pixel-size nil (line-beginning-position) (point)))
+;;         (set-window-buffer nil (current-buffer))
+;;         (car (window-text-pixel-size nil (line-beginning-position) (point)))))))
 
 
 (defun yant/org-align-tags (limit &optional force)
   "Align all the tags in org buffer."
   (save-match-data
     (when (eq major-mode 'org-mode)
-      (let ((ellw (aj/string-pixel-width org-ellipsis)))
+      (let (;; (ellw (aj/string-pixel-width org-ellipsis))
+            )
 	    (while (re-search-forward "^\\*+ \\(.+?\\)\\([ \t]+\\)\\(:\\(?:[^ \n]+:\\)+\\)$" limit t)
 	      (when (and (match-string 2)
 		             (or force
@@ -5569,8 +5628,8 @@ Optional MODE specifies major mode used for display."
 			   'display
 			   `(space . (:align-to
                           (- right
-						     (,(+ 3 ;; no idea, but otherwise it is sometimes not enough
-							      ellw
+						     (,(+ 50 ;; 3 ;; no idea, but otherwise it is sometimes not enough
+							      ;; ellw
                                   (if (match-beginning 3)
                                       (car (window-text-pixel-size nil (match-beginning 3) (match-end 3)))
                                     0))))))))))))))

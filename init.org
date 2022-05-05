@@ -499,10 +499,12 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 ***** Vertico for the interface and orderless as completion style
 #+begin_src emacs-lisp
 (use-package vertico
-  :straight (vertico :includes (vertico-directory vertico-repeat)
+  :straight (vertico :includes (vertico-directory vertico-repeat vertico-multiform vertico-buffer)
                      :files (:defaults
                              "extensions/vertico-directory.el"
-                             "extensions/vertico-repeat.el"))
+                             "extensions/vertico-repeat.el"
+                             "extensions/vertico-multiform.el"
+                             "extensions/vertico-buffer.el"))
   :bind (("M-r" . #'vertico-repeat)
          :map vertico-map
          ("<backspace>" . #'vertico-directory-delete-char)
@@ -510,10 +512,41 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   :init
   (vertico-mode)
   (add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
+  (vertico-multiform-mode)
   :custom
   (vertico-count 20)
   (vertico-count-format (cons "%-7s " "%s/%s"))
-  (vertico-cycle t))
+  (vertico-cycle t)
+  (vertico-multiform-commands
+   '((aj/run-cmd-in-small-frame buffer)))
+  (vertico-buffer-display-action
+   '(magit--display-buffer-fullframe)))
+
+
+;; (use-package vertico-posframe
+;;   :custom
+;;   (vertico-posframe-size-function #'aj/vertico-posframe-get-size)
+;;   (vertico-posframe-poshandler #'aj/posframe-poshandler-almost-frame-top-center)
+;;   :config
+;;   (defun aj/vertico-posframe-get-size ()
+;;     "The default functon used by `vertico-posframe-size-function'."
+;;     (list :height nil :width nil
+;;           :min-height (or vertico-posframe-min-height
+;;                           (let ((height (+ vertico-count 1)))
+;;                             (min height (or vertico-posframe-height height))))
+;;           :min-width (round (* (frame-width) 0.95))))
+
+;;   (defun aj/posframe-poshandler-almost-frame-top-center (info)
+;;     "Posframe's position handler.
+
+;;   Let posframe(0.5, 0) align to frame(0.5, 0).  The structure of
+;;   INFO can be found in docstring of `posframe-show'."
+;;     (cons (/ (- (plist-get info :parent-frame-width)
+;;                 (plist-get info :posframe-width))
+;;              2)
+;;           100))
+;;   )
+
 
 (use-package orderless
   :custom (orderless-component-separator #'orderless-escapable-split-on-space)
@@ -906,16 +939,15 @@ Used to preselect nearest headings and imenu items.")
 (defvar aj/zoterofile-history nil)
 
 (defun aj/open-zoterofile-new-frame ()
-  (let ((selectrum-display-action '(selectrum-display-full-frame)))
-    (aj/run-cmd-in-small-frame 100 20 #'aj/zoterofile "Zotero file" t)))
+  (aj/run-cmd-in-small-frame 100 20 #'aj/zoterofile "Zotero file" t))
 
 (autoload #'consult--multi "consult")
 
 (defun aj/zoterofile-open (file)
   "Open FILE in emacs or externally."
   (if aj/running-cmd-in-small-frame
-      #'consult-file-externally
-    #'find-file))
+      (consult-file-externally file)
+    (find-file file)))
 
 (defvar aj/zoterofile-options
   '( :category file
@@ -1083,9 +1115,7 @@ this redundant with C-x C-f, so I don't mind
 overriding it, but you should know before you do.
 #+begin_src emacs-lisp
 (define-key ctl-x-map "d" #'aj/visit-favorite-dir)
-
 #+end_src
-
 
 **** Launch in small frame
 #+begin_src emacs-lisp
@@ -1098,7 +1128,8 @@ overriding it, but you should know before you do.
               `(,@frame-params
                 (width . ,width) (height . ,height) (name . ,name)
                 (undecorated . t) (fullscreen . nil))))
-            (aj/running-cmd-in-small-frame t))
+            (aj/running-cmd-in-small-frame t)
+            (this-command 'aj/run-cmd-in-small-frame))
         (select-frame-set-input-focus ocframe)
         (aj/center-frame ocframe)
         (cl-loop for (f . c) in face-customizations
@@ -1107,7 +1138,6 @@ overriding it, but you should know before you do.
     (when forcecleanup
       (sit-for 0.01) ;; to allow other commands (for example via embark-act)
       (delete-frame))))
-
 #+end_src
 
 ***** helm-launcher :ARCHIVE:
@@ -1244,7 +1274,46 @@ overriding it, but you should know before you do.
   :after org)
 #+end_src
 
-***** ox-md-pandoc-zotero
+***** ox-pandoc (and zotero)
+For exporting via pandoc and to zotero
+#+begin_src emacs-lisp
+(use-package ox-pandoc
+  :custom (org-pandoc-options-for-odt
+           '((lua-filter . "/home/aj/lib/bbt-pandoc-zotero.lua")
+             (metadata . "zotero_author_in_text=true")
+             (reference-doc . "~/.emacs.d/pandoc-reference.odt")
+             ;; (metadata . "zotero_csl_style=apa")
+             ))
+  (org-pandoc-menu-entry
+   '((?n "to native and open." org-pandoc-export-to-native-and-open)
+     (?N "as native." org-pandoc-export-as-native)
+     (?o "to odt and open." org-pandoc-export-to-odt-and-open)
+     (?O "to odt." org-pandoc-export-to-odt)
+     (?x "to docx and open." org-pandoc-export-to-docx-and-open)
+     (?X "to docx." org-pandoc-export-to-docx)
+     (?k "to markdown." org-pandoc-export-to-markdown)
+     (?K "to markdown and open." org-pandoc-export-to-markdown-and-open)
+     (?m "as markdown." org-pandoc-export-as-markdown)
+     ))
+  :config
+
+  (org-cite-register-processor 'pandoc
+    :export-citation #'oc-pandoc-export-citation
+    :export-bibliography #'oc-pandoc-export-bibliography)
+
+  (defun oc-pandoc-export-citation (citation _style _ _info)
+    "Export CITATION object in org format."
+    (org-element-citation-interpreter
+     citation
+     (mapconcat (lambda (r) (org-element-citation-reference-interpreter r nil))
+                (org-cite-get-references citation))))
+
+  (defun oc-pandoc-export-bibliography (_k _f _s _p _b _i)
+    "Generate a #+print_bibliography:"
+    "#+print_bibliography:"))
+#+end_src
+
+***** ox-md-pandoc-zotero :ARCHIVE:
 For exporting and converting to zotero.
 #+begin_src emacs-lisp
 (use-package ox-md-pandoc-zotero
@@ -1265,7 +1334,7 @@ For exporting and converting to zotero.
   :init
   (setq org-directory "~/org"
         org-ellipsis " ⤵"
-        org-export-backends '(org odt ascii html icalendar latex md md-pandoc-zotero)
+        org-export-backends '(org odt ascii html icalendar latex pandoc)
         org-modules '(org-protocol org-habit org-inlinetask org-id org-pdfview)
         org-list-allow-alphabetical t
         org-id-method 'ts
@@ -1871,6 +1940,7 @@ Store visited directories in a list
     (add-to-list 'consult-dir-sources 'aj/consult-dir--source-dired-recent 'append)))
 #+end_src
 
+
 *** Ignore more files for normal completion
 #+begin_src emacs-lisp
 (with-eval-after-load 'latex
@@ -2359,7 +2429,6 @@ https://github.com/andersjohansson/tex-fold-linebreaks
                 "\\([0-9]\\|[[:space:]]\\([[:alpha:]]\\|t\\.ex\\|m\\.fl\\|bl\\|bl\\.a\\|e\\.g\\|i\\.e\\)?\\)$"))
 #+end_src
 ** Window management and navigation
-
 *** Bindings for ~other-window~ and ~next/previous-buffer~.
 
 ~other-window~ with ~<C-tab>~ and ~<C-S-tab>~ (like switching tabs in firefox).
@@ -2414,7 +2483,7 @@ Swich to  ~other-buffer~ with ~C-§~.
 
 *** Window management variables
 #+begin_src emacs-lisp
-(setq split-width-threshold 140)
+(setq split-width-threshold 130)
 #+end_src
 
 *** Window dividers :ARCHIVE:
@@ -2429,8 +2498,8 @@ Swich to  ~other-buffer~ with ~C-§~.
 
 (defhydra hydra-window (:hint nil :idle 1.0)
   "
-Split^^            ^Switch^       ^Resize^
-_2_ vertical       _r_otate CW    _<left>_  ←
+Split^^            ^Switch^       ^Resize^     ^Other^
+_2_ vertical       _r_otate CW    _<left>_  ←  _o_ Pop out frame
 _3_ horizontal     _e_ rotate CCW _<down>_  ↓
 _1_ only this      _R_otate 180°  _<up>_    ↑
 _0_ delete         _t_ranspose    _<right>_ →
@@ -2454,6 +2523,8 @@ _F_ollow
   ("C-0" delete-window :color blue)
   ("C-1" delete-other-windows :color blue)
 
+  ("o" aj/pop-out-buffer-to-new-frame :color blue)
+
   ("r" rotate-frame-clockwise)
   ("e" rotate-frame-anti-clockwise)
   ("R" rotate-frame)
@@ -2468,44 +2539,47 @@ _F_ollow
 (winner-mode)
 
 (use-package transpose-frame
-  :commands (transpose-frame flip-frame flop-frame rotate-frame
-                             rotate-frame-clockwise
-                             rotate-frame-anti-clockwise))
+  :commands ( transpose-frame flip-frame flop-frame rotate-frame
+              rotate-frame-clockwise
+              rotate-frame-anti-clockwise))
 
-(use-package windmove
-  :commands windmove-find-other-window)
 
 (defun aj/hydra-move-splitter-left (arg)
   "Move window splitter left."
   (interactive "p")
-  (if (let ((windmove-wrap-around))
-        (windmove-find-other-window 'right))
+  (if (window-in-direction 'right)
       (shrink-window-horizontally arg)
     (enlarge-window-horizontally arg)))
 
 (defun aj/hydra-move-splitter-right (arg)
   "Move window splitter right."
   (interactive "p")
-  (if (let ((windmove-wrap-around))
-        (windmove-find-other-window 'right))
+  (if (window-in-direction 'right)
       (enlarge-window-horizontally arg)
     (shrink-window-horizontally arg)))
 
 (defun aj/hydra-move-splitter-up (arg)
   "Move window splitter up."
   (interactive "p")
-  (if (let ((windmove-wrap-around))
-        (windmove-find-other-window 'up))
+  (if (window-in-direction 'up)
       (enlarge-window arg)
     (shrink-window arg)))
 
 (defun aj/hydra-move-splitter-down (arg)
   "Move window splitter down."
   (interactive "p")
-  (if (let ((windmove-wrap-around))
-        (windmove-find-other-window 'up))
+  (if (window-in-direction 'up)
       (shrink-window arg)
     (enlarge-window arg)))
+
+
+(defun aj/pop-out-buffer-to-new-frame ()
+  "Move current buffer to a new frame."
+  (interactive)
+  (let ((win (selected-window)))
+    (make-frame)
+    (with-selected-window win
+      (previous-buffer))))
 #+end_src
 
 *** Frame managment hydra (~C-x 5~ alternative)
@@ -2612,6 +2686,14 @@ already narrowed."
 #+end_src
 
 ** Searching and stuff
+
+*** Deadgrep
+Use deadgrep for control of searching. Also use [[https://github.com/phiresky/ripgrep-all][ripgrep-all]], to enable searching in pdfs etc.
+#+begin_src emacs-lisp
+(use-package deadgrep
+  :custom (deadgrep-executable "rga"))
+#+end_src
+
 *** Search customizations
 **** Isearch
 #+begin_src emacs-lisp
@@ -3102,19 +3184,10 @@ I often have more use for killing emacs (including all GUI-windows).
       (goto-char mk))))
 #+end_src
 
-*** Kill this buffer instead of kill-buffer
+*** Kill current buffer instead of kill-buffer
 #+begin_src emacs-lisp
-(global-set-key (kbd "C-x k") #'aj/kill-this-buffer)
+(global-set-key (kbd "C-x k") #'kill-current-buffer)
 (global-set-key (kbd "C-x K") #'kill-buffer-and-window)
-
-(defun aj/kill-this-buffer ()
-  "Kill the current buffer.
-When called in the minibuffer, get out of the minibuffer using
-`abort-recursive-edit'."
-  (interactive)
-  (if (minibufferp)
-      (abort-recursive-edit)
-    (kill-buffer (current-buffer))))
 #+end_src
 
 *** count-words instead of count-words-region
@@ -3326,11 +3399,6 @@ Only works with XDG trash dir."
   (cl-loop for file in (dired-map-over-marks (dired-get-filename) arg) do
            (shell-command (format "trash-rm %s" (file-name-nondirectory file)))
            (dired-remove-file file)))
-#+end_src
-
-*** y-or-n instead of yes-or-no
-#+begin_src emacs-lisp
-(defalias 'yes-or-no-p 'y-or-n-p)
 #+end_src
 
 *** Source my ~.bash_env~.
@@ -3588,7 +3656,9 @@ _d_: subtree     _TAB_: toggle
 			(setq indent-tabs-mode nil)))
 #+end_src
 
-*** smartparens
+*** smartparens :ARCHIVE:
+
+**** Initial
 #+begin_src emacs-lisp
 (use-package smartparens
   :init (require 'smartparens-config)
@@ -3607,6 +3677,11 @@ _d_: subtree     _TAB_: toggle
 ;; sista sabbar mitt skrivande, borde bara kopplas till org-mode, men vet inte hur)
 #+end_src
 
+
+**** Minibuffer evaluation
+#+begin_src emacs-lisp
+(add-hook 'eval-expression-minibuffer-setup-hook #'smartparens-mode)
+#+end_src
 *** Comment-dwim-2
 To only activate it in prog-mode, we define a minor mode with the binding.
 #+begin_src emacs-lisp
@@ -3625,10 +3700,6 @@ To only activate it in prog-mode, we define a minor mode with the binding.
   (add-hook 'prog-mode-hook #'comment-dwim-2-mode))
 #+end_src
 
-*** Minibuffer evaluation
-#+begin_src emacs-lisp
-(add-hook 'eval-expression-minibuffer-setup-hook #'smartparens-mode)
-#+end_src
 *** CPERL
 cperl instead of perl-mode
 #+begin_src emacs-lisp
@@ -3656,7 +3727,7 @@ cperl instead of perl-mode
   (add-to-list 'compilation-finish-functions 'aj/compile-notify)
 #+end_src
 
-*** Prettify
+*** Prettify :ARCHIVE:
 #+begin_src emacs-lisp
 (global-prettify-symbols-mode t)
 (setq prettify-symbols-unprettify-at-point t)
@@ -4364,55 +4435,6 @@ https://gist.github.com/imarko/ec8f39550662fcd16908b7ec9d100e7e
 
 #+end_src
 
-*** Extend archive-mode with functions to extract (copy out) single files
-Taken from: https://emacs.stackexchange.com/a/3843
-not needed anymore since this functionality has been added in Emacs 28.
-**** COMMENT Not needed. :ARCHIVE:
-#+begin_src emacs-lisp
-(with-eval-after-load 'arc-mode
-  (define-key archive-mode-map "C" #'aj/archive-extract-marked-to-file)
-
-  (defun aj/archive-extract-marked-to-file (output-dir)
-    "Extract marked archive items to OUTPUT-DIR."
-    (interactive "GOutput directory: ")
-    (let ((command (symbol-value (archive-name "extract")))
-          (archive (buffer-file-name))
-          (items (archive-get-marked ?* t))) ; get marked items; t means
-                                        ; get item under point if
-                                        ; nothing is marked
-      (dolist (item items)
-        (aj/archive-extract-to-file
-         archive
-         (archive--file-desc-ext-file-name item) ; get the name from the descriptor
-         command output-dir))))
-
-  (defun aj/archive-extract-to-file (archive-name item-name command dir)
-    "Extract ITEM-NAME from ARCHIVE-NAME using COMMAND. Save to
-DIR."
-    (unwind-protect
-        ;; remove the leading / from the file name to force
-        ;; expand-file-name to interpret its path as relative to dir
-        (let* ((file-name (if (string-match "\\`/" item-name)
-                              (substring item-name 1)
-                            item-name))
-               (output-file (expand-file-name file-name dir))
-               (output-dir (file-name-directory output-file)))
-          ;; create the output directory (and its parents) if it does
-          ;; not exist yet
-          (unless (file-directory-p output-dir)
-            (make-directory output-dir t))
-          ;; execute COMMAND, redirecting output to output-file
-          (apply #'call-process
-                 (car command)            ;program
-                 nil                      ;infile
-                 `(:file ,output-file)    ;destination
-                 nil                      ;display
-                 (append (cdr command) (list archive-name item-name))))
-      ;; FIXME: add unwind forms
-      nil))
-  )
-#+end_src
-
 *** Extra definitions for ~auto-mode-alist~
 #+begin_src emacs-lisp
 (add-to-list 'auto-mode-alist
@@ -4429,7 +4451,9 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
 (use-package pdf-tools
   :commands pdf-loader-install ;; TODO (fel?)
   :init (pdf-loader-install)
-  :custom (pdf-annot-tweak-tooltips . nil)
+  :custom
+  (pdf-annot-tweak-tooltips nil)
+  (pdf-view-use-scaling t)
   :config
   ;; I almost never have use for synctex:
   (setq pdf-tools-enabled-modes
@@ -4752,7 +4776,61 @@ fi
 #+end_src
 
 *** Modeline
-**** mini-modeline + doom-modeline
+**** mini-modeline
+#+begin_src emacs-lisp
+(use-package mini-modeline
+  :straight (:host 'github :repo "kiennq/emacs-mini-modeline")
+  :demand t
+  :hook (window-setup . mini-modeline-mode)
+  :config
+
+  (defsubst aj/modeline-column (pos)
+    "Get the column of the position POS."
+    (save-excursion (goto-char pos)
+                    (current-column)))
+
+  (defun aj/mode-line-region ()
+    (when (and mark-active (not (derived-mode-p 'special-mode)))
+      (let* ((beg (region-beginning))
+             (end (region-end))
+             (lines (count-lines beg (min end (point-max)))))
+        (concat " ｢"
+                (cond ((bound-and-true-p rectangle-mark-mode)
+                       (let ((cols (abs (- (aj/modeline-column end)
+                                           (aj/modeline-column beg)))))
+                         (format "%d×%d " lines cols)))
+                      ((> lines 1)
+                       (format "·%d≣%d" (- end beg) lines))
+                      ((format "·%d" (- end beg))))
+                (format " %dw" (count-words beg end))
+                "｣ "))))
+
+  (setq mini-modeline-r-format '("%e" mode-line-front-space
+                                 (:eval (aj/mode-line-region))
+                                 mode-line-mule-info
+                                 ;; mode-line-client
+                                 mode-line-modified
+                                 mode-line-remote
+                                 ;; mode-line-frame-identification
+                                 "  "
+                                 mode-line-buffer-identification
+                                 " " mode-line-position " "
+                                 mode-line-misc-info))
+
+  (setq mini-modeline-right-padding 1
+        mini-modeline-enhance-visual nil)
+
+  (add-hook 'aj/face-definitions-hook #'aj/mini-modeline-faces)
+  (defun aj/mini-modeline-faces (theme)
+    ;; (set-face-attribute 'mode-line nil :box t)
+    (when (member theme '(modus-operandi modus-vivendi))
+      (set-face-attribute 'mini-modeline-mode-line-inactive nil
+                          :background (modus-themes-color 'bg-active) :height 0.14)
+      (set-face-attribute 'mini-modeline-mode-line-active nil
+                          :background (modus-themes-color 'blue-fringe-bg) :height 0.14))))
+#+end_src
+
+**** mini-modeline + doom-modeline :ARCHIVE:
 #+begin_src emacs-lisp
 ;; (use-package doom-modeline
 ;;   :demand t
@@ -4980,7 +5058,13 @@ Also runs hook aj/face-definitions-hook."
     (with-eval-after-load 'org-indent
       ;; modus-operandi sets it to inherit fixed-pitch, but that is
       ;; bad with the detailed space matching I do!
-      (set-face-attribute 'org-indent nil :inherit 'org-hide))
+      ;; (set-face-attribute 'org-indent nil :inherit 'org-hide)
+
+      ;; but when going back to not overriding org-indent with
+      ;; displayed spaces, we need org-hide and org-indent to both use
+      ;; fixed-pitch to match ok.
+      (set-face-attribute 'org-hide nil :inherit 'fixed-pitch)
+      )
 
     (with-eval-after-load 'org-faces
 
@@ -5014,20 +5098,21 @@ Also runs hook aj/face-definitions-hook."
                             :weight 'light)
 
 
-        (set-face-attribute 'org-todo nil ;; :height 1.0
-                            :inherit 'fixed-pitch)
+        ;; (set-face-attribute 'org-todo nil ;; :height 1.0
+        ;;                     :inherit 'fixed-pitch)
 
-        (defface aj/org-todo `((t :inherit org-modern-todo :foreground ,(modus-themes-color 'red))) "Face for todo org-state" :group 'org-faces)
-        (defface aj/org-waiting `((t :inherit 'aj/org-todo :foreground ,(modus-themes-color 'yellow))) "Face for waiting org-state" :group 'org-faces)
-        (defface aj/org-started `((t :inherit 'aj/org-todo :foreground ,(modus-themes-color 'blue))) "Face for started org-state" :group 'org-faces)
-        (defface aj/org-done `((t :inherit org-modern-done)) "Face for done org-state" :group 'org-faces)
+        (set-face-attribute 'org-modern-todo nil :height 1.0 :inherit 'org-modern-label :foreground (modus-themes-color 'red))
 
-        (setq org-todo-keyword-faces
-              '(("TODO" . aj/org-todo)
+        (defface aj/org-waiting `((t :inherit org-modern-todo :foreground ,(modus-themes-color 'yellow))) "Face for waiting org-state" :group 'org-faces)
+        (defface aj/org-started `((t :inherit org-modern-todo :foreground ,(modus-themes-color 'blue))) "Face for started org-state" :group 'org-faces)
+        ;; (defface aj/org-done `((t :inherit org-modern-done)) "Face for done org-state" :group 'org-faces)
+
+        (setq org-modern-todo-faces
+              '(("TODO" . org-modern-todo)
                 ("STARTAD" . aj/org-started)
                 ("VÄNTAR" . aj/org-waiting)
-                ("AVFÖRD" . aj/org-done)
-                ("DONE" . aj/org-done)))
+                ("AVFÖRD" . org-modern-done)
+                ("DONE" . org-modern-done)))
 
 
         ;; (setq org-todo-keyword-faces
@@ -5040,6 +5125,8 @@ Also runs hook aj/face-definitions-hook."
 
     (with-eval-after-load 'idle-highlight-mode
       (set-face-attribute 'idle-highlight nil :inherit nil :underline t))
+
+    (set-face-attribute 'mode-line-buffer-id nil :inherit 'variable-pitch :weight 'regular)
 
 
     (run-hook-with-args 'aj/face-definitions-hook theme)))
@@ -5068,7 +5155,9 @@ Also runs hook aj/face-definitions-hook."
   (modus-themes-region '(bg-only no-extend))
   (modus-themes-org-agenda '((header-date . (bold-all))))
   (modus-themes-variable-pitch-ui t)
-  (modus-themes-completions 'moderate)
+  (modus-themes-completions '((matches nil)
+                              (selection background regular)))
+  (modus-themes-mixed-fonts t)
   :config
   (setq org-fontify-whole-heading-line t))
 #+end_src

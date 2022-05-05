@@ -34,7 +34,7 @@
   :group 'faces)
 
 (defcustom doc-font-attributes
-  '((default . (:family "EBGaramond" :height 1.25))
+  '((default . (:family "Crimson" :height 1.25))
     (org-document-title . (:height 1.2))
     (org-level-1 . (:height 1.4 :weight normal ))
     (org-level-2 . (:height 1.3 :weight normal :slant italic))

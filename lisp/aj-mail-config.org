@@ -368,9 +368,10 @@ Secure and economical.
                                fun)))
                      (delete-region (point-min) (point-max))
                      (insert new))
-                   (put-text-property (point-min) (1- (point-max))
-                                      'wrap-prefix
-                                      `(space :align-to ,(+ 2 (length h))))))))))
+                   (when (< (point-min) (point-max))
+                     (put-text-property (point-min) (1- (point-max))
+                                        'wrap-prefix
+                                        `(space :align-to ,(+ 2 (length h)))))))))))
 
 (defun aj/prettify-address-header (addresses &optional gnus-callback)
   "Prettify ADDRESSES string, make buttons using GNUS-CALLBACK function."
