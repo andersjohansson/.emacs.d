@@ -685,11 +685,6 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 	    (consult-mark)
       (funcall fun)))
 
-  ;; (defvar helm-mark-ring-map
-  ;;   (let ((map (make-sparse-keymap)))
-  ;;     (set-keymap-parent map helm-map)
-  ;;     (define-key map (kbd "C-<SPC>") 'helm-next-line) map)
-  ;;   "Keymap for `helm-all-mark-rings'.")
 
   (setq set-mark-command-repeat-pop t)
 
@@ -997,128 +992,6 @@ Used to preselect nearest headings and imenu items.")
     (directory-files aj/zotero-library t "\\.\\(pdf\\|djvu\\|vue\\)$")))
 #+end_src
 
-***** Favourite files (to mark files which should be prioritized in helm matches) :ARCHIVE:
-#+begin_src emacs-lisp
-(defvar aj/favourite-files nil)
-(with-eval-after-load 'savehist-mode
-  (add-to-list 'savehist-additional-variables 'aj/favourite-files))
-
-(defun aj/add-favourite-file ()
-  (interactive)
-  (if-let ((name (or
-                  (buffer-file-name)
-                  (and (eq major-mode 'dired-mode) default-directory))))
-      (cl-pushnew name aj/favourite-files :test #'string=)
-    (user-error "Not in a file- or dired-buffer")))
-
-(with-eval-after-load 'helm-for-files
-  (defun aj/remove-favourite-file (_candidate)
-    ;; to be run from helm
-    (cl-loop for file in (helm-marked-candidates)
-             do (setq aj/favourite-files (delete file aj/favourite-files))))
-
-  (defclass aj/helm-favourite-files-source (helm-source-sync helm-type-file)
-    ((candidates :initform 'aj/favourite-files)
-     (pattern-transformer :initform 'helm-recentf-pattern-transformer)
-     (match-part :initform (lambda (candidate)
-                             (if (or helm-ff-transformer-show-only-basename
-                                     helm-recentf--basename-flag)
-                                 (helm-basename candidate) candidate)))
-     (persistent-action :initform 'helm-ff-kill-or-find-buffer-fname)
-     (fuzzy-match :initform t)))
-
-  (defmethod helm--setup-source :after ((source aj/helm-favourite-files-source))
-    (setf (slot-value source 'action)
-          (append (symbol-value (helm-actions-from-type-file))
-                  '(("Delete file(s) from aj/favourite-files" .
-                     aj/remove-favourite-file)))
-          (slot-value source 'filtered-candidate-transformer)
-          (append (slot-value source 'filtered-candidate-transformer)
-                  '(aj/helm-recentf-filtered-candidates-shorten))))
-
-  (defvar aj/helm-source-favourite-files
-    (helm-make-source "Favourite files" 'aj/helm-favourite-files-source))
-
-  (setq helm-mini-default-sources
-        (-insert-at 1 'aj/helm-source-favourite-files helm-mini-default-sources))
-
-  )
-#+end_src
-
-***** Favourite directories :ARCHIVE:
-http://endlessparentheses.com/visit-directory-inside-a-set-of-directories.html
-#+begin_src emacs-lisp
-(defcustom aj/favourite-directories nil
-  "List of favorite directories.
-Used in `aj/visit-favorite-dir'. The order here affects the order
-that completions will be offered. Each element is a list of
-directory, search depth, and whether to include files."
-  :type '(repeat (list (directory :tag "Directory")
-                       (integer :tag "Search depth")
-                       (boolean :tag "Include files")))
-  :group 'aj)
-
-(defvar aj/fav-dir-history nil)
-
-(defun aj/visit-favourite-dir (files-too)
-  "Offer all directories inside a set of directories.
-Compile a list of all directories inside each element of
-`aj/favorite-directories', and visit one of them with
-`ido-completing-read'.
-With prefix argument FILES-TOO also offer to find files."
-  (interactive "P")
-  (let ((completions
-         (apply #'append
-                (mapcar (lambda (x)
-                          (aj/get-dir-list (car x) (cadr x) (or files-too (nth 2 x))))
-                        aj/favourite-directories)))
-        (helm-candidate-number-limit nil))
-    (dired
-     (helm-comp-read "Open directory: " completions
-                     :input-history aj/fav-dir-history))))
-
-
-(defun aj/get-dir-list (dir level &optional files-too)
-  "Get list of directories (or files with FILES-TOO) to a certain level"
-  (if (and (file-directory-p dir) (> level 0))
-      ;; recurse into directories if we have levels left
-      (apply #'append
-             (list dir)
-             (mapcar
-              (lambda (sdir) (aj/get-dir-list sdir (1- level) files-too))
-              (mapcar
-               #'abbreviate-file-name
-               (cl-remove-if-not
-                (if files-too #'file-readable-p
-                  #'file-directory-p)
-                (directory-files
-                 (expand-file-name dir)
-                 t "^[^\.].*" t)))))
-    ;; just return dir or file
-    (list dir)))
-
-;;TODO, define as helm-source
-;; (defclass aj/helm-favorit-dir-class (helm-source-sync helm-type-timers)
-;;   ((candidates :initform timer-idle-list)
-;;    (allow-dups :initform t)
-;;    (volatile :initform t)
-;;    (filtered-candidate-transformer
-;;     :initform
-;;     (lambda (candidates _source)
-;;       (cl-loop for timer in candidates
-;;                collect (cons (helm-elisp--format-timer timer) timer))))))
-
-;; (defvar helm-source-idle-time-timers
-;;   (helm-make-source "Idle Time Timers" 'helm-idle-time-timers-class))
-#+end_src
-
-Note that C-x d is usually bound to dired. I find
-this redundant with C-x C-f, so I don't mind
-overriding it, but you should know before you do.
-#+begin_src emacs-lisp
-(define-key ctl-x-map "d" #'aj/visit-favorite-dir)
-#+end_src
-
 **** Launch in small frame
 #+begin_src emacs-lisp
 (defvar aj/running-cmd-in-small-frame nil)
@@ -1140,32 +1013,6 @@ overriding it, but you should know before you do.
     (when forcecleanup
       (sit-for 0.01) ;; to allow other commands (for example via embark-act)
       (delete-frame))))
-#+end_src
-
-***** helm-launcher :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package helm-launcher
-  :straight (:depth full :host gitlab :repo "andersjohansson/helm-launcher")
-  :commands helm-launcher
-  :custom (helm-launcher-sources
-           '(helm-launcher-desktop-applications-source
-             helm-launcher-file-history-source
-             helm-launcher-recentf-mime-source
-             aj/helm-source-favourite-files
-             ;; aj/helm-source-dired-recent
-             ))
-  ;; :after helm
-  :init
-  (defun aj/helm-launcher-frame ()
-    (interactive)
-    (aj/run-cmd-in-small-frame 100 20 #'helm-launcher "Helm launcher" t nil
-                               '(;; (helm-selection :background "transparent")
-                                 )))
-  :config
-  (dolist (s '(helm-launcher-file-history-source
-               helm-launcher-recentf-mime-source
-               aj/helm-source-favourite-files))
-    (helm-all-the-icons-add-transformer #'helm-all-the-icons-files-add-icons (symbol-value s))))
 #+end_src
 
 *** Org init
@@ -1440,7 +1287,6 @@ For exporting and converting to zotero.
 (dolist (x '(org-clock-in org-clock-out org-clock-in-last org-clock-modify-effort-estimate org-clock-cancel org-clock-goto org-clock-display org-clock-report org-clocking-p))
   (autoload x "org-clock"))
 
-;; (require 'helm-org)
 (defhydra hydra-org-clock (:color blue :hint nil)
   "
  In/out^        ^Edit^         ^Summary     (_?_)
@@ -1481,12 +1327,6 @@ For exporting and converting to zotero.
    ((eq major-mode 'org-agenda-mode)
     (org-agenda-clock-in))
    (t (message "Not in org file or agenda"))))
-
-;; (defun aj/helm-org-clock-in (marker)
-;;   (save-window-excursion
-;;     (switch-to-buffer (marker-buffer marker))
-;;     (goto-char (marker-position marker))
-;;     (org-clock-in)))
 
 (defun aj/org-mark-current-clocking-done ()
   (interactive)
@@ -1961,7 +1801,7 @@ Store visited directories in a list
 *** Always offer to create new directories for ~read-file-name~
 Advises ~read-file-name~ to always ask if non-existent directories should be created. Adding a non-existent directory otherwise causes errors in lots of commands calling ~read-file-name~.
 
-This works for instance in ~dired-do-rename~ or ~mu4e-view-save-attachment~ (also with ~helm-mode~ activated).
+This works for instance in ~dired-do-rename~ or ~mu4e-view-save-attachment~.
 #+begin_src emacs-lisp
 (defun aj/create-non-existent-directories (filename)
   (unless (file-exists-p filename)
@@ -1998,7 +1838,6 @@ Define a dir-locals class and add directories which should by default be read-on
 
 ** Password-store
 Customizations for ~password-store~ and ~pass-mode.~
-In particular, I want good completion when generating a password, so, inspired by the directory-completion in ~helm-find-files~, I define a helm source which lists the password directories and allows completion on them.
 
 I also want a function that places the newly generated password in the kill ring: ~aj/password-store-generate-and-copy.~
 
@@ -2458,10 +2297,7 @@ Swich to  ~other-buffer~ with ~C-§~.
           :map buffer-flip-map
           ( "C-§" . buffer-flip-forward)
           ( "C-½" . buffer-flip-backward)
-          ( "C-g" . buffer-flip-abort))
-  :config
-  (setq buffer-flip-skip-patterns
-        '("^\\*helm\\b")))
+          ( "C-g" . buffer-flip-abort)))
 
 ;; (defun aj/switch-to-other-buffer ()
 ;;   (interactive)

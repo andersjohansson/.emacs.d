@@ -138,14 +138,6 @@ for refile folder selection)"
   (mu4e-maildirs-extension-load))
 #+end_src
 
-*** helm-mu :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package helm-mu
-  :commands (helm-mu helm-mu-contacts)
-  :config (require 'mu4e-headers)
-  (bind-key "S" #'helm-mu mu4e-main-mode-map))
-#+end_src
-
 *** mu4e-crm-contacts
 Insert contacts with completing-read-multiple
 https://gitlab.com/andersjohansson/mu4e-crm-contacts
@@ -822,9 +814,6 @@ https://vxlabs.com/2019/08/25/format-flowed-with-long-lines/
 
 ;; in case write is invoked before mu4e is loaded
 (add-hook 'mu4e-compose-pre-hook #'mu4e--start)
-
-;; (with-eval-after-load "helm-mode"
-;;   (add-to-list 'helm-mode-no-completion-in-region-in-modes 'mu4e-compose-mode))
 #+end_src
 
 *** Make header separator a thin line
@@ -1477,11 +1466,6 @@ attachment - should launch the no-attachment warning.")
 (defun aj/weekly-report-mail ()
   ""
   (interactive)
-  ;; ((mu4e-compose-mode-hook
-       ;;       (remq 'mu4e-helm-contact-hook-insert mu4e-compose-mode-hook))
-       ;;      ;; (symbol-function 'mu4e~draft-newmsg-construct
-       ;;      ;; #'aj/weekreport-msg-construct))
-       ;;      )
   (mu4e~compose-handler 'new)
   (delete-region (point-min) (point-max))
   (insert (format (aj/read-string-from-file
@@ -2094,7 +2078,6 @@ No automatic guess if FORCE-CHOICE is non-nil."
     :mejla "/mejla/Alla mail"
     :ajf "/ajf/Alla mail"))
 
-;; (defvar aj/mu4e-helm-refile-history nil)
 (defun aj/mu4e-choose-refile (startdir msg)
   "Choose a refile directory for MSG, starting search from STARTDIR"
   (let* ((subject (mu4e-message-field msg :subject))

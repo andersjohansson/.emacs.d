@@ -1391,61 +1391,6 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
 
 #+end_src
 
-**** Org clock with helm                                         :ARCHIVE:
-#+begin_src emacs-lisp
-(advice-add 'org-clock-select-task :override #'aj/helm-org-clock-select-task)
-
-(defun aj/helm-org-clock-select-task (&optional _prompt)
-  "Select a task that was recently associated with clocking."
-  (interactive)
-  (let ((aj/helm-org-candidates-todo-only t)
-        (helm-org-headings-actions '(("Clock in" . identity))))
-    (or
-     (helm :sources
-           (append
-            (list (aj/helm-org-clock-history))
-            (helm-org-build-sources (org-agenda-files)))
-           :candidate-number-limit 99999
-           :buffer "*Helm org clock*")
-     (user-error "No clock in task chosen"))))
-
-
-;; TODO add sources for
-;; org-clock-default task, interrupted-task, current clocking task
-;; (when (marker-buffer org-clock-default-task)
-;;   (insert (org-add-props "Default Task\n" nil 'face 'bold))
-;;   (setq s (org-clock-insert-selection-line ?d org-clock-default-task))
-;;   (push s sel-list))
-;; (when (marker-buffer org-clock-interrupted-task)
-;;   (insert (org-add-props "The task interrupted by starting the last one\n" nil 'face 'bold))
-;;   (setq s (org-clock-insert-selection-line ?i org-clock-interrupted-task))
-;;   (push s sel-list))
-;; (when (org-clocking-p)
-;;   (insert (org-add-props "Current Clocking Task\n" nil 'face 'bold))
-;;   (setq s (org-clock-insert-selection-line ?c org-clock-marker))
-;;   (push s sel-list))
-
-
-(defun aj/helm-org-clock-history ()
-  (let (och)
-    ;; Remove successive dups from the clock history to consider
-    (dolist (c org-clock-history)
-      (unless (equal c (car och))
-        (push c och)))
-    (helm-build-sync-source "Recently clocked"
-      :candidates
-      (cl-loop for m in (reverse och)
-               when (marker-buffer m)
-               collect (aj/helm-org-clock-candidate m)))))
-
-(defun aj/helm-org-clock-candidate (marker)
-  (with-temp-buffer
-    (let ((cm (org-clock-insert-selection-line 0 marker)))
-      (goto-char (point-min))
-      (cons (buffer-substring 4 (point-at-eol)) (cdr cm)))))
-
-#+end_src
-
 ** org-id, add id's in this file! And for all org files in a directory.
 #+begin_src emacs-lisp
 (defun aj/org-id-update-id-locations-from-file ()
@@ -1660,43 +1605,6 @@ A local variables comment block that is placed at the end of the file may be los
 (advice-add 'add-file-local-variable :before #'aj/org-insert-local-variable-heading)
 #+end_src
 
-** COMMENT org-db
-#+begin_src emacs-lisp
-(use-package org-db
-  :load-path "~/kodat/elisp/org-db"
-
-  )
-
-(aj/org-db-find-tag)
-(defun aj/org-db-find-tag ()
-  (interactive)
-  (let ((tag
-         (helm :sources
-               (helm-build-sync-source "Tags"
-                 :candidates (cl-loop for (id name) in (emacsql org-db [:select * :from tags])
-                                      collect (list name name id))
-                 :fuzzy-match t))))
-
-
-    (helm :sources
-          (helm-build-sync-source (format "Tagged: %s" (car tag))
-            :fuzzy-match t
-            :candidates
-            (cl-loop
-             for (file hl beg) in
-             (emacsql org-db [:select :distinct [files:filename headlines:title headlines:begin]
-                                      :from headlines
-                                      :inner :join headline-tags :on (= headlines:rowid headline-tags:headline-id)
-                                      :inner :join files :on (= headlines:filename-id files:rowid)
-                                      :where (= headline-tags:tag-id $s1)]
-                      (cadr tag))
-             collect (list (format "%s:%s" file hl) file beg))
-            :action '(("Open" . (lambda (x)
-                                  (find-file (car x))
-                                  (goto-char (cadr x))
-                                  (org-show-entry))))))))
-#+end_src
-
 ** Structure editing
 
 *** Display name of invisible parent when promoting/demoting
@@ -1786,42 +1694,6 @@ Useful for ~org-roam-directory~ for example.
   (directory-files default-directory t ".*\\.org$" t))
 #+end_src
 
-*** Refile with helm :ARCHIVE:
-Present a nicer-looking helm buffer for ~org-refile~
-This doesn’t use the functions defined above at all.
-#+begin_src emacs-lisp
-(setq org-refile-use-outline-path t
-      org-outline-path-complete-in-steps nil)
-
-;; (add-to-list 'helm-completing-read-handlers-alist
-;;              '(org-refile . helm-aj/org-refile-handler))
-;; (add-to-list 'helm-completing-read-handlers-alist
-;;              '(orgqda-refile-and-merge-tags . helm-aj/org-refile-handler))
-
-;; (defun helm-aj/org-refile-handler (prompt collection test
-;;                                           _require-match init hist
-;;                                           default _iim name buffer)
-
-;;   (let ((helm-truncate-lines nil))
-;;     (helm-comp-read prompt (mapcar #'car collection)
-;;                     :test test :initial-input init :default default
-;;                     :history hist :multiline nil :nomark t
-;;                     :fc-transformer #'aj/helm-org-hl-transformer
-;;                     :name name :buffer buffer)))
-
-;; (defun aj/helm-org-hl-transformer (tbl _s)
-;;   (cl-loop with n = (length org-level-faces)
-;;            for outline-path in tbl
-;;            collect
-;;            (cl-loop
-;;             with cleaned = (replace-regexp-in-string "\\(\*\\|\\\\/\\)" "" outline-path)
-;;             with i = -1
-;;             for p in (split-string cleaned "/")
-;;             do (cl-incf i)
-;;             collect (propertize p 'face (nth (mod i n) org-level-faces)) into l
-;;             finally return (cons (string-join l "/") outline-path))))
-#+end_src
-
 ** Navigation (consult-org)
 Loaded already in init.el, but configuration here:
 #+begin_src emacs-lisp
@@ -1838,358 +1710,6 @@ Loaded already in init.el, but configuration here:
         (save-restriction
           (consult--jump-1 m)
           (aj/org-tree-to-indirect-buffer))))))
-#+end_src
-
-
-** Navigation etc. (helm-org) :ARCHIVE:
-*** helm-org :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package helm-org
-  :custom (helm-org-format-outline-path t)
-  :commands helm-org-goto-marker
-  :custom
-  (helm-org-format-outline-path nil)
-  (helm-org-headings-fontify t)
-  :bind (:map org-mode-map
-              ("<f2>" . helm-org-in-buffer-headings)
-              :map helm-org-headings-map
-              ("C-c C-x b" . helm-org-run-open-heading-in-indirect-buffer)
-              ("C-x n" . aj/helm-org-toggle-narrowing))
-  :config
-  (advice-add 'helm-org-insert-link-to-heading-at-marker :override
-              #'aj/helm-org-insert-link-to-heading-at-marker)
-
-  (defun aj/helm-org-insert-link-to-heading-at-marker (_c)
-    "Alternative to `helm-org-insert-link-to-heading-at-marker'
-Uses CUSTOM_ID or `org-store-link' for linking."
-    (dolist (marker (helm-marked-candidates))
-      (let (link)
-        (with-current-buffer (marker-buffer marker)
-          (save-excursion
-            (goto-char (marker-position marker))
-            (let ((custom-id (org-entry-get nil "CUSTOM_ID"))
-                  (id (org-entry-get nil "ID"))
-                  (file-name (buffer-file-name)))
-              (setq link
-                    (cond
-                     (custom-id
-                      (org-link-make-string
-                       (if (string= (with-helm-current-buffer
-                                      (buffer-file-name))
-                                    file-name)
-                           (concat "#" custom-id)
-                         (concat "file:" (abbreviate-file-name
-                                          file-name) "::#" custom-id))))
-                     (id
-                      (org-id-store-link))
-                     (t (org-store-link nil nil))))))
-          (with-helm-current-buffer
-            (insert link " "))))))
-
-  (advice-add 'helm-org--open-heading-in-indirect-buffer :override
-              #'aj/helm-org--open-heading-in-indirect-buffer)
-
-  (defun aj/helm-org--open-heading-in-indirect-buffer (marker)
-    (save-excursion (helm-org-goto-marker marker)
-                    (aj/org-tree-to-indirect-buffer)))
-
-
-  (defvar aj/helm-org-widen nil)
-
-  (defun aj/helm-org-toggle-narrowing ()
-    (interactive)
-    (setq aj/helm-org-widen (not aj/helm-org-widen))
-    (helm-refresh))
-
-  (defvar aj/helm-org-candidates nil)
-  (defun aj/helm-org-in-buffer-init ()
-    (setq aj/helm-org-candidates
-          (helm-org--get-candidates-in-file
-           helm-current-buffer
-           helm-org-headings-fontify
-           t)))
-
-  ;; (defun aj/helm-org-in-buffer-headings ()
-  ;;   "Preconfigured helm for org buffer headings."
-  ;;   (interactive)
-  ;;   (helm :sources ;; (helm-org-build-sources files nil arg)
-  ;;         j(helm-build-sync-source "Org headings in buffer"
-  ;;           :init #'aj/helm-org-in-buffer-init
-  ;;           :candidates 'aj/helm-org-candidates
-  ;;           ;; :match-dynamic t
-  ;;           ;; :filtered-candidate-transformer
-  ;;           ;; #'helm-org-indent-headings
-  ;;           :action 'helm-org-headings-actions
-  ;;           :help-message 'helm-org-headings-help-message
-  ;;           :keymap helm-org-headings-map
-  ;;           :group 'helm-org)
-
-  ;;         :preselect (helm-org-in-buffer-preselect)
-  ;;         :truncate-lines helm-org-truncate-lines
-  ;;         :buffer "*helm org inbuffer*"))
-
-  )
-#+end_src
-
-*** Redefine ~helm-org--get-candidates-in-file~ :ARCHIVE:
-Use ~org-scan-tags~ to get some exclusion tools. Note that also ~org-agenda-skip-archived-trees~, ~org-agenda-skip-comment~, and ~org-agenda-skip-function~ can be let-bound to have effects here.
-
-Should check if it’s less efficient doing this than the homegrown mapping in helm-org. Right now it actually feels snappier, maybe because it excludes unneeded headings.
-
-#+begin_src emacs-lisp
-(defvar aj/helm-org-candidates-matcher t)
-(defvar aj/helm-org-candidates-todo-only nil)
-
-(advice-add 'helm-org--get-candidates-in-file :around
-            #'aj/helm-org--get-candidates-in-file)
-
-(defun aj/helm-org--get-candidates-in-file (fun filename &optional fontify nofname parents matcher _force-refresh)
-  (if parents ;; won’t handle that special case
-      (funcall fun filename fontify nofname parents)
-    (with-current-buffer (pcase filename
-                           ((pred bufferp) filename)
-                           ((pred stringp) (find-file-noselect filename t)))
-      (org-agenda-prepare-buffers (list filename))
-      (let ((match-fn (if fontify
-                          #'match-string
-                        #'match-string-no-properties))
-            (matcher (or matcher aj/helm-org-candidates-matcher))
-            (file (unless nofname
-                    (concat (helm-basename filename) ":")))
-            (width (window-width (helm-window)))
-            (org-agenda-skip-archived-trees nil))
-        (save-excursion
-          (save-restriction
-            (when (and
-                   aj/helm-org-widen
-                   ;; Only widen direct buffers, not indirect ones.
-                   (not (and (bufferp filename) (buffer-base-buffer filename))))
-              (widen))
-            ;; clear cache for org-get-outline-path
-            (and (boundp 'org-outline-path-cache)
-                 (setq org-outline-path-cache nil))
-            (cl-remove-if
-             #'null
-             (org-scan-tags
-              (lambda ()
-                (goto-char (point-at-bol))
-                (when (looking-at org-complex-heading-regexp)
-                  (let ((beg (point-at-bol))
-                        (end (point-at-eol))
-                        (level (length (match-string-no-properties 1)))
-                        (heading (funcall match-fn 4)))
-                    (when (and fontify
-                               (null (text-property-any
-                                      beg end 'fontified t)))
-                      (jit-lock-fontify-now beg end))
-                    (when (and (>= level helm-org-headings-min-depth)
-                               (<= level helm-org-headings-max-depth))
-                      (propertize
-                       (if helm-org-format-outline-path
-                           (org-format-outline-path
-                            (org-get-outline-path t t) width file)
-                         (if file
-                             (concat file (funcall match-fn 0))
-                           (funcall match-fn 0)))
-                       'helm-real-display heading
-                       'helm-realvalue
-                       (set-marker (make-marker) (point-at-eol)))))))
-              matcher aj/helm-org-candidates-todo-only))))))))
-
-;; (defun aj/helm-org--get-candidates-in-file (fun filename &optional fontify nofname parents matcher force-refresh)
-;;   (if parents ;; won’t handle that special case
-;;       (funcall fun filename fontify nofname parents)
-;;     (with-current-buffer (pcase filename
-;;                            ((pred bufferp) filename)
-;;                            ((pred stringp) (find-file-noselect filename t)))
-;;       (let ((tick (buffer-chars-modified-tick)))
-;;         (if (and helm-org--buffer-tick
-;;                  (= tick helm-org--buffer-tick)
-;;                  (null force-refresh))
-;;             helm-org--headers-cache
-;;           (set (make-local-variable 'helm-org--buffer-tick) tick)
-;;           (org-agenda-prepare-buffers (list filename))
-;;           (prog1
-;;               (setq-local
-;;                helm-org--headers-cache
-;;                (let ((match-fn (if fontify
-;;                                    #'match-string
-;;                                  #'match-string-no-properties))
-;;                      (matcher (or matcher aj/helm-org-candidates-matcher))
-;;                      (file (unless nofname
-;;                              (concat (helm-basename filename) ":")))
-;;                      (width (window-width (helm-window))))
-;;                  (save-excursion
-;;                    (save-restriction
-;;                      (unless (and (bufferp filename)
-;;                                   (buffer-base-buffer filename))
-;;                        ;; Only widen direct buffers, not indirect ones.
-;;                        (widen))
-;;                      ;; (unless parents (goto-char (point-min)))
-;;                      ;; clear cache for new version of org-get-outline-path
-;;                      (and (boundp 'org-outline-path-cache)
-;;                           (setq org-outline-path-cache nil))
-;;                      (cl-remove-if
-;;                       #'null
-;;                       (org-scan-tags
-;;                        (lambda ()
-;;                          (goto-char (point-at-bol))
-;;                          (when (looking-at org-complex-heading-regexp)
-;;                            (let ((beg (point-at-bol))
-;;                                  (end (point-at-eol))
-;;                                  (level (length (match-string-no-properties 1)))
-;;                                  (heading (funcall match-fn 4)))
-;;                              (when (and fontify
-;;                                         (null (text-property-any
-;;                                                beg end 'fontified t)))
-;;                                (jit-lock-fontify-now beg end))
-;;                              (when (and (>= level helm-org-headings-min-depth)
-;;                                         (<= level helm-org-headings-max-depth))
-;;                                (propertize
-;;                                 (if helm-org-format-outline-path
-;;                                     (org-format-outline-path
-;;                                      (org-get-outline-path t t) width file)
-;;                                   (if file
-;;                                       (concat file (funcall match-fn 0))
-;;                                     (funcall match-fn 0)))
-;;                                 'helm-real-display heading
-;;                                 'helm-realvalue
-;;                                 (set-marker (make-marker) (point-at-eol)))))))
-;;                        matcher aj/helm-org-candidates-todo-only))))))))))))
-#+end_src
-
-**** Some tests for this  :ARCHIVE:
-#+begin_src emacs-lisp
-(defun aj/measure-helm-org-cands (times name)
-  "Measure the time it takes to evaluate BODY."
-  (let ((time (current-time)))
-    (dotimes (i times)
-      (setq helm-org--headers-cache nil)
-      (helm-org--get-candidates-in-file (buffer-file-name)))
-    (format "%s: %.06f" name (float-time (time-since time)))))
-
-(defun aj/helm-org-test (times)
-  (interactive "p")
-  (let ((times (or (and (< 1 times) times) 100))
-        listan)
-    (advice-remove 'helm-org--get-candidates-in-file
-                   #'aj/helm-org--get-candidates-in-file)
-    (push (aj/measure-helm-org-cands times "Old") listan)
-    (advice-add 'helm-org--get-candidates-in-file :around
-                #'aj/helm-org--get-candidates-in-file)
-    (push (aj/measure-helm-org-cands times "New with exclusions") listan)
-    (let ((org-agenda-skip-archived-trees nil) (org-agenda-skip-comment-trees nil))
-      (push (aj/measure-helm-org-cands times "New with archived etc.") listan))
-    (message (string-join listan "\n"))))
-#+end_src
-
-*** Redefine ~helm-org-in-buffer-preselect~ :ARCHIVE:
-This works better for my purposes.
-#+begin_src emacs-lisp
-(defun aj/helm-org-in-buffer-preselect ()
-  (condition-case nil
-      (concat (org-get-heading t t t t) "$")
-    (error nil)))
-
-(advice-add 'helm-org-in-buffer-preselect :override #'aj/helm-org-in-buffer-preselect)
-#+end_src
-
-*** helm-org-rifle :ARCHIVE:
-Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entries.
-#+begin_src emacs-lisp
-(use-package helm-org-rifle
-  :commands helm-org-rifle helm-org-rifle-current-buffer
-  :init (bind-keys :map org-mode-map
-                   ("C-<f2>" . helm-org-rifle-current-buffer)
-                   ("S-<f2>" . helm-org-rifle))
-  (setq helm-org-rifle-show-path t
-        helm-org-rifle-show-tags t))
-#+end_src
-
-*** helm-org + helm-org-rifle: Make display of headings focus on first and last :ARCHIVE:
-#+begin_src emacs-lisp
-(defun aj/override-org-format-outline-path (fn &rest rest)
-  (cl-letf (((symbol-function 'org-format-outline-path)
-             #'aj/org-format-outline-path))
-    (apply fn rest)))
-
-(advice-add 'helm-org--get-candidates-in-file
-            :around
-            #'aj/override-org-format-outline-path)
-(advice-add 'helm-org-rifle--get-candidates-in-buffer
-            :around
-            #'aj/override-org-format-outline-path)
-
-
-;; This function has kind of involved and not very smart logic really.
-;; It gives a reasonable result though
-(defun aj/org-format-outline-path (path &optional width prefix separator)
-  (let* ((width (or width (window-width (helm-window)) 70))
-         ;; (width (round (* width 1.25))) ;; var-width font gives more room
-         (path (delq nil path))
-         (separator (or separator "/"))
-         (org-odd-levels-only nil)
-         (fontified
-          (cl-loop for head in path
-                   for n from 0
-                   collect
-                   (replace-regexp-in-string
-                    "[ \t]+\\'"
-                    ""
-                    (org-add-props
-                        head nil 'face
-                        (nth (% n org-n-level-faces) org-level-faces)))))
-         (first (car fontified))
-         (last (when (< 1 (length fontified))
-                 (car (last fontified))))
-         (fwidth (length first))
-         (lwidth (length last))
-         (middle
-          (when (< 2 (length fontified))
-            (string-join (cl-subseq fontified 1 -1) separator)))
-         (rwidth (- width (length prefix) (* 2 (length separator) 2))) ; possible width for only first+last
-         (diff (- rwidth fwidth lwidth))
-         fpath)
-    (if (< diff 0)
-        (if (null last)
-            (setq fpath (car (last fontified)))
-          (cond
-           ((< (* 1.5 rwidth) (+ fwidth lwidth))
-            (setq last (substring last 0 (floor (min (length last) (* .6 rwidth)))))
-            (setq first (substring first 0 (floor (min (length first) (* .3 rwidth))))))
-           ((< lwidth (* .25 rwidth))
-            (setq first (substring first 0 diff)))
-           ((< fwidth (* .25 rwidth))
-            (setq last (substring last 0 diff)))
-           (t
-            (let* ((lastrem (max (floor (/ (- lwidth) 2)) (floor (* 0.3 diff))))
-                   (firstrem (- diff lastrem)))
-              (setq last (substring last 0 lastrem))
-              (unless (> 0 firstrem) ; 0 means don’t remove! <0 is a problem
-                (setq first (substring first 0 firstrem))))))
-          (setq fpath (concat
-                       prefix (and prefix separator)
-                       first separator ".." separator last)))
-      (if (< 2 (length fontified))
-          (let* ((remains (- width fwidth lwidth
-                             (* 2 (length separator)) (length prefix) 4)))
-            (when (> (length middle) remains)
-              (setq middle (concat (substring middle 0 remains) "..")))
-            (setq fpath (concat
-                         prefix (and prefix path separator)
-                         first separator middle separator last)))
-        (setq fpath (concat
-                     prefix (and prefix path separator)
-                     first (and last separator) last))))
-    fpath))
-
-;; (defun aj/test-op ()
-;;   (interactive)
-;;   (message
-;;    (aj/org-format-outline-path
-;;     (org-get-outline-path t t)
-;;     (window-width)
-;;     nil "/")))
 #+end_src
 
 
@@ -2255,61 +1775,6 @@ Similar in aim to ~helm-org-in-buffer-headings~, but for searching inside entrie
     ))
 
 
-#+end_src
-** Redefine ~org-paste-special~ to choose from kill-ring (with helm) :ARCHIVE:
-If we have inadvertantly killed something between the special kill and yank we intended, we are then given an opportunity to easily choose the right thing to yank.
-#+begin_src emacs-lisp
-(defalias 'org-paste-special 'aj/org-paste-special)
-
-(defun aj/org-paste-special (arg)
-  "Paste rectangular region into table, or paste subtree relative to level.
-Calls `org-table-paste-rectangle' or `aj/org-paste-subtree', depending on context.
-See the individual commands for more information."
-  (interactive "P")
-  (if (org-at-table-p)
-      (org-table-paste-rectangle)
-    (aj/org-paste-subtree arg)))
-
-(defun aj/org-paste-subtree (arg)
-  (interactive "P")
-  (let ((tree (and kill-ring (current-kill 0))))
-    (unless (org-kill-is-subtree-p tree)
-      (setq tree (aj/helm-choose-kill-ring)))
-    (org-paste-subtree arg)))
-
-
-;; all this is reimplemented here since the normal actions and stuff
-;; for `helm-show-kill-ring' doesn’t match the intended usage (just
-;; return the value) here.
-(defun aj/helm-choose-kill-ring ()
-  "Helm for choosing an element in `kill-ring' and moving it to head"
-  (interactive)
-  (let ((enable-recursive-minibuffers t))
-    (helm :sources aj/helm-source-kill-ring-choose
-          :buffer "*helm kill ring choose*"
-          :resume 'noresume
-          :allow-nest t)))
-
-(defvar aj/helm-source-kill-ring-choose
-  (helm-build-sync-source "Kill Ring"
-    :nomark t
-    :candidates #'helm-kill-ring-candidates
-    :filtered-candidate-transformer #'helm-kill-ring-transformer
-    :action '(("Return + front" . aj/helm-kill-ring-choose-action))
-    :multiline t)
-  "Source for browsing the kill-ring and returning an entry which
-  is placed first in the ring")
-
-(defun aj/helm-kill-ring-choose-action (_candidate)
-  "Return selected helm candidate and move it to head of `kill-ring'"
-  (let ((str (helm-get-selection nil 'withprop)))
-    (with-helm-current-buffer
-      (setq kill-ring (delete str kill-ring))
-      (kill-new str)
-      str)))
-
-(dolist (fn '(helm-kill-ring-candidates helm-kill-ring-transformer))
-  (autoload fn "helm-ring"))
 #+end_src
 
 ** Extra org-entities :org_async:
@@ -3171,64 +2636,6 @@ https://gitlab.com/andersjohansson/emacs-zotxt-extra
   :defer t
   :commands zotxt-extra-maybe-edit-description
   zotxt-extra-link-parse-desc zotxt-extra--replace-consecutive)
-
-;; (defvar-local zotxt-helm-citation-files nil)
-;; (put 'zotxt-helm-citation-files 'safe-local-variable
-;; 	 #'orgqda--string-or-list-of-strings-p)
-;; (use-package zotxt-helm
-;;   :straight (:depth full :host gitlab :repo "andersjohansson/emacs-zotxt-extra" :files ("zotxt-helm.el"))
-;;   :after zotxt
-;;   :demand t
-;;   :init (setq zotxt-helm-method 'async)
-;;   :commands zotxt-helm-link-to-disp-real
-;;   :config
-;;   ;; this could be added to zotxt-helm, but it’s depending so much on
-;;   ;; orgqda and I don’t want to require or copy that to zotxt-helm
-;;   (require 'orgqda)
-
-;;   (defun zotxt-helm-get-current-refs ()
-;; 	(let* ((orgqda-tag-files zotxt-helm-citation-files)
-;; 		   (manyfiles (and zotxt-helm-citation-files
-;; 						   (orgqda-tag-files))))
-;; 	  (cl-remove-duplicates
-;; 	   (if manyfiles
-;; 		   (cl-loop for file in manyfiles
-;; 					append
-;; 					(orgqda--inhibit-org-startups
-;; 					 (with-current-buffer (find-file-noselect file)
-;; 					   (zotxt-helm-get-current-refs-in-buffer))))
-;; 		 (zotxt-helm-get-current-refs-in-buffer))
-;; 	   :test 'equal)))
-
-;;   (defun zotxt-helm-get-current-refs-in-buffer ()
-;; 	(org-element-map
-;; 		(if zotxt-helm-current-refs-in-widened-buffer
-;; 			(save-restriction
-;; 			  (widen)
-;; 			  (org-element-parse-buffer))
-;; 		  (org-element-parse-buffer))
-;; 		'link #'zotxt-helm-link-to-disp-real))
-
-;;   (setf (alist-get 'persistent-action zotxt-helm-current-refs-source)
-;;         #'aj/zotxt-helm-current-show-full-ref)
-
-;;   ;; Display full ref for "current" refs
-;;   (defun aj/zotxt-helm-current-show-full-ref (cand)
-;;     "Display complete citation of selected ref in helm"
-;;     (interactive)
-;;     (when-let
-;;         ((key (with-temp-buffer (insert cand) (org-zotxt-extract-link-id-at-point))))
-;;       (deferred:$
-;;         (zotxt-get-item-bibliography-deferred (list :key key))
-;;         (deferred:nextc it
-;;           (lambda (item)
-;;             (save-window-excursion
-;;               (select-window (active-minibuffer-window))
-;;               (when-let ((ov (car-safe (overlays-at 1))))
-;;                 (overlay-put ov 'display (plist-get item :citation))
-;;                 (overlay-put ov 'face 'default))
-;;               ))))))
-;;   )
 
 (use-package org-zotxt
   :straight nil ;; already installed with zotxt-emacs above
@@ -4299,7 +3706,7 @@ The detection of in-word apostrophes etc. often fails. Always using ~´~ to mean
 
 
 **** LaTeX classes and support for special documents
-***** Configuration for thesis writing
+***** Configuration for thesis writing :ARCHIVE:
 Here it is, finished ☺: http://urn.kb.se/resolve?urn=urn:nbn:se:uu:diva-357341
 ****** UUthesis, for my thesis
 #+begin_src emacs-lisp
@@ -4337,7 +3744,7 @@ Here it is, finished ☺: http://urn.kb.se/resolve?urn=urn:nbn:se:uu:diva-357341
     ref))
 
 (defun aj/org-gls-complete (&optional _arg)
-  (concat "gls:" (helm-comp-read "Glossary terms " (aj/org-gls-find nil t))))
+  (concat "gls:" (completing-read "Glossary terms " (aj/org-gls-find nil t))))
 
 ;;just assume we should use glossaryterms.tex if it exists in default dir.
 (defun aj/org-gls-find (&optional ref wide)
@@ -4382,11 +3789,10 @@ Here it is, finished ☺: http://urn.kb.se/resolve?urn=urn:nbn:se:uu:diva-357341
 
 (defun aj/org-paperref-complete (&optional _arg)
   (concat "paper:"
-          (string-join (helm-comp-read
-                                 "Paperrefs: "
-                                 (aj/org-paperref-find nil t)
-                                 :marked-candidates t)
-                     ", ")))
+          (string-join (completing-read-multiple
+                        "Paperrefs: "
+                        (aj/org-paperref-find nil t))
+                       ", ")))
 
 (defun aj/org-paperref-show (refs)
   (message
