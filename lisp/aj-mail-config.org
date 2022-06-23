@@ -107,32 +107,18 @@ for refile folder selection)"
     (mu4e-headers-attach-mark     ("a" . "📎"))
     (mu4e-headers-encrypted-mark  ("x" . "🔐"))
     (mu4e-headers-signed-mark     ("s" . "🔏"))
-    (mu4e-headers-unread-mark    ("u" . "● ") modus-themes-mark-symbol) ;; ★
+    (mu4e-headers-unread-mark     ("u" . "● ") modus-themes-mark-symbol) ;; ★
+    (mu4e-headers-list-mark       ("s" . "⚟"))
+    (mu4e-headers-personal-mark   ("p" . "👨"))
+    (mu4e-headers-calendar-mark   ("c" . "📅"))
     ))
-
-
-;; not needed with the new :align-to fix for headers.
-;; Only symbols that are in Ubuntu mono font, to avoid width problems
-;; (defconst aj/mu4e-symbols-override
-;;   '((mu4e-headers-draft-mark     . ("D" . "□")) ;; ✒ ✏
-;;     (mu4e-headers-flagged-mark   . ("F" . "†"))
-;;     (mu4e-headers-new-mark       . ("N" . " "))
-;;     (mu4e-headers-passed-mark    . ("P" . "»")) ;; ↪ "→"
-;;     (mu4e-headers-replied-mark   . ("R" . "«")) ;; "→"
-;;     (mu4e-headers-seen-mark      . ("S" . "")) ;; ✓ 🗸 ✔
-;;     (mu4e-headers-trashed-mark   . ("T" . "∏")) ;; 🗑
-;;     (mu4e-headers-attach-mark    . ("a" . "■"))
-;;     (mu4e-headers-encrypted-mark . ("x" . "🔐"))
-;;     (mu4e-headers-signed-mark    . ("s" . "🔏"))
-;;     (mu4e-headers-unread-mark    . ("u" . "•")) ;; ★
-;;     ))
 
 
 (cl-loop for (var (letter . symbol) face) in aj/mu4e-symbols-override
          do (set var (cons letter (propertize symbol 'face (or face '(:weight normal))))))
 
 (setq mu4e-headers-visible-flags
-      '(seen unread replied passed attach encrypted signed draft flagged))
+      '(list unread replied passed attach encrypted signed draft flagged calendar))
 #+end_src
 
 ** Add ons
@@ -238,7 +224,7 @@ Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 #+end_src
 
 ** Contact handling
-*** LDAP (EUDC)
+*** LDAP (EUDC) :ARCHIVE:
 #+begin_src emacs-lisp
 (with-eval-after-load 'mu4e-compose
   (bind-key "C-c C-ä" #'eudc-expand-inline mu4e-compose-mode-map))
@@ -2009,7 +1995,7 @@ The most complex part is for choosing refile folders, depending on account and s
      ,gmail)
     (t ,default)))
 
-(setq mu4e-sent-folder "/chalmers/Skickat" ; gmail is set to delete sent mails
+(setq mu4e-sent-folder "/chalmers/Sent Items" ; gmail is set to delete sent mails
                                         ; (because it recreates them on the
                                         ; server from the mails sent via its
                                         ; smtp server.)
@@ -2017,13 +2003,13 @@ The most complex part is for choosing refile folders, depending on account and s
                                         ; to the server
       mu4e-trash-folder (lambda (msg)
                           (aj/mu4e-msg-account msg
-                            :chalmers "/chalmers/Borttagna objekt"
+                            :chalmers "/chalmers/Deleted Items"
                             :mejla "/mejla/Papperskorgen"
                             :ajf "/ajf/Papperskorgen"))
       mu4e-refile-folder #'aj/mu4e-refile-folder)
 
 
-(defvar aj/mu4e-refile-sender-hash (make-hash-table :test 'equal)) ;; (added to ‘additional-variables’)
+(defvar aj/mu4e-refile-sender-hash (make-hash-table :test 'equal)) ;; (added to ‘savehist-additional-variables’)
 
 (defun aj/mu4e-refile-guess-by-sender (msg)
   (cl-loop with current-max = 0
@@ -2103,7 +2089,7 @@ No automatic guess if FORCE-CHOICE is non-nil."
 
 (defun aj/mu4e-default-refile-folder (msg)
   (aj/mu4e-msg-account msg
-    :chalmers "/chalmers/Arkiv"
+    :chalmers "/chalmers/Archive"
     ;; Only for show, they get changed labels via custom action
     :mejla "/mejla/Alla mail"
     :ajf "/ajf/Alla mail"))
@@ -2178,7 +2164,7 @@ messages “refiled” in gmail accounts from the inbox listing."
    (aj/mu4e-msg-account msg
      :gmail (lambda (_docid msg _target) (aj/mu4e-retag-as-move msg "-\\Inbox"))
      :default (lambda (docid _msg target)
-                (mu4e--server-move docid (mu4e~mark-check-target target) "-N+S")))
+                (mu4e--server-move docid (mu4e--mark-check-target target) "-N+S")))
    docid msg target))
 
 ;; Redefine move to trash
@@ -2191,7 +2177,7 @@ messages “refiled” in gmail accounts from the inbox listing."
               (aj/mu4e-msg-account msg
                 :gmail (lambda (msg) (mu4e-action-retag-message msg "-\\Inbox,-\\Starred,-\\Important")))))
     (funcall retagfn msg))
-  (mu4e--server-move docid (mu4e~mark-check-target target) "+T+S-N"))
+  (mu4e--server-move docid (mu4e--mark-check-target target) "+T+S-N"))
 #+end_src
 
 ** Marks
@@ -2243,10 +2229,10 @@ At times, I can safely refile messages without reading them and at the same time
    (aj/mu4e-msg-account msg
      :gmail (lambda (docid msg target)
               (mu4e-action-retag-message msg "-\\Inbox")
-              (mu4e--server-move docid (mu4e~mark-check-target target) "-N+S"))
+              (mu4e--server-move docid (mu4e--mark-check-target target) "-N+S"))
      :default (lambda (docid _msg target)
                 (mu4e--server-move
-                 docid (mu4e~mark-check-target target) "-N+S")))
+                 docid (mu4e--mark-check-target target) "-N+S")))
    docid msg target))
 
 

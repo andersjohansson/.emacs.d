@@ -324,7 +324,7 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 (straight-use-package '(mu4e :host github
                              :repo "djcb/mu"
                              :branch "master"
-                             :files ("build/mu4e/*")
+                             :files ("mu4e/*.el" "mu4e/mu4e.info" "build/mu4e/mu4e-config.el" "build/mu/mu")
                              ;; straight is too eager rebuilding
                              ;; (every small change), and
                              ;; compiling mu is slow!!! I’ll do it
@@ -518,7 +518,8 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   (vertico-count-format (cons "%-7s " "%s/%s"))
   (vertico-cycle t)
   (vertico-multiform-commands
-   '((aj/run-cmd-in-small-frame buffer)))
+   '((aj/run-cmd-in-small-frame buffer)
+     (message-tab (vertico-sort-function . identity))))
   (vertico-buffer-display-action
    '(magit--display-buffer-fullframe)))
 
@@ -596,8 +597,6 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 
   (consult-preview-key (kbd "C-ä"))
   :init
-  ;; CRM
-  (advice-add #'completing-read-multiple :override #'consult-completing-read-multiple)
 
   ;; gives us completion at point using the ordinary minibuffer
   ;; completion (vertico):
@@ -607,26 +606,28 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 
   :config
 
+  ;; CRM
+  ;; (advice-add #'completing-read-multiple :override #'consult-completing-read-multiple)
 
   ;; CRM
   ;; https://github.com/bdarcus/citar/issues/492#issuecomment-997024450
-  (defun consult-vertico--crm-select ()
-    "Select/deselect candidate."
-    (interactive)
-    (when (let ((cand (vertico--candidate)))
-            (and (vertico--match-p cand) (not (equal cand ""))))
-      (vertico-exit)))
+  ;; (defun consult-vertico--crm-select ()
+  ;;   "Select/deselect candidate."
+  ;;   (interactive)
+  ;;   (when (let ((cand (vertico--candidate)))
+  ;;           (and (vertico--match-p cand) (not (equal cand ""))))
+  ;;     (vertico-exit)))
 
-  (defun consult-vertico--crm-exit ()
-    "Select/deselect candidate and exit."
-    (interactive)
-    (when (let ((cand (vertico--candidate)))
-            (and (vertico--match-p cand) (not (equal cand ""))))
-      (run-at-time 0 nil #'exit-minibuffer))
-    (vertico-exit))
+  ;; (defun consult-vertico--crm-exit ()
+  ;;   "Select/deselect candidate and exit."
+  ;;   (interactive)
+  ;;   (when (let ((cand (vertico--candidate)))
+  ;;           (and (vertico--match-p cand) (not (equal cand ""))))
+  ;;     (run-at-time 0 nil #'exit-minibuffer))
+  ;;   (vertico-exit))
 
-  (define-key consult-crm-map [remap vertico-insert] #'consult-vertico--crm-select)
-  (define-key consult-crm-map [remap exit-minibuffer] #'consult-vertico--crm-exit)
+  ;; (define-key consult-crm-map [remap vertico-insert] #'consult-vertico--crm-select)
+  ;; (define-key consult-crm-map [remap exit-minibuffer] #'consult-vertico--crm-exit)
 
 
   ;; (setq consult-preview-key 'any)
@@ -794,7 +795,7 @@ https://www.freedesktop.org/wiki/Specifications/desktop-bookmark-spec/"
      :category file
      :face     consult-file
      :history  file-name-history
-     ;; :action   ,#'consult--file-action
+     :action      ,#'consult--file-action
      :items
      ,(lambda ()
         (let ((ht (consult--buffer-file-hash)))
@@ -880,7 +881,9 @@ Used to preselect nearest headings and imenu items.")
 
 ;;Advise vertico--update-candidates to select the nearest candidate if applicable.
 
-(define-advice vertico--update-candidates (:after (&rest _) choose-candidate)
+(advice-add #'vertico--update-candidates :after #'aj/vertico--update-candidates-choose)
+
+(defun aj/vertico--update-candidates-choose (&rest _)
   "Pick the nearest candidate rather than the first after updating candidates."
   (when (and aj/consult-previous-point
              (memq current-minibuffer-command
@@ -891,12 +894,11 @@ Used to preselect nearest headings and imenu items.")
                         vertico--candidates
                         aj/consult-previous-point
                         (lambda (cand point-pos) ; counts on candidate list being sorted
-                          (> (car (get-text-property ; get text location marker
-                                   0
-                                   (cl-case current-minibuffer-command
-                                     (consult-org-heading 'consult-org--heading)
-                                     (consult-outline 'consult-location))
-                                   cand))
+                          (> (cl-case current-minibuffer-command
+                               (consult-outline
+                                (car (consult--get-location cand)))
+                               (consult-org-heading
+                                (get-text-property 0 'consult--candidate cand)))
                              point-pos)))
                        (length vertico--candidates))))))
   (setq aj/consult-previous-point nil))
@@ -1499,7 +1501,7 @@ For exporting and converting to zotero.
 
 #+end_src
 
-*** Flymake
+*** Flymake :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package flymake
   :hook
@@ -1512,7 +1514,7 @@ For exporting and converting to zotero.
   )
 #+end_src
 
-*** Flycheck :ARCHIVE:
+*** Flycheck
 #+begin_src emacs-lisp
 (use-package flycheck
   :commands (global-flycheck-mode)
@@ -1531,7 +1533,16 @@ For exporting and converting to zotero.
      (string-prefix-p "*Org Src " (buffer-name))
      (string-prefix-p "*scratch*" (buffer-name))
      (funcall origfun))))
+#+end_src
 
+*** Eglot-ltex :ARCHIVE:
+#+begin_src emacs-lisp
+;; (use-package flycheck-languagetool
+;;   :custom (flycheck-languagetool-server-jar "/usr/share/java/languagetool/languagetool-server.jar"))
+
+(use-package eglot-ltex
+  :straight (:host 'github :repo "emacs-languagetool/eglot-ltex")
+  :custom (eglot-languagetool-server-path "/usr/bin/ltex-ls"))
 #+end_src
 
 *** Saveplace is neccessary
@@ -1643,7 +1654,7 @@ Use mu4e, the extensive config is in an [[file:lisp/aj-mail-config.org][external
          ("C-x i" . mu4e~headers-jump-to-maildir)
          ("C-x å" . mu4e-search-bookmark))
   :defer 5
-  :custom ((mu4e-mu-binary (expand-file-name "build/mu/mu" (straight--repos-dir "mu")))
+  :custom ((mu4e-mu-binary (expand-file-name "mu" (straight--build-dir "mu4e")))
            (mu4e-confirm-quit nil)
            (mu4e-context-policy 'pick-first)
            (mu4e-compose-context-policy 'ask-if-none)
@@ -2687,6 +2698,18 @@ already narrowed."
 
 ** Searching and stuff
 
+*** wgrep, for editing via grep buffers
+Should also work for consult-embark exported searches
+#+begin_src emacs-lisp
+(use-package wgrep
+  ;; a kind of autoload that should be neccessary
+  :hook (grep-setup . wgrep-setup)
+  :custom
+  ;; like the binding for ‘dired-toggle-read-only’ for wdired
+  (wgrep-enable-key "\C-x\C-q")
+  (wgrep-auto-save-buffer t))
+#+end_src
+
 *** Deadgrep
 Use deadgrep for control of searching. Also use [[https://github.com/phiresky/ripgrep-all][ripgrep-all]], to enable searching in pdfs etc.
 #+begin_src emacs-lisp
@@ -3489,10 +3512,12 @@ Dims parentheses in lisp modes.
 
 *** Elisp
 
-**** Bind ~pp-eval-last-sexp~.
+**** Bind ~pp-eval-last-sexp~ and ~pp-eval-expression~
 #+begin_src emacs-lisp
-(bind-key "C-x C-S-e" #'pp-eval-last-sexp)
+(bind-keys ("C-x C-S-e" . pp-eval-last-sexp)
+           ("C-M-:" . pp-eval-expression))
 #+end_src
+
 **** Some settings from ESK
 #+begin_src emacs-lisp
 (add-hook 'emacs-lisp-mode-hook 'aj/remove-elc-on-save)
@@ -3656,7 +3681,7 @@ _d_: subtree     _TAB_: toggle
 			(setq indent-tabs-mode nil)))
 #+end_src
 
-*** smartparens :ARCHIVE:
+*** smartparens
 
 **** Initial
 #+begin_src emacs-lisp
@@ -3669,11 +3694,8 @@ _d_: subtree     _TAB_: toggle
   (sp-use-smartparens-bindings)
   (sp-pair "`" nil :actions :rem) ;den sabbar org-cdlatex-mode m.m.
   (sp-local-pair 'org-mode "\\(" "\\)" :trigger "$$")
-  (face-spec-reset-face 'sp-show-pair-match-face)
-  (face-spec-reset-face 'sp-show-pair-mismatch-face)
-  (set-face-attribute 'sp-show-pair-match-face nil :inherit 'show-paren-match)
-  (set-face-attribute 'sp-show-pair-mismatch-face nil :inherit 'show-paren-mismatch)
-  (define-key smartparens-mode-map (kbd "M-<delete>") 'undefined))
+  (define-key smartparens-mode-map (kbd "M-<delete>") 'undefined)
+  (define-key smartparens-mode-map (kbd "M-<backspace>") 'undefined))
 ;; sista sabbar mitt skrivande, borde bara kopplas till org-mode, men vet inte hur)
 #+end_src
 
@@ -4271,10 +4293,12 @@ For doing smart (curly) quotes, mainly in emails since org has it’s own mechan
          ("C-x 4 4" . langtool-show-message-at-point)
          ("C-x 4 c" . langtool-correct-buffer))
   :custom
-  ;; (langtool-language-tool-server-jar
-  ;; "/usr/share/languagetool:/usr/share/java/languagetool/*")
-  ;; (langtool-server-user-arguments '("-p" "8342"))
-  (langtool-java-classpath "/usr/share/languagetool:/usr/share/java/languagetool/*")
+  ;; (langtool-java-classpath "/usr/share/languagetool:/usr/share/java/languagetool/*")
+  (langtool-language-tool-server-jar "/usr/share/languagetool:/usr/share/java/languagetool/*")
+
+  ;; (langtool-language-tool-server-jar "/usr/share/java/languagetool/languagetool-server.jar")
+  (langtool-server-user-arguments '("-p" "8342"))
+  ;; (langtool-java-classpath "/usr/share/languagetool:/usr/share/java/languagetool/*")
   (langtool-mother-tongue "sv")
   (langtool-disabled-rules '("WHITESPACE_RULE" "EN_QUOTES")))
 
@@ -4481,7 +4505,7 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
                  aj/pdf-view-midnight-list))
       (pdf-view-midnight-minor-mode 1)))
 
-  (defvar aj/pdf-hl-color "#DED1EE")
+  (defvar aj/pdf-hl-color "#EDE3FA")
   (defvar aj/pdf-ul-color "#633D91")
   (defvar aj/pdf-ol-color "#9C2F38")
   (defvar aj/pdf-note-color "#77599C")
@@ -4531,16 +4555,15 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
    :map pdf-view-mode-map
    ("s a" . pdf-view-auto-slice-minor-mode)
    ("q" . aj/pdf-quit)
-   ("w" . aj/pdf-hl-and-copy)
-   ;;("w" . aj/pdf-hl-and-copy)
-   ("e" . aj/pdf-ul)
-   ("r" . aj/pdf-ol)
-   ("t" . aj/pdf-sq)
-   ("y" . aj/pdf-hl-note)
-   ("W" . (lambda () (interactive) (aj/pdf-hl t)))
-   ("E" . (lambda () (interactive) (aj/pdf-ul t)))
-   ("R" . (lambda () (interactive) (aj/pdf-ol t)))
-   ("T" . (lambda () (interactive) (aj/pdf-sq t)))
+   ("1" . aj/pdf-hl-and-copy)
+   ("2" . aj/pdf-ul)
+   ("3" . aj/pdf-ol)
+   ("4" . aj/pdf-sq)
+   ("5" . aj/pdf-hl-note)
+   ("!" . (lambda () (interactive) (aj/pdf-hl t)))
+   ("\"" . (lambda () (interactive) (aj/pdf-ul t)))
+   ("#" . (lambda () (interactive) (aj/pdf-ol t)))
+   ("¤" . (lambda () (interactive) (aj/pdf-sq t)))
    ("<C-S-mouse-1>" . aj/pdf-text))
 
   (defun aj/pdf-quit ()
@@ -5039,15 +5062,9 @@ Load my own face customizations after enabling a theme.
 (setq goto-address-mail-face 'aj/goto-address-mail-face)
 
 (defun aj/apply-face-definitions (&optional theme)
-  "Do face definition stuff after loading theme.
+  "Do face definition stuff after loading THEME.
 Also runs hook aj/face-definitions-hook."
   (unless (member theme '(use-package user)) ;enable theme calls itself with user theme.
-
-    ;; (set-face-attribute 'scroll-bar nil :foreground (face-attribute
-    ;; 'widget-field :background))
-
-    ;; (when (eq 'pgtk (framep-on-display))
-    ;;   (set-face-attribute 'internal-border nil :background "#dddddd"))
 
     ;; don’t inherit bold for these:
     (set-face-attribute 'orderless-match-face-0 nil :inherit nil)
@@ -5078,9 +5095,10 @@ Also runs hook aj/face-definitions-hook."
       ;; ;; (set-face-attribute 'org-meta-line nil :inherit 'org-drawer)
 
       (set-face-attribute 'org-block-begin-line nil :overline (modus-themes-color 'bg-active) :height 0.9)
-      (set-face-attribute 'org-block-end-line nil :underline (modus-themes-color 'bg-active) :overline nil :height 0.9)
+      (set-face-attribute 'org-block-end-line nil :underline `(:color ,(modus-themes-color 'bg-active) :position t) :overline nil :height 0.9)
 
-      (set-face-attribute 'org-quote nil :weight 'light :height 0.95 :background nil)
+      ;;(set-face-attribute 'org-quote nil :weight 'light :height 0.95 :background nil)
+      (set-face-attribute 'org-quote nil :height 0.95 :background nil)
 
       ;; ;; Use fixed-pitch for checkbox, compressed font for table
       (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
@@ -5088,32 +5106,15 @@ Also runs hook aj/face-definitions-hook."
 
       (set-face-attribute 'org-agenda-date-today nil :background nil)
 
+      ;; (dolist (n '("1" "2" "3" "4" "5" "6" "7" "8"))
+      ;;   (set-face-attribute (intern (concat "org-level-" n)) nil :weight 'light))
+
       (when (eq theme 'modus-operandi)
         (set-face-attribute 'org-block nil :background "#f8f8f8")
-        (dolist (n '("1" "2" "3" "4" "5" "6" "7" "8"))
-          (set-face-attribute (intern (concat "org-level-" n)) nil :weight 'light))
 
         ;; avoid tags inheriting headline color
-        (set-face-attribute 'org-tag nil :foreground (modus-themes-color 'magenta-nuanced-fg)
-                            :weight 'light)
-
-
-        ;; (set-face-attribute 'org-todo nil ;; :height 1.0
-        ;;                     :inherit 'fixed-pitch)
-
-        (set-face-attribute 'org-modern-todo nil :height 1.0 :inherit 'org-modern-label :foreground (modus-themes-color 'red))
-
-        (defface aj/org-waiting `((t :inherit org-modern-todo :foreground ,(modus-themes-color 'yellow))) "Face for waiting org-state" :group 'org-faces)
-        (defface aj/org-started `((t :inherit org-modern-todo :foreground ,(modus-themes-color 'blue))) "Face for started org-state" :group 'org-faces)
-        ;; (defface aj/org-done `((t :inherit org-modern-done)) "Face for done org-state" :group 'org-faces)
-
-        (setq org-modern-todo-faces
-              '(("TODO" . org-modern-todo)
-                ("STARTAD" . aj/org-started)
-                ("VÄNTAR" . aj/org-waiting)
-                ("AVFÖRD" . org-modern-done)
-                ("DONE" . org-modern-done)))
-
+        ;; (set-face-attribute 'org-tag nil :foreground (modus-themes-color 'magenta-nuanced-fg)
+        ;;                     :weight 'light)
 
         ;; (setq org-todo-keyword-faces
         ;;       `(("TODO" . ,(modus-themes-color 'red))
@@ -5122,6 +5123,21 @@ Also runs hook aj/face-definitions-hook."
         ;;         ("AVFÖRD" . ,(modus-themes-color 'green))
         ;;         ("DONE" . ,(modus-themes-color 'green)))))
         ))
+
+    (with-eval-after-load 'org-modern
+      (set-face-attribute 'org-modern-todo nil :height 1.0 :inherit 'org-modern-label :foreground (modus-themes-color 'red))
+
+      (defface aj/org-waiting `((t :inherit org-modern-todo :foreground ,(modus-themes-color 'yellow))) "Face for waiting org-state" :group 'org-faces)
+      (defface aj/org-started `((t :inherit org-modern-todo :foreground ,(modus-themes-color 'blue))) "Face for started org-state" :group 'org-faces)
+      ;; (defface aj/org-done `((t :inherit org-modern-done)) "Face for done org-state" :group 'org-faces)
+
+      (setq org-modern-todo-faces
+            '(("TODO" . org-modern-todo)
+              ("STARTAD" . aj/org-started)
+              ("VÄNTAR" . aj/org-waiting)
+              ("AVFÖRD" . org-modern-done)
+              ("DONE" . org-modern-done))))
+
 
     (with-eval-after-load 'idle-highlight-mode
       (set-face-attribute 'idle-highlight nil :inherit nil :underline t))
@@ -5146,6 +5162,7 @@ Also runs hook aj/face-definitions-hook."
 #+begin_src emacs-lisp
 (use-package modus-themes
   :custom
+  (modus-themes-headings '((t . (regular))))
   (modus-themes-syntax '(yellow-comments))
   (modus-themes-links '(faint neutral-underline))
   (modus-themes-fringes 'subtle)

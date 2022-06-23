@@ -89,7 +89,7 @@ TEMPLATE is the processed template used to format the entry."
            (when (assoc "CTIME" props)
              (org-entry-delete (point) "CTIME"))))))))
 #+end_src
-** [[https://github.com/nullman/emacs-org-visibility][org-visibility]]
+** [[https://github.com/nullman/emacs-org-visibility][org-visibility]]                                                  :ARCHIVE:
 Automatically save and restore previous visibility, very useful.
 #+begin_src emacs-lisp
 (use-package org-visibility
@@ -144,7 +144,9 @@ Avoid colons for syncing to windows systems (onedrive)"
   (org-modern-block nil) ;; doesn’t work with org-indent
   (org-modern-hide-stars nil)
   (org-modern-star '["♦"])
-  (org-modern-table-vertical 1))
+  (org-modern-table nil)
+  ;; (org-modern-table-vertical 1)
+  )
 #+end_src
 
 *** [[https://github.com/integral-dw/org-superstar-mode/][org-superstar]] (successor to org-bullets) :ARCHIVE:
@@ -1704,6 +1706,7 @@ A local variables comment block that is placed at the end of the file may be los
 
 (defun aj/org-show-parent-for-demote-promote ()
   (when
+      ;; not true for some org-capture cases that we want to avoid.
       (eq (selected-window) (get-buffer-window))
     (when-let ((prev (save-excursion
                        (when (org-up-heading-safe)
@@ -1719,8 +1722,8 @@ A local variables comment block that is placed at the end of the file may be los
                                                           (- right (+ 30)))))
                                    (concat "⇧ " (cdr prev)))
                                   (point-at-eol))))))
-
 #+end_src
+
 *** Sorting by last name
 I often have lists of names for headlines. Nice to be able to sort them by last name. Here is a function to be used for creating a sort key that sorts on last name for ~org-sort-entries~ or ~org-sort-list~.
 #+begin_src emacs-lisp
@@ -1829,11 +1832,11 @@ Loaded already in init.el, but configuration here:
 (setf (alist-get 'consult-org-heading embark-keymap-alist) 'aj/org-heading-map)
 
 (defun aj/embark-org-clone-indirect-heading (heading)
-  (when-let ((m (car-safe (get-text-property 0 'consult-org--heading heading))))
+  (when-let ((m (get-text-property 0 'consult--candidate heading)))
     (let ((consult-after-jump-hook nil))
       (save-excursion
         (save-restriction
-          (consult--jump-nomark m)
+          (consult--jump-1 m)
           (aj/org-tree-to-indirect-buffer))))))
 #+end_src
 
@@ -2949,8 +2952,6 @@ List of prefix strings or regex."
    (goto-char (point-min))
    (when (search-forward "[[note:" nil t)
      (aj/org-annotate-add-right-margin))))
-
-
 #+end_src
 
 ** Cite with new org-cite
@@ -3458,7 +3459,7 @@ Named with org prefix to be preserved in org exports."
   :demand t
   :custom
   (org-re-reveal-revealjs-version "4")
-  (org-re-reveal-root "../")
+  (org-re-reveal-root (concat "file://" (expand-file-name "~/lib/reveal.js")))
   ;; org-re-reveal-mathjax-url "https://cdnjs.cloudflare.com/ajax/libs/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
   (org-re-reveal-plugins '(zoom notes))
   (org-re-reveal-theme "white")
@@ -3507,7 +3508,9 @@ Named with org prefix to be preserved in org exports."
        ((?x "As file linked to server"
             aj/org-reveal-export-to-html-link)
         (?c "As linked file and browse"
-            aj/org-reveal-export-to-html-link-and-browse))))
+            aj/org-reveal-export-to-html-link-and-browse)
+        (?z "Link, and package for publish"
+            aj/org-reveal-export-to-html-link-and-package))))
 
 (defconst aj/revealjs-base-url "http://localhost:8000/")
 
@@ -3609,7 +3612,44 @@ Named with org prefix to be preserved in org exports."
   (setq aj/org-reveal-current-url aj/org-reveal-last-url)
   (aj/org-reveal-try-server-start :data nil))
 
-(setq aj/org-reveal-last-url "http://localhost:8000/2019-05-avhandling-l%C3%A4ngre/avhandlingspresentation.html")
+
+
+(defun aj/org-reveal-export-to-html-link-and-package (&optional async subtreep visible-only body-only ext-plist)
+  "Export current buffer to reveal.js, package for publishing."
+  (interactive)
+  (make-directory "publish" 'noerror)
+  (let* ((copydir (expand-file-name "publish/"))
+         (exportfile (expand-file-name (aj/org-reveal-export-to-html-link async subtreep visible-only body-only ext-plist)))
+         (default-directory (file-name-directory exportfile)))
+    (cl-loop for f in
+             (directory-files "../assets" 'absolute
+                              (rx (or (seq bol "webfont-")
+                                      (seq (or ".css" ".js" ".svg") eol))))
+             do (make-symbolic-link f copydir 'overwrite))
+    (make-symbolic-link (expand-file-name "../plugin") copydir 'overwrite)
+
+    (with-temp-buffer
+      (insert-file-contents exportfile)
+      (goto-char (point-min))
+      (while (search-forward-regexp
+              (rx (or
+                   (seq (or "src=" "href=" "data-background=")
+                        ?\"
+                        (group-n 1 (+ (not ?\")))
+                        ?\")
+                   (seq "src:" (* " ")
+                        ?'
+                        (group-n 1 (+ (not ?')))
+                        ?')))
+              nil t)
+        (let ((fn (match-string 1)))
+          (when (file-exists-p fn)
+            (let ((fnd (file-name-nondirectory fn)))
+              (replace-match fnd t t nil 1)
+              (make-symbolic-link (expand-file-name fn) copydir 'overwrite)))))
+
+      (write-file (file-name-concat copydir "index.html")))
+    ))
 #+end_src
 
 **** Mode and hydra for help with input
@@ -3768,7 +3808,10 @@ We also allow for a caption, which will be put in a cite attribute."
 			                     attributes
 		                       (plist-put attributes :id reference)))
                  (attributes (if caption
-                                 (plist-put attributes :cite (org-trim (org-export-data caption info)))
+                                 (plist-put attributes :cite
+                                            (replace-regexp-in-string
+                                             "</?a[^>]*>" ""
+                                             (org-trim (org-export-data caption info))))
                                attributes))
 		         (attr (org-html--make-attribute-string attributes)))
 	        (if (org-string-nw-p attr) (concat " " attr) ""))
@@ -3924,7 +3967,6 @@ For my university template, add a final slide with the logo.
 ;;     (goto-char (point-min))
 ;;     (org-mode)))
 #+end_src
-
 
 *** Ignored drawers
 #+begin_src emacs-lisp
