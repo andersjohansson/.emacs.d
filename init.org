@@ -225,7 +225,7 @@ When using the experimental ~feature/native-comp~ branch of emacs, loaded librar
 (setq inhibit-startup-message t)
 
 (when window-system
-  (setq frame-title-format '(buffer-file-name "%f" ("%b")))
+  (setq frame-title-format '"%b")
 
   (defun aj/deactivate-gui (mode on)
     "Activate or deactivate MODE depending on ON, and defines a variable stating my choice."
@@ -248,7 +248,7 @@ When using the experimental ~feature/native-comp~ branch of emacs, loaded librar
 ;; Emoticons
 (set-fontset-font t '(#x1f600 . #x1f64f) "Noto Color Emoji")
 ;; Misc symbols
-(set-fontset-font t '(#x1f300 . #x1F5ff) "Noto Color Emoji")
+;; (set-fontset-font t '(#x1f300 . #x1F5ff) "Noto Color Emoji")
 #+end_src
 
 *** Determine which of my two computers we are running on
@@ -268,11 +268,6 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 
 (defvar aj/face-definitions-hook nil
   "Extra functions for defining faces after loading themes etc.")
-
-(defun aj/solarized-theme-p (&optional theme)
-  (or (and theme (member theme '(solarized-light solarized-dark)))
-      (custom-theme-enabled-p 'solarized-light)
-      (custom-theme-enabled-p 'solarized-dark)))
 #+end_src
 
 *** Add /lisp to load-path :org_async:
@@ -312,10 +307,11 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 *** Fix recipes and stuff for loading some packages
 #+begin_src emacs-lisp
 ;; Define how to build org and mu4e already here, so that dependencies work out
-(straight-use-package '(org :host github
-                            :repo "yantar92/org"
-                            :branch "weekday-repeats"
-                            :pre-build (list "make" "autoloads" (concat "EMACS=" invocation-directory invocation-name))
+(straight-use-package `(org :repo "https://git.savannah.gnu.org/git/emacs/org-mode.git"
+                            :local-repo "org"
+                            :host nil
+                            :branch "ajfixes"
+                            :pre-build (("make" "autoloads" ,(concat "EMACS=" invocation-directory invocation-name)))
                             :build (:not autoloads)
                             :files (:defaults
                                     "lisp/*.el"
@@ -593,7 +589,7 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
          ("<f2>" . consult-org-heading))
   :custom
   (consult-ripgrep-args
-   "rga --no-ignore --null --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --line-number .")
+   "rga --no-ignore --null --line-buffered --color=never --max-columns=10000 --path-separator / --smart-case --no-heading --line-number .")
 
   (consult-preview-key (kbd "C-ä"))
   :init
@@ -689,6 +685,10 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   (setq set-mark-command-repeat-pop t)
 
   (advice-add 'pop-to-mark-command :around #'aj/pop-to-mark-invoke-consult)
+
+
+
+
   )
 
 #+end_src
@@ -917,7 +917,46 @@ Used to preselect nearest headings and imenu items.")
   ;; if you want to have consult previews as you move around an
   ;; auto-updating embark collect buffer
   :hook
-  (embark-collect-mode . consult-preview-at-point-mode))
+  (embark-collect-mode . consult-preview-at-point-mode)
+  :config
+
+  ;; Export grep to org.
+  (setf (alist-get 'consult-grep embark-exporters-alist)
+        #'aj/embark-consult-export-grep-choose)
+
+  (defun aj/embark-consult-export-grep-choose (lines)
+    (if (y-or-n-p "Use org?")
+        (aj/embark-consult-export-grep-org lines)
+      (embark-consult-export-grep lines)))
+
+  (defun aj/embark-consult-export-grep-org (lines)
+    "Create a org mode buffer listing LINES."
+    (let ((buf (generate-new-buffer "*Embark Export Grep Org*"))
+          (lastfile))
+      (with-current-buffer buf
+        (insert "* Exported grep results\n")
+        (dolist (line lines)
+          (if (string-match "^\\([^:]+\\):\\([^:]+\\):\\(.+\\)$" line)
+              (let ((fn (match-string 1 line)))
+                (unless (equal lastfile fn)
+                  (insert (format "** [[file:%s]]\n" fn)))
+                (setq lastfile fn)
+                (insert (format "*** [[file:%s::%s]]\n#+begin_quote\n%s\n#+end_quote\n"
+                                fn
+                                (match-string 2 line)
+                                (replace-regexp-in-string
+                                 "^\*"
+                                 "​*" ; zero-width space + *
+                                 (match-string 3 line)))))
+            (insert "** " line "\n")))
+        (goto-char (point-min))
+        (org-mode)
+        (use-local-map (make-composed-keymap
+                        embark-consult-revert-map
+                        (current-local-map))))
+      (pop-to-buffer buf)))
+
+  )
 #+end_src
 
 ***** all-the-icons-completion, for some eye candy
@@ -1182,7 +1221,7 @@ For exporting and converting to zotero.
   :demand t
   :init
   (setq org-directory "~/org"
-        org-ellipsis " ⤵"
+        org-ellipsis " ↴"
         org-export-backends '(org odt ascii html icalendar latex pandoc)
         org-modules '(org-protocol org-habit org-inlinetask org-id org-pdfview)
         org-list-allow-alphabetical t
@@ -1375,14 +1414,20 @@ For exporting and converting to zotero.
      (funcall origfun))))
 #+end_src
 
-*** Eglot-ltex :ARCHIVE:
+*** Eglot-ltex, for grammarcheck with languagetool and eglot
 #+begin_src emacs-lisp
 ;; (use-package flycheck-languagetool
-;;   :custom (flycheck-languagetool-server-jar "/usr/share/java/languagetool/languagetool-server.jar"))
+;;   :init
+;;   (setq flycheck-languagetool-server-command
+;;         '("java" "-cp" "\"/usr/share/java/languagetool/*\"" "org.languagetool.server.HTTPServer")
+;;         flycheck-languagetool-server-port "8099")
+
+;;   ;; (setq flycheck-languagetool-server-jar "/usr/share/java/languagetool/languagetool-server.jar")
+;;   )
 
 (use-package eglot-ltex
   :straight (:host 'github :repo "emacs-languagetool/eglot-ltex")
-  :custom (eglot-languagetool-server-path "/usr/bin/ltex-ls"))
+  :custom (eglot-languagetool-server-path "/opt/ltex-ls/"))
 #+end_src
 
 *** Saveplace is neccessary
@@ -1435,7 +1480,9 @@ I very seldom happen upon right-to-left text in Emacs, and couldn’t read it in
 #+begin_src emacs-lisp
 (setq-default bidi-paragraph-direction 'left-to-right)
 (setq bidi-inhibit-bpa t)
-(global-so-long-mode t)
+
+;; not needed with optimizations in 29?
+;;(global-so-long-mode t)
 #+end_src
 
 ** Debugging
@@ -2279,6 +2326,68 @@ https://github.com/andersjohansson/tex-fold-linebreaks
                 "\\([0-9]\\|[[:space:]]\\([[:alpha:]]\\|t\\.ex\\|m\\.fl\\|bl\\|bl\\.a\\|e\\.g\\|i\\.e\\)?\\)$"))
 #+end_src
 ** Window management and navigation
+*** Repeat mode
+#+begin_src emacs-lisp
+(use-package repeat
+  :custom (repeat-exit-timeout 5)
+  :config (repeat-mode)
+
+  (with-eval-after-load 'org
+    (defvar aj/org-mode-navigation-repeat-map
+      (let ((map (make-sparse-keymap)))
+        (define-key map (kbd "C-b") #'org-backward-heading-same-level)
+        (define-key map (kbd "b") #'org-backward-heading-same-level)
+        (define-key map (kbd "C-f") #'org-forward-heading-same-level)
+        (define-key map (kbd "f") #'org-forward-heading-same-level)
+        (define-key map (kbd "C-n") #'org-next-visible-heading)
+        (define-key map (kbd "n") #'org-next-visible-heading)
+        (define-key map (kbd "C-p") #'org-previous-visible-heading)
+        (define-key map (kbd "p") #'org-previous-visible-heading)
+        (define-key map (kbd "C-u") #'outline-up-heading)
+        (define-key map (kbd "u") #'outline-up-heading)
+        map))
+
+    (dolist (command '(org-backward-heading-same-level
+                       org-forward-heading-same-level
+                       org-next-visible-heading
+                       org-previous-visible-heading))
+      (put command 'repeat-map 'aj/org-mode-navigation-repeat-map))))
+
+
+
+
+;; (defmacro aj/create-repeat-map (mapname &rest bindings)
+;;   (declare (indent 1))
+;;   `(defvar ,mapname (make-sparse-keymap))
+;;   (let (exps)
+;;     (cl-loop for (key command) in bindings collect
+;;              `(progn (define-key ,mapname (kbd ,key) #',command)
+;;                      (put #',command 'repeat-map ,mapname))
+;;              into exps
+;;              )
+;;     `(progn ,exps))
+;;   ;; `(let ((map (make-sparse-keymap)))
+;;   ;;    ,(cl-loop for (key command) in bindings do
+;;   ;;              `(progn (define-key 'map (kbd ,key) #',command)
+;;   ;;                      (put #',command 'repeat-map ',mapname)))
+
+;;   ;;    (defvar mapname map))
+;;   )
+
+;; (macroexpand-all (aj/create-repeat-map 'aj/test-map
+;;                    ("1" aj/test-cmd-1)
+;;                    ("2" aj/test-cmd-2)))
+
+;; (defun aj/test-cmd-1
+;;     (interactive)
+;;   (message "1"))
+;; (defun aj/test-cmd-2
+;;     (interactive)
+;;   (message "2"))
+
+
+
+#+end_src
 *** Bindings for ~other-window~ and ~next/previous-buffer~.
 
 ~other-window~ with ~<C-tab>~ and ~<C-S-tab>~ (like switching tabs in firefox).
@@ -2754,6 +2863,116 @@ A bit nicer than isearch. I also like to use fuzzy search (words separated by wh
   :config (magit-todos-mode t))
 #+end_src
 
+*** Magit + difftastic
+https://tsdh.org/posts/2022-08-01-difftastic-diffing-with-magit.html
+#+begin_src emacs-lisp
+(with-eval-after-load 'magit
+  (defun th/magit--with-difftastic (buffer command)
+    "Run COMMAND with GIT_EXTERNAL_DIFF=difft then show result in BUFFER."
+    (let ((process-environment
+           (cons (concat "GIT_EXTERNAL_DIFF=difft --width="
+                         (number-to-string (frame-width)))
+                 process-environment)))
+      ;; Clear the result buffer (we might regenerate a diff, e.g., for
+      ;; the current changes in our working directory).
+      (with-current-buffer buffer
+        (setq buffer-read-only nil)
+        (erase-buffer))
+      ;; Now spawn a process calling the git COMMAND.
+      (make-process
+       :name (buffer-name buffer)
+       :buffer buffer
+       :command command
+       ;; Don't query for running processes when emacs is quit.
+       :noquery t
+       ;; Show the result buffer once the process has finished.
+       :sentinel (lambda (proc event)
+                   (when (eq (process-status proc) 'exit)
+                     (with-current-buffer (process-buffer proc)
+                       (goto-char (point-min))
+                       (ansi-color-apply-on-region (point-min) (point-max))
+                       (setq buffer-read-only t)
+                       (view-mode)
+                       (end-of-line)
+                       ;; difftastic diffs are usually 2-column side-by-side,
+                       ;; so ensure our window is wide enough.
+                       (let ((width (current-column)))
+                         (while (zerop (forward-line 1))
+                           (end-of-line)
+                           (setq width (max (current-column) width)))
+                         ;; Add column size of fringes
+                         (setq width (+ width
+                                        (fringe-columns 'left)
+                                        (fringe-columns 'right)))
+                         (goto-char (point-min))
+                         (pop-to-buffer
+                          (current-buffer)
+                          `(;; If the buffer is that wide that splitting the frame in
+                            ;; two side-by-side windows would result in less than
+                            ;; 80 columns left, ensure it's shown at the bottom.
+                            ,(when (> 80 (- (frame-width) width))
+                               #'display-buffer-at-bottom)
+                            (window-width
+                             . ,(min width (frame-width))))))))))))
+
+
+  (defun th/magit-show-with-difftastic (rev)
+    "Show the result of \"git show REV\" with GIT_EXTERNAL_DIFF=difft."
+    (interactive
+     (list (or
+            ;; If REV is given, just use it.
+            (when (boundp 'rev) rev)
+            ;; If not invoked with prefix arg, try to guess the REV from
+            ;; point's position.
+            (and (not current-prefix-arg)
+                 (or (magit-thing-at-point 'git-revision t)
+                     (magit-branch-or-commit-at-point)))
+            ;; Otherwise, query the user.
+            (magit-read-branch-or-commit "Revision"))))
+    (if (not rev)
+        (error "No revision specified")
+      (th/magit--with-difftastic
+       (get-buffer-create (concat "*git show difftastic " rev "*"))
+       (list "git" "--no-pager" "show" "--ext-diff" rev))))
+
+  (defun th/magit-diff-with-difftastic (arg)
+    "Show the result of \"git diff ARG\" with GIT_EXTERNAL_DIFF=difft."
+    (interactive
+     (list (or
+            ;; If RANGE is given, just use it.
+            (when (boundp 'range) range)
+            ;; If prefix arg is given, query the user.
+            (and current-prefix-arg
+                 (magit-diff-read-range-or-commit "Range"))
+            ;; Otherwise, auto-guess based on position of point, e.g., based on
+            ;; if we are in the Staged or Unstaged section.
+            (pcase (magit-diff--dwim)
+              ('unmerged (error "unmerged is not yet implemented"))
+              ('unstaged nil)
+              ('staged "--cached")
+              (`(stash . ,value) (error "stash is not yet implemented"))
+              (`(commit . ,value) (format "%s^..%s" value value))
+              ((and range (pred stringp)) range)
+              (_ (magit-diff-read-range-or-commit "Range/Commit"))))))
+    (let ((name (concat "*git diff difftastic"
+                        (if arg (concat " " arg) "")
+                        "*")))
+      (th/magit--with-difftastic
+       (get-buffer-create name)
+       `("git" "--no-pager" "diff" "--ext-diff" ,@(when arg (list arg))))))
+
+  (transient-define-prefix th/magit-aux-commands ()
+    "My personal auxiliary magit commands."
+    ["Auxiliary commands"
+     ("d" "Difftastic Diff (dwim)" th/magit-diff-with-difftastic)
+     ("s" "Difftastic Show" th/magit-show-with-difftastic)])
+
+
+  (transient-append-suffix 'magit-dispatch "!"
+    '("#" "My Magit Cmds" th/magit-aux-commands))
+  (define-key magit-status-mode-map (kbd "#") #'th/magit-aux-commands))
+#+end_src
+
 *** Display tracked files
 Sometimes I want to see what is tracked in a repository.
 Define this as a global minor mode which adds a section in the magit status buffer (global because it seemed buggy to modify local value of ~magit-status-sections-hook~).  Inspired by magit-todos mode definition.
@@ -2833,6 +3052,13 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
 #+begin_src emacs-lisp
 (use-package git-timemachine)
 #+end_src
+
+*** diff-hl-mode
+#+begin_src emacs-lisp
+(use-package diff-hl
+  :init (global-diff-hl-mode))
+#+end_src
+
 ** visible-bookmarks (bm)
 #+begin_src emacs-lisp
 (use-package bm
@@ -2875,7 +3101,7 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
   :straight (aj-custom-commands :host gitlab :repo "andersjohansson/aj-custom-emacs-commands")
   :defer t
   :bind (("C-x C-k" . aj/delete-current-buffer-file)
-         ("C-x C-r" . aj/rename-current-buffer-file)
+         ("C-x C-r" . rename-visited-file)
          ("C-c m" . aj/message-peek)
          :map prog-mode-map
          ("C-a" . aj/beginning-or-indentation))
@@ -4591,13 +4817,14 @@ fi
          (shell-command-to-string
           "gsettings get org.gnome.desktop.interface text-scaling-factor")))
 
+  ;; FIXED!
   ;; emacs (PGTK-build) at startup seems to interpret the gnome text-scaling-factor
   ;; in a weird way, so I get too large font. Scaling down already
   ;; here works.
-  (when (< 1 aj/startup-gnome-text-scaling-factor)
-    (set-face-attribute 'default nil :height
-                        (round (/ (face-attribute 'default :height)
-                                  aj/startup-gnome-text-scaling-factor))))
+  ;; (when (< 1 aj/startup-gnome-text-scaling-factor)
+  ;;   (set-face-attribute 'default nil :height
+  ;;                       (round (/ (face-attribute 'default :height)
+  ;;                                 aj/startup-gnome-text-scaling-factor))))
   (setq aj/startup-font-size
         (face-attribute 'default :height)))
 
@@ -5042,7 +5269,7 @@ From modus-themes manual
 **** Dark-light-switching
 #+begin_src emacs-lisp
 (defun aj/toggle-light-dark ()
-  "Toggles light and dark solarized theme in Emacs and Arc theme in gtk."
+  "Toggles light and dark theme in Emacs and Arc theme in gtk."
   (interactive)
   (cond
    ((custom-theme-enabled-p aj/light-theme)

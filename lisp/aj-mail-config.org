@@ -2258,8 +2258,8 @@ Some of the functions are redefined.
                   (let* ((msg (mu4e-message-at-point))
                          (markdescr (assq ',mark mu4e-marks))
                          (docid (plist-get msg :docid))
-                         (ask-target (mu4e~mark-ask-target ',mark))
-                         (target (mu4e~mark-get-dyn-target ',mark ask-target)))
+                         (ask-target (mu4e--mark-ask-target ',mark))
+                         (target (mu4e--mark-get-dyn-target ',mark ask-target)))
                     (if markdescr
                         (funcall (plist-get (cdr markdescr) :action) docid msg target)
                       (mu4e-error "Unrecognized mark %S" ',mark)))
@@ -2279,6 +2279,30 @@ Some of the functions are redefined.
 ;;  (aj/mu4e~headers-defun-mark-for action)
 #+end_src
 
+** Make toggle functions for flagging and unread
+These two actions which doesn’t move the message from the folder is good to be able to just toggle directly.
+#+begin_src emacs-lisp
+(defun aj/mu4e-toggle-flag ()
+  (interactive)
+  (let* ((msg (mu4e-message-at-point))
+         (docid (plist-get msg :docid)))
+    (if (member 'flagged (plist-get msg :flags))
+        (mu4e--server-move docid nil "-F-u-N")
+      (mu4e--server-move docid nil "+F-u-N"))))
+
+(defun aj/mu4e-toggle-unread ()
+  (interactive)
+  (let* ((msg (mu4e-message-at-point))
+         (docid (plist-get msg :docid)))
+    (if (member 'unread (plist-get msg :flags))
+        (mu4e--server-move docid nil "-u-N")
+      (mu4e--server-move docid nil "+u-N"))))
+
+
+(bind-keys :map mu4e-headers-mode-map
+           ("+" . aj/mu4e-toggle-flag)
+           ("." . aj/mu4e-toggle-unread))
+#+end_src
 
 ** Actions for toggling tags :ARCHIVE:
 #+begin_src emacs-lisp

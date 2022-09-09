@@ -9,11 +9,25 @@
 #+end_src
 
 * Org-config
+
+** Request, for some connections to zotero and reveal server below
+#+begin_src emacs-lisp
+(use-package request
+  :commands request)
+#+end_src
+
 ** Org-roam
 #+begin_src emacs-lisp
+;; these should be installed by emqcsql-sqlite-builtin...
+(use-package emacsql :demand t)
+(use-package emacsql-sqlite :demand t)
+
+(use-package emacsql-sqlite-builtin :demand t)
+
 (use-package org-roam
-  :demand t
+  :defer 2
   :custom
+  (org-roam-database-connector 'sqlite-builtin)
   (org-roam-directory "/home/aj/jobb/anteckningar")
   (org-roam-db-update-on-save nil)
   (org-roam-link-auto-replace nil) ;; have never had any "roam:" links
@@ -22,6 +36,8 @@
   (org-roam-node-template-prefixes
    `(("tags" . ,(propertize "#" 'display ""))))
   (org-roam-node-template-prefixes nil)
+  (org-roam-buffer-postrender-functions '(visual-line-mode variable-pitch-mode))
+
   :bind (("C-c n l" . org-roam-buffer-toggle)
          ("C-c n f" . org-roam-node-find)
          ("C-c n g" . org-roam-graph)
@@ -139,13 +155,16 @@ Avoid colons for syncing to windows systems (onedrive)"
 #+begin_src emacs-lisp
 (use-package org-modern
   :demand t
-  :hook (org-mode . org-modern-mode)
+  :config (global-org-modern-mode)
   :custom
-  (org-modern-block nil) ;; doesn’t work with org-indent
   (org-modern-hide-stars nil)
-  (org-modern-star '["♦"])
+  (org-modern-star '["❖"])
   (org-modern-table nil)
   ;; (org-modern-table-vertical 1)
+  (org-modern-block-name '(("quote" . ("🙶" "🙷"))
+                           (t . t)))
+  (org-modern-block-fringe nil) ;; doesn’t work with org-indent
+
   )
 #+end_src
 
@@ -1081,6 +1100,9 @@ I want to be able to use emojis \etc. But that doesn’t work with the way ~org-
 Currently I need to sync both with my work exchange server and some private google calendars.
 ***** Functions for syncing some or all external calendars
 #+begin_src emacs-lisp
+(use-package deferred
+  :commands deferred:$)
+
 (defun aj/org-cal-sync-maybe (probefile hours program &optional force)
   (let ((mtime (nth 5 (file-attributes probefile))))
     (when (or force (not mtime)
@@ -1090,15 +1112,15 @@ Currently I need to sync both with my work exchange server and some private goog
 (defun aj/org-calendar-maybe-sync-all (&optional force)
   (interactive "P")
   (deferred:$
-    (deferred:parallel
-      (aj/org-cal-sync-maybe "~/org/imp/G.org" 8 "aj-gcal-to-org" force)
-      (aj/org-cal-sync-maybe "~/org/imp/chalmerskalender.org" 3 "aj-sync-exchange-calendar" force))
-    (deferred:nextc it
-      (lambda (args)
-        ;; (message "All synced!")
-        (when args (buffer-live-p org-agenda-buffer)
-              (with-current-buffer org-agenda-buffer
-                (org-agenda-redo t)))))))
+   (deferred:parallel
+    (aj/org-cal-sync-maybe "~/org/imp/G.org" 8 "aj-gcal-to-org" force)
+    (aj/org-cal-sync-maybe "~/org/imp/chalmerskalender.org" 3 "aj-sync-exchange-calendar" force))
+   (deferred:nextc it
+                   (lambda (args)
+                     ;; (message "All synced!")
+                     (when args (buffer-live-p org-agenda-buffer)
+                           (with-current-buffer org-agenda-buffer
+                             (org-agenda-redo t)))))))
 
 (defun aj/org-calendar-sync-all ()
   (interactive)
@@ -1407,6 +1429,58 @@ Add a function to ~org-clock-in-prepare-hook~, run in ~org-clock-in~, where we c
     (when recentf-active (recentf-mode))))
 #+end_src
 
+** Completion for linking to headlines
+Do this with a custom link type?
+#+begin_src emacs-lisp
+(with-eval-after-load 'ol
+  (org-link-set-parameters "#"
+                           :complete #'aj/org-complete-ids)
+
+
+  (defun aj/org-complete-ids ()
+    (let ((candidates))
+      (org-element-cache-map
+       (lambda (hl)
+         (when-let ((id (org-element-property :CUSTOM_ID hl))
+                    (id (concat "#" id)))
+           (let ((cand (concat (org-element-property :title hl) "   " (propertize id 'face 'shadow))))
+             (add-text-properties 0 1
+                                  `(consult--candidate ,id)
+                                  cand)
+             (push cand candidates))))
+
+       :granularity 'headline)
+      (consult--read
+       (nreverse candidates)
+       :prompt "Custom id link: "
+       :require-match nil
+       :sort nil
+       :lookup #'consult--lookup-candidate)
+      ;; (pp-display-expression s "*ids*")
+      )))
+
+
+;; (defun aj/org-get-names ()
+;;   (let (candidates)
+;;     (org-element-cache-map
+;;      (lambda (el)
+;;        (when-let ((name (org-element-property :name el)))
+;;          (push name candidates)
+;;          ;; (let ((cand (concat (org-element-property :title hl) "   " (propertize name 'face 'shadow))))
+
+;;          ;;   (add-text-properties 0 1
+;;          ;;                        `(consult--candidate ,name)
+;;          ;;                        cand)
+;;          ;;   (push cand candidates))
+;;          ))
+
+;;      :granularity 'element)
+;;     (pp-display-expression candidates "*names*"))
+
+;;   )
+
+#+end_src
+
 ** Visibility, folding, display etc.
 *** Patch initial display of trees with folded visibility property
 When outline visibility is set so that these trees wouldn’t be shown (for example with ~show2levels~) we don’t want them to be shown just because they bave a visibility property set to ~folded~. This patch fixes that problem.
@@ -1618,18 +1692,18 @@ A local variables comment block that is placed at the end of the file may be los
       (eq (selected-window) (get-buffer-window))
     (when-let ((prev (save-excursion
                        (when (org-up-heading-safe)
-                         (cons (point) (propertize
-                                        (substring-no-properties
-                                         (org-get-heading t t t t))
-                                        'face 'fringe))))))
+                         (cons (point) (org-get-heading t t t t))))))
       (unless (pos-visible-in-window-p (car prev))
-        (momentary-string-display (concat
-                                   (propertize " "
-                                               'display
-                                               '(space . (:align-to
-                                                          (- right (+ 30)))))
-                                   (concat "⇧ " (cdr prev)))
-                                  (point-at-eol))))))
+        (with-silent-modifications
+          (momentary-string-display (concat
+                                     (propertize
+                                      " "
+                                      'display
+                                      '(space . (:align-to
+                                                 (- right (+ 30)))))
+                                     "⮴ "
+                                     (cdr prev))
+                                    (point-at-eol)))))))
 #+end_src
 
 *** Sorting by last name
@@ -1811,7 +1885,7 @@ I almost always finish capturing by refiling, and while ~org-capture-finalize~ d
 (advice-add 'org-capture-finalize :after #'org-save-all-org-buffers)
 #+end_src
 *** Capture templates
-(private and kept in custom.el)
+Templates are private and kept in custom.el.
 #+begin_src emacs-lisp
 (setq org-default-notes-file (expand-file-name "notes.org" org-directory))
 #+end_src
@@ -1993,17 +2067,17 @@ Don’t use it now
 (defun aj/org-return-citation (&optional initial-input)
   "Fetch a citation and return it as a string.
 Possibly passss INITIAL-INPUT"
-  (let* ((ref (citar-select-ref :initial-input initial-input))
-         (key (car ref)))
+  (let* ((key (car (citar-select-refs :multiple nil :initial-input initial-input))))
     (setq aj/org-last-returned-citation-key key)
     (concat "[cite:@" key "]")))
 
 (defun aj/org-return-reference-author-year-title (&optional initial-input)
   "Fetch a simply formatted reference and return it as a string.
 Possibly passss INITIAL-INPUT"
-  (let* ((ref (citar-select-ref :initial-input initial-input)))
-    (setq aj/org-last-returned-citation-key (car ref))
-    (citar--format-entry-no-widths ref "${author editor} (${year issued date}) “${title}”")))
+  (let* ((key (car (citar-select-refs :multiple nil :initial-input initial-input))))
+    (setq aj/org-last-returned-citation-key key)
+    (citar-format--entry "${author editor} (${year issued date}) “${title}”" key)))
+
 #+end_src
 
 **** Capture in new frame.                                       :ARCHIVE:
@@ -2063,17 +2137,20 @@ I keep some notes for papers in org-mode, but sort my papers in Zotero. With thi
   (interactive)
   (if-let ((link (aj/get-org-protocol-link))
            (id (or
-                (org-roam-node-refs (org-roam-node-at-point))
-                (citar-org-key-at-point)
+                (car-safe (org-roam-node-refs (org-roam-node-at-point)))
+                (car-safe (citar-org-key-at-point))
                 (save-excursion
                   (org-back-to-heading)
                   (when (search-forward "[cite:" (point-at-eol) t)
-                    (citar-org-key-at-point)))))
-           (fn (buffer-file-name)))
+                    (car-safe (citar-org-key-at-point))))
+                (when-let ((ref (org-entry-get (point) "roam_refs")))
+                  (and (string-match org-element-citation-key-re ref)
+                       (match-string 1 ref)))))
+           (fn (buffer-file-name (org-base-buffer (current-buffer)))))
       (request
         "http://127.0.0.1:23119/zotxt/inserturl"
         :params
-        `(("betterbibtexkey" . ,(car id))
+        `(("betterbibtexkey" . ,id)
           ("url" . ,link)
           ("title" . ,(format "org-link to %s" fn))))
     (user-error "Couldn’t create link")))
@@ -2172,7 +2249,7 @@ Can be passed any ox BACKEND in a non-interactive call"
 
   :config
   (set-face-attribute 'org-annotate-bracket-face nil :inherit 'font-lock-variable-name-face :weight 'bold)
-  (set-face-attribute 'org-annotate-face nil :underline nil :inherit 'font-lock-comment-face)
+  (set-face-attribute 'org-annotate-face nil :underline nil :weight 'unspecified :inherit 'font-lock-comment-face)
 
   (defun aj/org-annotate-extract-author (note)
     (if (string-match "{\\([^}]+\\)} *" note)
@@ -2424,77 +2501,60 @@ List of prefix strings or regex."
 #+begin_src emacs-lisp
 (use-package citar
   :custom
-  (bibtex-completion-additional-search-fields '(doi url))
-  (bibtex-completion-pdf-field "file")
   (citar-at-point-function 'embark-act)
-  (citar-file-open-function #'find-file-other-window)
+  (citar-file-open-functions '(("html". citar-file-open-external)
+                               (t . find-file-other-window)))
   (citar-format-reference-function #'citar-citeproc-format-reference)
+  (citar-notes-paths '("~/jobb/anteckningar/"))
   (citar-citeproc-csl-styles-dir org-cite-csl-styles-dir)
   (citar-citeproc-csl-locales-dir org-cite-csl-locales-dir)
-  (citar-citeproc-csl-style "apa.csl")
-  (citar-notes-paths '("~/jobb/anteckningar/"))
-  (citar-open-note-function #'aj/citar-open-roam-note)
   :config
-  (citar-filenotify-setup nil)
-  (define-key citar-citation-map (kbd "z") (cons "open in zotero" #'aj/org-cite-zotxt-follow))
+  (setq citar-citeproc-csl-style "apa.csl") ;; because it’s a defvar...
+  (define-key citar-citation-map (kbd "z") (cons "open in zotero" #'aj/org-cite-zotero-follow))
   (define-key citar-citation-map (kbd "F") (cons "open externally" #'aj/citar-open-file-externally))
   (defun aj/citar-open-file-externally (key-entry)
     "Open citation KEYS in external program."
-    (interactive (list (citar-select-ref
-                        :rebuild-cache current-prefix-arg)))
-    (let ((citar-file-open-function #'citar-file-open-external))
-      (citar-open-library-file key-entry)))
+    (interactive (list (citar-select-ref)))
+    (let ((citar-file-open-functions
+           '((t . citar-file-open-external))))
+      (citar-open-files key-entry)))
 
-  (defun aj/org-cite-zotxt-follow (key)
+  (defun aj/org-cite-zotero-follow (key)
     "Follow citation KEY to Zotero."
     (request
-      (format "%s/select" zotxt-url-base)
+      "http://127.0.0.1:23119/zotxt/select"
       :params `(("betterbibtexkey" . ,key))))
 
-  (defun aj/citar-fetch-zotero-json ()
-    (call-process-shell-command
-     (format "curl http://127.0.0.1:23119/better-bibtex/export/library?/1/library.json -o %s"
-             (car citar-bibliography))))
-
-  (add-hook 'citar-force-refresh-hook #'aj/citar-fetch-zotero-json)
-
-  (defun aj/citar-open-roam-note (key _entry)
-    (org-roam-ref-find key))
-
-  ;; (defun aj/citar-get-csl-references (keys)
-  ;;   (let ((proc (citeproc-create "/home/aj/.zotero-profile/styles/apa.csl"
-  ;;                                ;; (lambda (_)
-  ;;                                ;;   (cl-loop for (k . v) in keys
-  ;;                                ;;            collect
-  ;;                                ;;            (list k v)))
-  ;;                                (citeproc-hash-itemgetter-from-any citar-bibliography)
-  ;;                                (org-cite-csl--locale-getter))))
-
-  ;;     (citeproc-add-uncited (mapcar #'car keys) proc)
-  ;;     (insert (car (citeproc-render-bib proc 'plain)))))
-
+  ;; (defun aj/citar-fetch-zotero-json ()
+  ;;   (call-process-shell-command
+  ;;    (format "curl http://127.0.0.1:23119/better-bibtex/export/library?/1/library.json -o %s"
+  ;;            (car citar-bibliography))))
   )
 
-
 ;;Nice display (activation) with csl styles
-(use-package citeproc)
 (use-package oc-csl-activate
   :straight (:host github :repo "andras-simonyi/org-cite-csl-activate")
   :demand t
+  :custom (org-cite-csl-activate-use-citar-cache t)
   :hook (org-mode . cursor-sensor-mode))
 
+(use-package citar-embark
+  :after citar embark
+  :config (citar-embark-mode))
+
 (use-package citar-org
-  :after (embark org oc citar)
+  :after (org oc citar)
   :straight nil
   :demand t
   :bind ( :map org-mode-map
           ("C-c C-å" . org-cite-insert))
-  :custom (citar-org-activation-functions '(org-cite-csl-activate citar-org-activate-keymap))
-  :config
-  (setq org-cite-insert-processor 'citar
-        org-cite-follow-processor 'citar
-        org-cite-activate-processor 'citar)
+  :custom
+  (citar-org-activation-functions '(org-cite-csl-activate citar-org-activate-keymap))
+  (org-cite-insert-processor 'citar)
+  (org-cite-follow-processor 'citar)
+  (org-cite-activate-processor 'citar)
 
+  :config
   (setf (alist-get
          'key-at-point
          (alist-get '(org-mode) citar-major-mode-functions nil nil #'equal))
@@ -2508,9 +2568,33 @@ List of prefix strings or regex."
                 (cons (match-beginning 0)
                       (match-end 0)))))))
 
+(use-package citar-org-roam
+  :after (citar org-roam)
+  :straight (:host github :repo "emacs-citar/citar-org-roam")
+  :config
+  (defun aj/citar-org-roam--create-capture-note (citekey entry)
+    "Open or create org-roam node for CITEKEY and ENTRY."
+    ;; adapted from https://jethrokuan.github.io/org-roam-guide/#orgc48eb0d
+    (let ((title (citar-format--entry
+                  "${author editor} (${year issued date}) “${title}”"
+                  citekey)))
+      (org-roam-capture-
+       :templates
+       '(("r" "reference" entry "* ${title} %? :#läsning%^g" :if-new
+          (file+datetree "~/jobb/anteckningar/anteckningar-%<%Y>.org" month)
+          :immediate-finish nil
+          :unnarrowed nil))
+       :node (org-roam-node-create :title title))
+      (org-roam-ref-add (concat "@" citekey))
+      (org-id-get-create)))
+
+  (advice-add 'citar-org-roam--create-capture-note :override
+              #'aj/citar-org-roam--create-capture-note)
+  (citar-org-roam-mode)
+  )
 
 #+end_src
-*** Add extra group for current refs to citar
+*** Add extra group for current refs to citar :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package citar-current-refs
   :straight (:host 'gitlab :repo "andersjohansson/citar-current-refs")
@@ -2585,7 +2669,7 @@ I just override ~org-cite-follow~, because these choices are what I always want.
 (setq org-cite-export-processors
       '((latex biblatex)
         (pandoc pandoc)
-        (t basic)))
+        (t . (csl "apa.csl" "apa.csl"))))
 #+end_src
 
 **** Oc-pandoc, export to markdown with pandoc citations. :ARCHIVE:
@@ -2595,7 +2679,7 @@ See also [[file:../init.org::*ox-md-pandoc-zotero]] for the zotero-conversion ex
   :straight (:host gitlab :repo "andersjohanssson/org-cite-pandoc"))
 #+end_src
 
-** Zotxt (old, moving away from this in favor of org-cite)
+** Zotxt (old, moving away from this in favor of org-cite) :ARCHIVE:
 For using Zotero reference management in plain text.
 https://gitlab.com/egh/zotxt
 https://gitlab.com/egh/zotxt-emacs
@@ -2754,7 +2838,7 @@ Some hackish functions
   :commands biblatex-to-zotxt)
 #+end_src
 
-** Zotxt to org cite
+** Zotxt to org cite :ARCHIVE:
 Compatibility library for converting old zotxt citations to new org-cite ones.
 #+begin_src emacs-lisp
 (use-package zotxt-to-org-cite
@@ -2884,13 +2968,33 @@ Named with org prefix to be preserved in org exports."
   (org-re-reveal-hashonebasedindex t)
   (org-re-reveal-extra-options "hash: true, navigationMode: 'linear'")
 
-  )
+  :config
 
-;; these can now be enabled.
-;; TODO, make them real plugins for this to work
-;; (cl-loop for l in '((ajfixes "ajFixes" "assets/aj-fixes.js")
-;;                     (ajfixbubbles "ajFixBubbles" "assets/aj-fix-bubbles.js"))
-;;          do (add-to-list 'org-re-reveal-plugin-config l))
+  ;; To browse slide from current headline.
+  (org-export-define-derived-backend
+      'revealid 're-reveal
+    :menu-entry
+    '(?v 2
+         ((?c "As file, browse at current HL"
+              aj/org-reveal-export-to-html-browse))))
+
+  (defun aj/org-reveal-export-to-html-browse (&optional async subtreep visible-only body-only ext-plist)
+    "Export current buffer to a reveal.js file, browse at current HL."
+    (interactive)
+    (let (created-id)
+      (unwind-protect
+          (let* ((slide-id
+                  (unless (org-before-first-heading-p)
+                    (or (org-entry-get (point) "custom_id")
+                        (org-entry-get (point) "id")
+                        (progn (setq created-id t) (org-id-get-create)))))
+                 (file-url (browse-url-file-url
+                            (expand-file-name
+                             (org-re-reveal-export-to-html
+                              async subtreep visible-only body-only ext-plist)))))
+            (browse-url (concat file-url (when slide-id
+                                           (concat "#slide-" slide-id)))))
+        (when created-id (org-entry-delete (point) "id"))))))
 #+end_src
 
 **** reveal - org-annotate-style
@@ -2904,7 +3008,7 @@ Named with org prefix to be preserved in org exports."
     (format "<span style=\"font-size:.5em;font-style:italic;color:#a00\">[%s]</span> %s" path (or desc ""))))
 #+end_src
 
-**** reveal: Commands for exporting, starting server, and displaying presentations via server
+**** reveal: Commands for exporting, starting server, and displaying presentations via server :ARCHIVE:
 #+begin_src emacs-lisp
 (defvar aj/path-to-revealjs "~/lib/reveal.js/")
 
@@ -3153,7 +3257,7 @@ Named with org prefix to be preserved in org exports."
     ("q" nil)))
 #+end_src
 
-**** COMMENT Fix file paths when inserting links in ~aj-org-reveal-mode~
+**** COMMENT Fix file paths when inserting links in ~aj-org-reveal-mode~ :ARCHIVE:
 Fungerar inte på grund av relativiseringen av sökvägar i slutet av org-insert-link
 #+begin_src emacs-lisp
 ;; (advice-add 'org-link-complete-file :filter-return #'aj/org-reveal-link-fix-path)
@@ -3295,7 +3399,7 @@ For my university template, add a final slide with the logo.
        '(:REVEAL_DATA_STATE "chalmers-final-slide" :level 1 :raw-value ""))))
   data)
 #+end_src
-**** Rewrite image-paths for inclusion.
+**** Rewrite image-paths for inclusion. :ARCHIVE:
 #+begin_src emacs-lisp
 (add-to-list 'org-export-filter-parse-tree-functions
              #'aj/org-reveal-rewrite-image-file-paths)
@@ -3314,7 +3418,21 @@ For my university template, add a final slide with the logo.
   tree)
 
 #+end_src
+**** Rewrite image-paths, using compressed files for html embedding (~org-re-reveal-single-file~).
+#+begin_src emacs-lisp
+(defvar aj/org-re-reveal-compressed nil
+  "Use compressed files when non-nil.")
 
+(defun aj/org-re-reveal-use-compressed-files (backend)
+  (when
+      (and aj/org-re-reveal-compressed
+           (org-export-derived-backend-p backend 're-reveal))
+    (while (search-forward "bilder/lego" nil t)
+      (replace-match "bilder/lego-comp"))))
+
+(add-hook 'org-export-before-parsing-hook
+          #'aj/org-re-reveal-use-compressed-files)
+#+end_src
 **** Exporting tree of notes
 #+begin_src emacs-lisp
 (defun aj/org-notes-export (async subtreep visible-only body-only)
@@ -3375,6 +3493,20 @@ For my university template, add a final slide with the logo.
 ;;     (org-mode)))
 #+end_src
 
+**** Minify css and js
+#+begin_src emacs-lisp
+(defun aj/org-re-reveal--read-file (file)
+  (with-temp-buffer
+    (cond
+     ((string-match "\\.css$" file)
+      (call-process-shell-command (concat "python -mrcssmin <" file) nil t))
+     ((string-match "\\.js$" file)
+      (call-process-shell-command (concat "python -mrjsmin <" file) nil t))
+     (t (insert-file-contents-literally file)))
+    (buffer-string)))
+
+(advice-add 'org-re-reveal--read-file :override #'aj/org-re-reveal--read-file)
+#+end_src
 *** Ignored drawers
 #+begin_src emacs-lisp
 (with-eval-after-load 'ox
