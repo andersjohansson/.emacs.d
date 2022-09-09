@@ -3056,7 +3056,10 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
 *** diff-hl-mode
 #+begin_src emacs-lisp
 (use-package diff-hl
-  :init (global-diff-hl-mode))
+  :init (global-diff-hl-mode)
+  :config
+  (add-hook 'magit-pre-refresh-hook 'diff-hl-magit-pre-refresh)
+  (add-hook 'magit-post-refresh-hook 'diff-hl-magit-post-refresh))
 #+end_src
 
 ** visible-bookmarks (bm)
