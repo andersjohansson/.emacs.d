@@ -26,7 +26,7 @@
 
 (require 'face-remap)
 (require 'org nil t)
-(require 'org-superstar nil t)
+(require 'org-modern nil t)
 (require 'org-indent nil t)
 
 
@@ -88,8 +88,8 @@ Height and family is kept from the “default” ‘default’ face."
 
 (defcustom doc-font-modify-parspace 'vertical
   "Replace double line breaks via font-lock.
-When 'vertical, use small vertical space between paragraphs, when
-'indent, use paragraph indents."
+When ‘vertical’, use small vertical space between paragraphs, when
+‘indent’, use paragraph indents."
   :type '(choice (const :tag "No modification" nil)
                  (const :tag "Small vertical space" vertical)
                  (const :tag "Indent" indent)))
@@ -148,13 +148,10 @@ Along with some other changes."
         (when (derived-mode-p 'org-mode)
           (doc-font--store-old-val 'org-indent-mode)
           (org-indent-mode -1)
-          (when (bound-and-true-p org-superstar-mode)
-            (doc-font--set-and-store-old-val 'org-superstar-remove-leading-stars t)
-            (doc-font--set-and-store-old-val 'org-superstar-headline-bullets-list
-                                             '(?\N{ZERO WIDTH SPACE}))
-            (doc-font--set-and-store-old-val 'org-superstar-prettify-item-bullets t)
-            (doc-font--set-and-store-old-val 'org-cycle-level-faces nil)
-            (org-superstar-restart)))
+          (when (bound-and-true-p global-org-modern-mode)
+            (doc-font--set-and-store-old-val 'org-modern-hide-stars t)
+            (org-modern-mode -1)
+            (org-modern-mode)))
 
         (when (eq 'indent doc-font-modify-parspace)
           (make-local-variable 'font-lock-extra-managed-props)
@@ -176,9 +173,9 @@ Along with some other changes."
 
     (cl-loop for (c . v) in doc-font-variable-cookies do
              (kill-local-variable c))
-    (when (bound-and-true-p org-superstar-mode)
-      (org-superstar-restart))
-
+    (when (bound-and-true-p org-modern-mode)
+      (org-modern-mode -1)
+      (org-modern-mode))
     (font-lock-remove-keywords nil doc-font-parspace-indent-keyword)
     (font-lock-remove-keywords nil doc-font-parspace-vertical-keyword)
     (when (eq 'indent doc-font-modify-parspace)
