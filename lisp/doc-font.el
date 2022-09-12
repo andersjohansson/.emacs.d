@@ -47,7 +47,10 @@
     ;;(org-block (:background ,base02))
     (org-link . (:underline t :weight normal))
     (org-special-keyword . (:height 0.9))
-    (org-table . (:height 0.6))) ;; means most tables may fit.
+    (org-table . (:height 0.6))  ;; means most tables may fit.
+    (org-drawer . (:height 0.6))
+    (org-special-keyword . (:height 0.6))
+    (org-property-value . (:height 0.6)))
   "Faces to remap, with attributes to remap."
   :type '(alist :key-type face :value-type (plist :value-type sexp)))
 
