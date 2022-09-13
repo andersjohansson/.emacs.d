@@ -4840,7 +4840,7 @@ Save viewed page, like saveplace
 
 ** Display customizations: theme, modeline, etc.
 *** Variable pitch
-I want to use variable pitch for most things. But changing the default face to a variable pitch font is not a good idea, since so many tabular modes etc. depend on a monospace font. Setting it for ~prog-mode~, ~text-mode~ and in the modeline is good though.
+I want to use variable pitch for most things. But changing the default face to a variable pitch font is not a good idea, since so many tabular modes etc. depend on a monospace font. Setting it ~text-mode~ and in the modeline is good though.
 
 #+begin_src emacs-lisp
 (add-hook 'text-mode-hook #'variable-pitch-mode)
@@ -5211,10 +5211,10 @@ Also runs hook aj/face-definitions-hook."
   (unless (member theme '(use-package user)) ;enable theme calls itself with user theme.
 
     ;; don’t inherit bold for these:
-    (set-face-attribute 'orderless-match-face-0 nil :inherit nil)
-    (set-face-attribute 'orderless-match-face-1 nil :inherit nil)
-    (set-face-attribute 'orderless-match-face-2 nil :inherit nil)
-    (set-face-attribute 'orderless-match-face-3 nil :inherit nil)
+    ;; (set-face-attribute 'orderless-match-face-0 nil :inherit nil)
+    ;; (set-face-attribute 'orderless-match-face-1 nil :inherit nil)
+    ;; (set-face-attribute 'orderless-match-face-2 nil :inherit nil)
+    ;; (set-face-attribute 'orderless-match-face-3 nil :inherit nil)
 
     (with-eval-after-load 'org-indent
       ;; modus-operandi sets it to inherit fixed-pitch, but that is
@@ -5242,13 +5242,13 @@ Also runs hook aj/face-definitions-hook."
       (set-face-attribute 'org-block-end-line nil :underline `(:color ,(modus-themes-color 'bg-active) :position t) :overline nil :height 0.9)
 
       ;;(set-face-attribute 'org-quote nil :weight 'light :height 0.95 :background nil)
-      (set-face-attribute 'org-quote nil :height 0.95 :background nil)
+      (set-face-attribute 'org-quote nil :height 0.95 :background 'unspecified)
 
       ;; ;; Use fixed-pitch for checkbox, compressed font for table
       (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
       (set-face-attribute 'org-table nil :family "Input Mono Compressed")
 
-      (set-face-attribute 'org-agenda-date-today nil :background nil)
+      (set-face-attribute 'org-agenda-date-today nil :background 'unspecified)
 
       ;; (dolist (n '("1" "2" "3" "4" "5" "6" "7" "8"))
       ;;   (set-face-attribute (intern (concat "org-level-" n)) nil :weight 'light))
