@@ -492,7 +492,7 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   (prescient-persist-mode +1))
 #+end_src
 
-***** Vertico for the interface and orderless as completion style
+***** Vertico for the interface and prescient as completion style
 #+begin_src emacs-lisp
 (use-package vertico
   :straight (vertico :includes (vertico-directory vertico-repeat vertico-multiform vertico-buffer)
@@ -544,21 +544,43 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 ;;           100))
 ;;   )
 
+;; see ;; https://github.com/minad/vertico/wiki#using-prescientel-filtering-and-sorting
 
-(use-package orderless
-  :custom (orderless-component-separator #'orderless-escapable-split-on-space)
-  :init
-  (setq completion-styles '(orderless)
-        completion-category-defaults nil
-        ;; completion-category-overrides '((file (styles partial-completion)))
+(use-package prescient
+  :after vertico
+  :demand t
+  :init (setq completion-styles '(prescient basic))
+  :custom
+  (prescient-filter-method '(literal initialism prefix regexp))
+  (prescient-use-char-folding t)
+  (prescient-use-case-folding 'smart)
+  (prescient-sort-full-matches-first t) ; Works well with `initialism'.
+  (prescient-sort-length-enable nil)
+  :config
+  ;; Use `prescient-completion-sort' after filtering.
+  (setq vertico-sort-function #'prescient-completion-sort)
 
-        ;; we do have ‘orderless-smart-case’, but it doesn‘t seem to apply to
-        ;; file-name completion for some reason
-        read-file-name-completion-ignore-case t
-        read-buffer-completion-ignore-case t))
+  ;; Make `prescient.el' remember the chosen candidates.
+  (advice-add #'vertico-insert :after
+              (lambda () (prescient-remember (vertico--candidate))))
+
+  (prescient-persist-mode 1)
+  )
+
+;; (use-package orderless
+;;   :custom (orderless-component-separator #'orderless-escapable-split-on-space)
+;;   :init
+;;   (setq completion-styles '(orderless)
+;;         completion-category-defaults nil
+;;         ;; completion-category-overrides '((file (styles partial-completion)))
+
+;;         ;; we do have ‘orderless-smart-case’, but it doesn‘t seem to apply to
+;;         ;; file-name completion for some reason
+;;         read-file-name-completion-ignore-case t
+;;         read-buffer-completion-ignore-case t))
 
 ;; Configure a custom style dispatcher (see the Consult wiki)
-  ;; (setq orderless-style-dispatchers '(+orderless-dispatch))
+;; (setq orderless-style-dispatchers '(+orderless-dispatch))
 
 ;; Do not allow the cursor in the minibuffer prompt
 (setq minibuffer-prompt-properties
@@ -685,10 +707,6 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   (setq set-mark-command-repeat-pop t)
 
   (advice-add 'pop-to-mark-command :around #'aj/pop-to-mark-invoke-consult)
-
-
-
-
   )
 
 #+end_src
@@ -752,7 +770,6 @@ https://www.freedesktop.org/wiki/Specifications/desktop-bookmark-spec/"
           (mapcar #'cdr))
 
       (message "consult: List of XDG recent files not found"))))
-
 
 
 ;; (defun aj/consult--recent-files-sort (file-list)
@@ -819,7 +836,6 @@ https://www.freedesktop.org/wiki/Specifications/desktop-bookmark-spec/"
 ;;   (consult--buffer-action (find-file-noselect dir)))
 
 
-
 (setq consult-buffer-sources
       '(consult--source-hidden-buffer
         consult--source-buffer
@@ -843,6 +859,8 @@ https://www.freedesktop.org/wiki/Specifications/desktop-bookmark-spec/"
      consult-dir--source-default
      consult-dir--source-project         ;projectile if available, project.el otherwise
      consult-dir--source-recentf
+     consult-dir--source-tramp-local
+     consult-dir--source-tramp-ssh
      aj/consult-dir--source-xdg))
 
   :config
