@@ -2861,10 +2861,12 @@ A bit nicer than isearch. I also like to use fuzzy search (words separated by wh
    ;; don’t steal C-TAB, which I use for ‘other-window’
    ("<C-tab>" . nil)
    ("C-c <C-tab>" . magit-section-cycle))
+  :custom
+  (magit-log-auto-more t)
+  (magit-diff-refine-hunk t)
+  ;; (magit-bury-buffer-function #'magit-mode-quit-window)
   :config
   (magit-auto-revert-mode -1) ;; I use global-auto-revert
-  (setq magit-diff-refine-hunk t
-        magit-bury-buffer-function #'magit-mode-quit-window)
 
   (add-hook 'git-commit-setup-hook #'git-commit-turn-on-flyspell)
   (add-hook 'git-commit-setup-hook
