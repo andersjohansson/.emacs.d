@@ -4100,7 +4100,8 @@ Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t
 (defvar aj/formal-english-fl-keywords nil)
 
 (define-minor-mode aj/formal-english-minor-mode
-  "Minor mode for expanding abbrevs like \"dont\" to \"do not\"."
+  "Minor mode for expanding abbrevs like \"dont\" to \"do not\".
+And for higlighting existing don’t etc."
   :lighter ""
   (if aj/formal-english-minor-mode
       (font-lock-add-keywords nil aj/formal-english-fl-keywords)
@@ -4435,22 +4436,52 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
 ;; needs wn, installed with aur package wordnet-cli
 (use-package wordnut)
 
-(defhydra hydra-word-lookup
-  (:color blue)
-  ("w" sdcv-search "in Webster's")
-  ("p" define-word-at-point "word at point")
-  ("<RET>" define-word "define word")
-  ("t" (define-word (read-from-minibuffer "Tyda: " ) 'tyda) "tyda")
-  ("T" (define-word-at-point nil 'tyda) "Tyda at point")
-  ("c" (define-word (read-from-minibuffer "Synonymer: " ) 'synonymer) "synonymer")
-  ("C" (define-word-at-point nil 'synonymer) "Synonymer at point")
-  ("s" (define-word (read-from-minibuffer "Thesaurus: " ) 'thesaurus) "Thesaurus")
-  ("S" (define-word-at-point nil 'thesaurus) "Thesaurus at point")
-  ("b" (define-word (read-from-minibuffer "bab.la: " ) 'babla))
-  ("n" wordnut-search "wordnut")
-  ("g" google-translate-smooth-translate "Google translate"))
+;; (embark-define-keymap aj/embark-word-lookup-map
+;;   "Keymap for looking up words in dictionaries etc."
+;;   ("w" sdcv-search)
+;;   ("RET" define-word)
+;;   ;; ("t" (define-word (read-from-minibuffer "Tyda: " ) 'tyda) "tyda")
+;;   ;; ("T" (define-word-at-point nil 'tyda) "Tyda at point")
+;;   ;; ("c" (define-word (read-from-minibuffer "Synonymer: " ) 'synonymer) "synonymer")
+;;   ;; ("C" (define-word-at-point nil 'synonymer) "Synonymer at point")
+;;   ;; ("s" (define-word (read-from-minibuffer "Thesaurus: " ) 'thesaurus) "Thesaurus")
+;;   ;; ("S" (define-word-at-point nil 'thesaurus) "Thesaurus at point")
+;;   ;; ("b" (define-word (read-from-minibuffer "bab.la: " ) 'babla))
+;;   ;; ("n" wordnut-search "wordnut")
+;;   ;; ("g" google-translate-smooth-translate "Google translate")
+;;   ;; ("h" display-local-help)
+;;   ;; ("H" embark-toggle-highlight)
+;;   ;; ("d" xref-find-definitions)
+;;   ;; ("r" xref-find-references)
+;;   ;; ("a" xref-find-apropos)
+;;   ;; ("s" info-lookup-symbol)
+;;   ;; ("n" embark-next-symbol)
+;;   ;; ("p" embark-previous-symbol)
+;;   ;; ("'" expand-abbrev)
+;;   ;; ("$" ispell-word)
+;;   ;; ("o" occur)
+;;   )
 
-(bind-key "C-x l"  #'hydra-word-lookup/body)
+;; (fset 'aj/embark-word-lookup-map aj/embark-word-lookup-map)
+;; (define-key embark-identifier-map "W" 'aj/embark-word-lookup-map)
+
+
+
+;; (defhydra hydra-word-lookup
+;;   (:color blue)
+;;   ("w" sdcv-search "in Webster's")
+;;   ("p" define-word-at-point "word at point")
+;;   ("<RET>" define-word "define word")
+;;   ("t" (define-word (read-from-minibuffer "Tyda: " ) 'tyda) "tyda")
+;;   ("T" (define-word-at-point nil 'tyda) "Tyda at point")
+;;   ("c" (define-word (read-from-minibuffer "Synonymer: " ) 'synonymer) "synonymer")
+;;   ("C" (define-word-at-point nil 'synonymer) "Synonymer at point")
+;;   ("s" (define-word (read-from-minibuffer "Thesaurus: " ) 'thesaurus) "Thesaurus")
+;;   ("S" (define-word-at-point nil 'thesaurus) "Thesaurus at point")
+;;   ("b" (define-word (read-from-minibuffer "bab.la: " ) 'babla))
+;;   ("n" wordnut-search "wordnut")
+;;   ("g" google-translate-smooth-translate "Google translate"))
+
 
 (defmacro aj/define-word-with (backend)
   "Return a function which calls ‘define-word’ with BACKEND."
@@ -4459,42 +4490,57 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
      ,(format "Call define-word with %s" backend)
      (define-word word ',backend)))
 
-(embark-define-keymap embark-word-definitions-map
+(defun aj/google-translate-guess (text)
+  "Translate TEXT, guessing language."
+  (let* ((from (with-temp-buffer (insert text)
+                                 (symbol-name (guess-language-buffer))))
+         (to (cond ((equal from "sv") "en")
+                   ((equal from "en") "sv")
+                   (t (google-translate-read-target-language)))))
+    (google-translate-translate from to text)))
+
+(embark-define-keymap aj/embark-word-lookup-map
   "Keymap for ‘define-word’ etc."
   ;; :parent identifier-symbol-map
   ("w" sdcv-search)
-  ("d" define-word)
+  ("RET" (aj/define-word-with wordnik))
   ("t" (aj/define-word-with tyda))
   ("b" (aj/define-word-with babla))
   ("s" (aj/define-word-with thesaurus))
   ("n" wordnut-search)
-  ("g" google-translate-smooth-translate))
+  ("g" aj/google-translate-guess))
 
-(fset 'embark-word-definitions-map embark-word-definitions-map)
-(define-key embark-symbol-map "w" 'embark-word-definitions-map)
+(fset 'aj/embark-word-lookup-map aj/embark-word-lookup-map)
+(define-key embark-identifier-map "W" 'aj/embark-word-lookup-map)
+(define-key embark-region-map "W" 'aj/embark-word-lookup-map)
 
-;; (bind-key "C-x l" #'aj/embark-word-definitions)
+(defun aj/word-lookup ()
+  (interactive)
+  (let* ((targets (embark--targets))
+         (tf (seq-filter (lambda (x)
+                           (member (plist-get x :type) '(identifier symbol region)))
+                         targets))
+         (targets (or
+                   tf
+                   `((:type identifier :target ,(read-string "Word: " (word-at-point))))))
+         (ind (mapcar #'funcall '(embark-mixed-indicator embark-highlight-indicator)))
+         (action
+          (unwind-protect
+              (or (embark--prompt
+                   ind
+                   aj/embark-word-lookup-map
+                   targets)
+                  (user-error "Canceled"))
+            (mapc #'funcall ind))
+          )) ;; (mapc #'funcall ind)
+
+    (funcall action (plist-get (car targets) :target))
+
+    ))
+
+(bind-key "C-x l"  #'aj/word-lookup)
 
 
-;; (defun aj/embark-word-definitions ()
-;;   (interactive)
-;;   (let* ((ind '(embark-mixed-indicator embark-highlight-indicator))
-;;          (targets (embark--targets))
-;;          (tf (seq-filter (lambda (x)
-;;                            (member (plist-get x :type) '(symbol region)))
-;;                          targets))
-;;          (become (unwind-protect
-;;                      (embark--prompt
-;;                       (mapcar #'funcall ind)
-;;                       embark-word-definitions-map
-;;                       (or targets
-;;                           `((:type embark-become :target ,(read-string "Word: ")))))
-;;                    (mapc #'funcall ind))))
-
-;;     ;; (unless become
-;;     ;;   (user-error "Canceled"))
-;;     ;; (embark--become-command become target)
-;;     ))
 
 
 
