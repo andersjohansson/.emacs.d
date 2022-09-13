@@ -3057,9 +3057,21 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
 #+begin_src emacs-lisp
 (use-package diff-hl
   :init (global-diff-hl-mode)
+  :custom
+  (diff-hl-fringe-bmp-function 'aj/diff-hl-fringe-bmp-from-type)
   :config
   (add-hook 'magit-pre-refresh-hook 'diff-hl-magit-pre-refresh)
-  (add-hook 'magit-post-refresh-hook 'diff-hl-magit-post-refresh))
+  (add-hook 'magit-post-refresh-hook 'diff-hl-magit-post-refresh)
+  (defun aj/diff-hl-fringe-bmp-from-type(_type _pos)
+    'aj/diff-hl-bitmap)
+  (define-fringe-bitmap 'aj/diff-hl-bitmap
+    [#b00011000] nil nil '(center repeated))
+
+  (add-hook 'aj/face-definitions-hook
+            (lambda (&rest _ignore)
+              (set-face-attribute 'diff-hl-insert nil :inverse-video t :foreground (face-background 'fringe))
+              (set-face-attribute 'diff-hl-delete nil :inverse-video t :foreground (face-background 'fringe))
+              (set-face-attribute 'diff-hl-change nil :inverse-video t :foreground (face-background 'fringe)))))
 #+end_src
 
 ** visible-bookmarks (bm)
