@@ -50,7 +50,8 @@
     (org-table . (:height 0.6))  ;; means most tables may fit.
     (org-drawer . (:height 0.6))
     (org-special-keyword . (:height 0.6))
-    (org-property-value . (:height 0.6)))
+    (org-property-value . (:height 0.6))
+    (org-modern-tag . (:height 0.8)))
   "Faces to remap, with attributes to remap."
   :type '(alist :key-type face :value-type (plist :value-type sexp)))
 
@@ -148,7 +149,8 @@ Along with some other changes."
         (doc-font--store-old-val 'line-spacing)
         (setq line-spacing doc-font-extra-line-spacing)
 
-        (when (derived-mode-p 'org-mode)
+        (when (and (derived-mode-p 'org-mode)
+                   (not (buffer-base-buffer)))
           (doc-font--store-old-val 'org-indent-mode)
           (org-indent-mode -1)
           (when (bound-and-true-p global-org-modern-mode)
