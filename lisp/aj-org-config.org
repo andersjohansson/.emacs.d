@@ -604,6 +604,8 @@ have `org-warning' face."
 Sort symbols _@#% first, ignore case and collate depending on current locale."
   (let* ((fa (string-to-char a))
          (fb (string-to-char b))
+         ;; the possibly allowed symbols all have charcode less than
+         ;; 65, letters from 65 and up
          (fas (< fa 65))
          (fbs (< fb 65)))
     (cond
