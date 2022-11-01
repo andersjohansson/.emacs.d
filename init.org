@@ -495,7 +495,9 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 ***** Vertico for the interface and prescient as completion style
 #+begin_src emacs-lisp
 (use-package vertico
-  :straight (vertico :includes (vertico-directory vertico-repeat vertico-multiform vertico-buffer)
+  :straight (vertico :host github
+                     :repo "minad/vertico"
+                     :includes (vertico-directory vertico-repeat vertico-multiform vertico-buffer)
                      :files (:defaults
                              "extensions/vertico-directory.el"
                              "extensions/vertico-repeat.el"
@@ -552,20 +554,25 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   :init (setq completion-styles '(prescient basic))
   :custom
   (prescient-filter-method '(literal initialism prefix regexp))
+  (prescient-history-length 500)
   (prescient-use-char-folding t)
   (prescient-use-case-folding 'smart)
   (prescient-sort-full-matches-first t) ; Works well with `initialism'.
-  (prescient-sort-length-enable nil)
+  (prescient-sort-length-enable t)
   :config
   ;; Use `prescient-completion-sort' after filtering.
   (setq vertico-sort-function #'prescient-completion-sort)
 
-  ;; Make `prescient.el' remember the chosen candidates.
-  (advice-add #'vertico-insert :after
-              (lambda () (prescient-remember (vertico--candidate))))
+  (defun vertico-prescient-remember ()
+    "Remember the chosen candidate with Prescient."
+    (when (>= vertico--index 0)
+      (prescient-remember
+       (substring-no-properties
+        (nth vertico--index vertico--candidates)))))
+  (advice-add #'vertico-insert :after #'vertico-prescient-remember)
 
-  (prescient-persist-mode 1)
-  )
+
+  (prescient-persist-mode 1))
 
 ;; (use-package orderless
 ;;   :custom (orderless-component-separator #'orderless-escapable-split-on-space)
@@ -623,38 +630,13 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
         completion-cycle-threshold 3)
 
   :config
-
-  ;; CRM
-  ;; (advice-add #'completing-read-multiple :override #'consult-completing-read-multiple)
-
-  ;; CRM
-  ;; https://github.com/bdarcus/citar/issues/492#issuecomment-997024450
-  ;; (defun consult-vertico--crm-select ()
-  ;;   "Select/deselect candidate."
-  ;;   (interactive)
-  ;;   (when (let ((cand (vertico--candidate)))
-  ;;           (and (vertico--match-p cand) (not (equal cand ""))))
-  ;;     (vertico-exit)))
-
-  ;; (defun consult-vertico--crm-exit ()
-  ;;   "Select/deselect candidate and exit."
-  ;;   (interactive)
-  ;;   (when (let ((cand (vertico--candidate)))
-  ;;           (and (vertico--match-p cand) (not (equal cand ""))))
-  ;;     (run-at-time 0 nil #'exit-minibuffer))
-  ;;   (vertico-exit))
-
-  ;; (define-key consult-crm-map [remap vertico-insert] #'consult-vertico--crm-select)
-  ;; (define-key consult-crm-map [remap exit-minibuffer] #'consult-vertico--crm-exit)
-
-
   ;; (setq consult-preview-key 'any)
   (setq consult-narrow-key (kbd "<"))
 
-  ;; like "C-s" from helm’s find-file.
-  (define-key embark-file-map "s" #'aj/consult-ripgrep-from-dir)
-  (defun aj/consult-ripgrep-from-dir (file)
-    (consult-ripgrep (file-name-directory file)))
+  ;; ;; like "C-s" from helm’s find-file.
+  ;; (define-key embark-file-map "s" #'aj/consult-ripgrep-from-dir)
+  ;; (defun aj/consult-ripgrep-from-dir (file)
+  ;;   (consult-ripgrep (file-name-directory file)))
 
   ;; disable automatic preview for some commands
   ;; (consult-customize
@@ -921,12 +903,16 @@ Used to preselect nearest headings and imenu items.")
 #+begin_src emacs-lisp
 (use-package embark
   :demand t
+  :straight (:files ("embark.el" "embark-org.el"))
   :custom
-  (embark-mixed-indicator-delay 1)
+  (embark-mixed-indicator-delay 2)
   ;; recommended in embark README:
   (y-or-n-p-use-read-key t)
   :bind (("C-." . embark-act)
-         ("M-." . embark-dwim)))
+         ("M-." . embark-dwim))
+  :config
+  (with-eval-after-load 'org
+    (require 'embark-org)))
 
 ;; Consult users will also want the embark-consult package.
 (use-package embark-consult
