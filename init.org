@@ -3853,6 +3853,17 @@ cperl instead of perl-mode
   :hook prog-mode)
 #+end_src
 ** Text-modes and spelling
+*** Edit-indirect
+#+begin_src emacs-lisp
+(use-package edit-indirect
+  :after embark
+  :config
+  (add-to-list 'embark-pre-action-hooks '(edit-indirect-region embark--mark-target))
+  (bind-key "å" #'edit-indirect-region 'embark-sentence-map)
+  (bind-key "å" #'edit-indirect-region 'embark-paragraph-map)
+  (bind-key "å" #'edit-indirect-region 'embark-region-map))
+#+end_src
+
 *** Visual-line-mode
 **** Text-mode uses visual-line-mode and visual-fill-column-mode
 #+begin_src emacs-lisp
