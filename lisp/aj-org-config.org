@@ -3612,15 +3612,34 @@ For my university template, add a final slide with the logo.
 (defvar aj/org-re-reveal-compressed nil
   "Use compressed files when non-nil.")
 
-(defun aj/org-re-reveal-use-compressed-files (backend)
-  (when
-      (and aj/org-re-reveal-compressed
-           (org-export-derived-backend-p backend 're-reveal))
-    (while (search-forward "bilder/lego" nil t)
-      (replace-match "bilder/lego-comp"))))
+;; (defun aj/org-re-reveal-use-compressed-files1 (backend)
+;;   (when
+;;       (and aj/org-re-reveal-compressed
+;;            (org-export-derived-backend-p backend 're-reveal))
 
-(add-hook 'org-export-before-parsing-hook
+;;     (while (search-forward "bilder/lego" nil t)
+;;       (replace-match "bilder/lego-comp"))))
+
+;; (add-hook 'org-export-before-parsing-hook
+;;           #'aj/org-re-reveal-use-compressed-files)
+
+(add-hook 'org-export-filter-parse-tree-functions
           #'aj/org-re-reveal-use-compressed-files)
+
+(defun aj/org-re-reveal-use-compressed-files (tree backend info)
+  (when (and aj/org-re-reveal-compressed
+             (org-export-derived-backend-p backend 're-reveal))
+    (org-element-map tree '(link)
+      (lambda (link)
+        (when (equal "file" (org-element-property :type link))
+          (let* ((path (org-element-property :path link))
+                 (ext (file-name-extension path))
+                 (nonext (file-name-sans-extension path))
+                 (comp (concat nonext "_comp." ext)))
+            (when (file-exists-p comp)
+              (org-element-put-property link :path comp)))))
+      info))
+  tree)
 #+end_src
 **** Exporting tree of notes
 #+begin_src emacs-lisp
