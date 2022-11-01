@@ -2005,14 +2005,21 @@ The most complex part is for choosing refile folders, depending on account and s
            if (< current-max count) do
            (setq current-mf folder
                  current-max count)
-           finally return (when current-mf
-                            (if ;; Treat it as a fact if very common, or
-                                ;; if matching match the default folder.
-                                (or (< 3 current-max)
-                                    (equal current-mf (aj/mu4e-default-refile-folder msg)))
-                                current-mf
-                              ;; else, as a suggestion
-                              (list current-mf)))))
+           finally return
+           ;; no suggestions + extra choice for refiling. Refiling
+           ;; should guess or fall back to default archive. Otherwise
+           ;; the user can do a move. More expected to get interaction
+           ;; for move vs refile.
+           current-mf
+           ;; (when current-mf
+           ;;   (if ;; Treat it as a fact if very common, or
+           ;;       ;; if matching matches the default folder.
+           ;;       (or (< 3 current-max)
+           ;;           (equal current-mf (aj/mu4e-default-refile-folder msg)))
+           ;;       current-mf
+           ;;     ;; else, as a suggestion
+           ;;     (list current-mf)))
+           ))
 
 (defun aj/mu4e-refile-store-history (from folder)
   "Store FOLDER in history for sender FROM."
@@ -2037,20 +2044,33 @@ The most complex part is for choosing refile folders, depending on account and s
 
 (add-to-list 'aj/mu4e-refile-fns #'aj/mu4e-refile-guess-by-sender t)
 
-(defun aj/mu4e-refile-folder (msg &optional force-choice)
-  "Guess or offer to select a refile folder for MSG.
-Chooses depending on account functions in ‘aj/mu4e-refile-fns’
-No automatic guess if FORCE-CHOICE is non-nil."
+(defun aj/mu4e-refile-folder (msg)
+  "Choose a refile folder for MSG.
+Choose depending on account functions in ‘aj/mu4e-refile-fns’ or
+fallbacks to default refile folder."
   (let ((dir (run-hook-with-args-until-success 'aj/mu4e-refile-fns msg)))
     (cond
      ((stringp dir)
-      (if force-choice
-          (aj/mu4e-refile-store-history-msg msg (aj/mu4e-choose-refile dir msg))
-        dir))
+      dir)
      ((consp dir)
       (aj/mu4e-refile-store-history-msg msg (aj/mu4e-choose-refile (car dir) msg)))
      (t
-      (aj/mu4e-refile-store-history-msg msg (aj/mu4e-choose-refile nil msg))))))
+      (aj/mu4e-default-refile-folder msg)))))
+
+;; (defun aj/mu4e-refile-folder (msg &optional force-choice)
+;;   "Guess or offer to select a refile folder for MSG.
+;; Chooses depending on account functions in ‘aj/mu4e-refile-fns’
+;; No automatic guess if FORCE-CHOICE is non-nil."
+;;   (let ((dir (run-hook-with-args-until-success 'aj/mu4e-refile-fns msg)))
+;;     (cond
+;;      ((stringp dir)
+;;       (if force-choice
+;;           (aj/mu4e-refile-store-history-msg msg (aj/mu4e-choose-refile dir msg))
+;;         dir))
+;;      ((consp dir)
+;;       (aj/mu4e-refile-store-history-msg msg (aj/mu4e-choose-refile (car dir) msg)))
+;;      (t
+;;       (aj/mu4e-refile-store-history-msg msg (aj/mu4e-choose-refile nil msg))))))
 
 ;; (defun aj/mu4e-refile-folder (msg &optional force-choice)
 ;;   "Guess or offer to select a refile folder for MSG.
