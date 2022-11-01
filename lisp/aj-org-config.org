@@ -3812,7 +3812,111 @@ should be relativized or not. Returns the possibly relativized filename"
           (expand-file-name path)))))))
 #+end_src
 
+*** Redefine ~org-export--skip-p~ to avoid comments introducing paragraph breaks
+#+begin_src emacs-lisp
+(el-patch-feature ox)
+(with-eval-after-load 'ox
+
+  (el-patch-defun org-export--skip-p (datum options selected excluded)
+    "Non-nil when element or object DATUM should be skipped during export.
+OPTIONS is the plist holding export options.  SELECTED, when
+non-nil, is a list of headlines or inlinetasks belonging to
+a tree with a select tag.  EXCLUDED is a list of tags, as
+strings.  Any headline or inlinetask marked with one of those is
+not exported."
+    (cl-case (org-element-type datum)
+      ((comment comment-block)
+       ;; Skip all comments and comment blocks.  Make to keep maximum
+       ;; number of blank lines around the comment so as to preserve
+       ;; local structure of the document upon interpreting it back into
+       ;; Org syntax.
+       (let* ((previous (org-export-get-previous-element datum options))
+	          (before (or (org-element-property :post-blank previous) 0))
+	          (after (or (org-element-property :post-blank datum) 0)))
+         (when previous
+	       (org-element-put-property previous :post-blank (max before after (el-patch-remove 0)))))
+       t)
+      (clock (not (plist-get options :with-clocks)))
+      (drawer
+       (let ((with-drawers-p (plist-get options :with-drawers)))
+         (or (not with-drawers-p)
+	         (and (consp with-drawers-p)
+		          ;; If `:with-drawers' value starts with `not', ignore
+		          ;; every drawer whose name belong to that list.
+		          ;; Otherwise, ignore drawers whose name isn't in that
+		          ;; list.
+		          (let ((name (org-element-property :drawer-name datum)))
+		            (if (eq (car with-drawers-p) 'not)
+		                (member-ignore-case name (cdr with-drawers-p))
+		              (not (member-ignore-case name with-drawers-p))))))))
+      (fixed-width (not (plist-get options :with-fixed-width)))
+      ((footnote-definition footnote-reference)
+       (not (plist-get options :with-footnotes)))
+      ((headline inlinetask)
+       (let ((with-tasks (plist-get options :with-tasks))
+	         (todo (org-element-property :todo-keyword datum))
+	         (todo-type (org-element-property :todo-type datum))
+	         (archived (plist-get options :with-archived-trees))
+	         (tags (org-export-get-tags datum options nil t)))
+         (or
+	      (and (eq (org-element-type datum) 'inlinetask)
+	           (not (plist-get options :with-inlinetasks)))
+	      ;; Ignore subtrees with an exclude tag.
+	      (cl-some (lambda (tag) (member tag excluded)) tags)
+	      ;; When a select tag is present in the buffer, ignore any tree
+	      ;; without it.
+	      (and selected (not (memq datum selected)))
+	      ;; Ignore commented sub-trees.
+	      (org-element-property :commentedp datum)
+	      ;; Ignore archived subtrees if `:with-archived-trees' is nil.
+	      (and (not archived) (org-element-property :archivedp datum))
+	      ;; Ignore tasks, if specified by `:with-tasks' property.
+	      (and todo
+	           (or (not with-tasks)
+		           (and (memq with-tasks '(todo done))
+		                (not (eq todo-type with-tasks)))
+		           (and (consp with-tasks) (not (member todo with-tasks))))))))
+      ((latex-environment latex-fragment) (not (plist-get options :with-latex)))
+      (node-property
+       (let ((properties-set (plist-get options :with-properties)))
+         (cond ((null properties-set) t)
+	           ((consp properties-set)
+	            (not (member-ignore-case (org-element-property :key datum)
+				                         properties-set))))))
+      (planning (not (plist-get options :with-planning)))
+      (property-drawer (not (plist-get options :with-properties)))
+      (statistics-cookie (not (plist-get options :with-statistics-cookies)))
+      (table (not (plist-get options :with-tables)))
+      (table-cell
+       (and (org-export-table-has-special-column-p
+	         (org-export-get-parent-table datum))
+	        (org-export-first-sibling-p datum options)))
+      (table-row (org-export-table-row-is-special-p datum options))
+      (timestamp
+       ;; `:with-timestamps' only applies to isolated timestamps
+       ;; objects, i.e. timestamp objects in a paragraph containing only
+       ;; timestamps and whitespaces.
+       (when (let ((parent (org-export-get-parent-element datum)))
+	           (and (memq (org-element-type parent) '(paragraph verse-block))
+		            (not (org-element-map parent
+			                 (cons 'plain-text
+				                   (remq 'timestamp org-element-all-objects))
+			               (lambda (obj)
+			                 (or (not (stringp obj)) (org-string-nw-p obj)))
+			               options t))))
+         (cl-case (plist-get options :with-timestamps)
+	       ((nil) t)
+	       (active
+	        (not (memq (org-element-property :type datum) '(active active-range))))
+	       (inactive
+	        (not (memq (org-element-property :type datum)
+		               '(inactive inactive-range))))))))))
+#+end_src
+
+
 *** ODT-export
+
+***
 **** noindent-style for odt paragraphs and spaced paragrahs in lists.
 #+begin_src emacs-lisp
 (defvar-local aj/org-export-odt-noindent nil
