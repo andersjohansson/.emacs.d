@@ -66,7 +66,18 @@ TEMPLATE is the processed template used to format the entry."
     "Add citekey as roam ref to current node."
     (interactive)
     (org-roam-ref-add (concat "@" (car (citar-select-ref)))))
-  )
+
+
+  ;; add id if we are in roam-dir
+  (org-link-set-parameters "id" :store #'aj/org-store-link-maybe-id)
+  (defun aj/org-store-link-maybe-id ()
+    (when (and (buffer-file-name)
+               (file-in-directory-p (buffer-file-name) org-roam-directory))
+      (org-id-get-create)
+      (prog1 (org-id-store-link)
+	    (setq desc (or (plist-get org-store-link-plist
+						          :description)
+					   ""))))))
 
 
 (use-package org-roam-ui
