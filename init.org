@@ -4108,29 +4108,59 @@ And for higlighting existing don’t etc."
 ;; quoting characters and personal dictionaries, so I set my dicts
 ;; like this:
 
-(add-hook 'ispell-initialize-spellchecker-hook #'aj/extra-dicts)
-(defun aj/extra-dicts ()
-  (setq ispell-base-dicts-override-alist
-        '(("en_GB"
-           "[[:alpha:]]" "[^[:alpha:]]"
-           "[’'´.0-b:-]" t ("-d" "en_GBz-large")
-           nil utf-8)
-          ("en_US"
-           "[[:alpha:]]" "[^[:alpha:]]"
-           "[’'´.0-b:-]" t ("-d" "en_US")
-           nil utf-8)
-          ("en_GB,sv_SE"
-           "[[:alpha:]]" "[^[:alpha:]]"
-           "[’'´.0-b:-]" t ("-d" "en_GBz-large,sv_SE")
-           nil utf-8)
-          ("blandat"
-           "[[:alpha:]]" "[^[:alpha:]]"
-           "[ø’'´.0-b:-]" t ("-d" "en_GBz-large,sv_SE,da_DK")
-           nil utf-8)
-          ("en_US,sv_SE"
-           "[[:alpha:]]" "[^[:alpha:]]"
-           "[’'´.0-b:-]" t ("-d" "en_US,sv_SE")
-           nil utf-8))))
+;; (add-hook 'ispell-initialize-spellchecker-hook #'aj/extra-dicts)
+
+
+;; We want mine to override also hunspell autodetected, the hook
+;; doesn’t work then since we can only override ‘ispell-dictionary-base-alist’
+;; (advice-add 'ispell-set-spellchecker-params :after #'aj/extra-dicts)
+
+;; ;; this is all I need.
+;; (defun aj/extra-dicts (&rest _ignore)
+;;   (setq ispell-dictonary-alist
+;;         '(("en_GB"
+;;            "[[:alpha:]]" "[^[:alpha:]]"
+;;            "[’'´.0-b:-]" t ("-d" "en_GBz-large")
+;;            nil utf-8)
+;;           ("en_US"
+;;            "[[:alpha:]]" "[^[:alpha:]]"
+;;            "[’'´.0-b:-]" t ("-d" "en_US")
+;;            nil utf-8)
+;;           ("en_GB,sv_SE"
+;;            "[[:alpha:]]" "[^[:alpha:]]"
+;;            "[’'´.0-b:-]" t ("-d" "en_GBz-large,sv_SE")
+;;            nil utf-8)
+;;           ("blandat"
+;;            "[[:alpha:]]" "[^[:alpha:]]"
+;;            "[ø’'´.0-b:-]" t ("-d" "en_GBz-large,sv_SE,da_DK")
+;;            nil utf-8)
+;;           ("en_US,sv_SE"
+;;            "[[:alpha:]]" "[^[:alpha:]]"
+;;            "[’'´.0-b:-]" t ("-d" "en_US,sv_SE")
+;;            nil utf-8))))
+
+
+(setq ispell-local-dictionary-alist
+      '(("en_GB"
+         "[[:alpha:]]" "[^[:alpha:]]"
+         "[’'´.0-b:-]" t ("-d" "en_GB-oxendict")
+         nil utf-8)
+        ("en_US"
+         "[[:alpha:]]" "[^[:alpha:]]"
+         "[’'´.0-b:-]" t ("-d" "en_US")
+         nil utf-8)
+        ("en_GB,sv_SE"
+         "[[:alpha:]]" "[^[:alpha:]]"
+         "[’'´.0-b:-]" t ("-d" "en_GB-oxendict,sv_SE")
+         nil utf-8)
+        ("blandat"
+         "[[:alpha:]]" "[^[:alpha:]]"
+         "[ø’'´.0-b:-]" t ("-d" "en_GB-oxendict,sv_SE,da_DK")
+         nil utf-8)
+        ("en_US,sv_SE"
+         "[[:alpha:]]" "[^[:alpha:]]"
+         "[’'´.0-b:-]" t ("-d" "en_US,sv_SE")
+         nil utf-8)))
 #+end_src
 
 **** flyspell-hydra and custom commands
