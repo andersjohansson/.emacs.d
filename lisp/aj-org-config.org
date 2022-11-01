@@ -2230,8 +2230,14 @@ I keep some notes for papers in org-mode, but sort my papers in Zotero. With thi
         :params
         `(("betterbibtexkey" . ,id)
           ("url" . ,link)
-          ("title" . ,(format "org-link to %s" fn))))
-    (user-error "Couldn’t create link")))
+          ("title" . ,(format "org-link to %s" fn)))
+        :success (cl-function
+                  (lambda (&key _data &allow-other-keys)
+                    (message "Linked!")))
+        :error (cl-function
+                (lambda (&key response &allow-other-keys)
+                  (message "Failed on %s" (request-response-url response)))))
+    (user-error "Couldn’t construct link.")))
 
 ;; (with-eval-after-load 'zotxt
 ;;   (defun aj/add-zotero-link-to-headline ()
