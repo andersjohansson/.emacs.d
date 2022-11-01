@@ -616,8 +616,8 @@ Sort symbols _@#% first, ignore case and collate depending on current locale."
 
 (with-eval-after-load 'orgqda
   (add-to-list 'orgqda-sort-parameters
-               '(symbols-first :description "Sort symbols first"
-                               :compare aj/org-tag-sort-lessp))
+               '(symbols-first (:description . "Sort symbols first")
+                               (:compare . aj/org-tag-sort-lessp)))
   (setq orgqda-keep-tags-sorted 'symbols-first))
 #+end_src
 
