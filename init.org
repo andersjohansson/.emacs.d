@@ -3186,7 +3186,7 @@ Some bindings both for acting and extending the region.
   :config (whole-line-or-region-global-mode))
 #+end_src
 
-*** Save interprogram-paste, so it won’t be overwritten by kills done in emacs and is instead kept in the kill ring.
+*** Save interprogram-paste, so it won’t be overwritten by kills done in emacs and is instead kept in the kill ring. :ARCHIVE:
 #+begin_src emacs-lisp
 (setq save-interprogram-paste-before-kill t)
 #+end_src
