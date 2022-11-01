@@ -2588,20 +2588,41 @@ List of prefix strings or regex."
   (citar-at-point-function 'embark-act)
   (citar-file-open-functions '(("html". citar-file-open-external)
                                (t . find-file-other-window)))
+  ;; This is slow every time because citeproc parses the bib-file
+  ;; Better to adapt the template so we get enough data.
   (citar-format-reference-function #'citar-citeproc-format-reference)
+
+  (citar-crossref-variable nil)
+  (citar-ellipsis "…")
   (citar-notes-paths '("~/jobb/anteckningar/"))
   (citar-citeproc-csl-styles-dir org-cite-csl-styles-dir)
   (citar-citeproc-csl-locales-dir org-cite-csl-locales-dir)
+
+  (citar-symbols
+   `((file ,(all-the-icons-faicon "file-o" :face 'all-the-icons-green :v-adjust -0.1) . " ")
+     (note ,(all-the-icons-material "speaker_notes" :face 'all-the-icons-blue :v-adjust -0.3) . " ")
+     (link ,(all-the-icons-octicon "link" :face 'all-the-icons-orange :v-adjust 0.01) . " ")))
+  (citar-symbol-separator "  ")
+
+  ;; only the ones I use, no need to do the other work:
+  (citar-file-sources (list (list :items #'citar-file--get-from-file-field
+                                  :hasitems #'citar-file--has-file-field)))
+  (citar-file-parser-functions '(citar-file--parser-default))
+
   :config
+  ;; (setf (alist-get 'preview citar-templates)
+  ;;         "${author editor} (${year issued date}) ${title}, \
+  ;; ${journal journaltitle publisher container-title collection-title}, ${volume} (${issue}). ${DOI URL}\n")
+
   (setq citar-citeproc-csl-style "apa.csl") ;; because it’s a defvar...
   (define-key citar-citation-map (kbd "z") (cons "open in zotero" #'aj/org-cite-zotero-follow))
   (define-key citar-citation-map (kbd "F") (cons "open externally" #'aj/citar-open-file-externally))
-  (defun aj/citar-open-file-externally (key-entry)
+  (defun aj/citar-open-file-externally (keys)
     "Open citation KEYS in external program."
-    (interactive (list (citar-select-ref)))
+    (interactive (list (citar-select-refs)))
     (let ((citar-file-open-functions
            '((t . citar-file-open-external))))
-      (citar-open-files key-entry)))
+      (citar-open-files keys)))
 
   (defun aj/org-cite-zotero-follow (key)
     "Follow citation KEY to Zotero."
@@ -2613,7 +2634,12 @@ List of prefix strings or regex."
   ;;   (call-process-shell-command
   ;;    (format "curl http://127.0.0.1:23119/better-bibtex/export/library?/1/library.json -o %s"
   ;;            (car citar-bibliography))))
+
+  (defun aj/citar-copy-references-new-frame ()
+    (aj/run-cmd-in-small-frame 100 20 #'citar-copy-reference "References" t))
   )
+
+
 
 ;;Nice display (activation) with csl styles
 (use-package oc-csl-activate
