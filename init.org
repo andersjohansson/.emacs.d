@@ -3966,7 +3966,8 @@ The minor mode defined below takes care of this. I advice ~fill-region-as-paragr
       (goto-char to)
       ;; has to changed? too much?
       (while (search-backward-regexp se from t)
-        (replace-match "\n" t nil nil 2)))))
+        (replace-match "\n" t nil nil 2)
+        (goto-char (match-beginning 0))))))
 
 (defun aj/set-org-sentence-end ()
   "Allow sentences to end with an org-bracket-link
