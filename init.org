@@ -5249,12 +5249,12 @@ Also runs hook aj/face-definitions-hook."
     (with-eval-after-load 'org-indent
       ;; modus-operandi sets it to inherit fixed-pitch, but that is
       ;; bad with the detailed space matching I do!
-      ;; (set-face-attribute 'org-indent nil :inherit 'org-hide)
+      (set-face-attribute 'org-indent nil :inherit 'org-hide)
 
       ;; but when going back to not overriding org-indent with
       ;; displayed spaces, we need org-hide and org-indent to both use
       ;; fixed-pitch to match ok.
-      (set-face-attribute 'org-hide nil :inherit 'fixed-pitch)
+      ;; (set-face-attribute 'org-hide nil :inherit 'fixed-pitch)
       )
 
     (with-eval-after-load 'org-faces
@@ -5299,7 +5299,7 @@ Also runs hook aj/face-definitions-hook."
         ))
 
     (with-eval-after-load 'org-modern
-      (set-face-attribute 'org-modern-todo nil :height 1.0 :inherit 'org-modern-label :foreground (modus-themes-color 'red))
+      (set-face-attribute 'org-modern-todo nil :height 1.0)
 
       (defface aj/org-waiting `((t :inherit org-modern-todo :foreground ,(modus-themes-color 'yellow))) "Face for waiting org-state" :group 'org-faces)
       (defface aj/org-started `((t :inherit org-modern-todo :foreground ,(modus-themes-color 'blue))) "Face for started org-state" :group 'org-faces)
