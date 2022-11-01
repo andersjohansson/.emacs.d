@@ -1045,7 +1045,7 @@ Used to preselect nearest headings and imenu items.")
              (make-frame
               `(,@frame-params
                 (width . ,width) (height . ,height) (name . ,name)
-                (undecorated . t) (fullscreen . nil))))
+                (undecorated . nil) (fullscreen . nil))))
             (aj/running-cmd-in-small-frame t)
             (this-command 'aj/run-cmd-in-small-frame))
         (select-frame-set-input-focus ocframe)
@@ -1062,7 +1062,7 @@ Used to preselect nearest headings and imenu items.")
 **** Load with org
 ***** orgqda
 #+begin_src emacs-lisp
-;; don’t install old versions with melpa repository and git.
+;; built-in, to avoid possibly installing old versions with melpa repository and git.
 (straight-use-package '(hierarchy :type built-in))
 
 (use-package orgqda
@@ -3687,7 +3687,7 @@ Argument SYM-NAME is the thing to find."
   :commands aggressive-indent-mode
   :init (add-hook 'prog-mode-hook #'aggressive-indent-mode)
   :config (add-hook 'reb-mode-hook (lambda () (aggressive-indent-mode -1))) ;; meaningless and shadows the important keybinding C-c C-q
-  )
+  (add-to-list 'aggressive-indent-protected-current-commands #'org-export-dispatch))
 #+end_src
 
 *** Outline
@@ -3963,7 +3963,7 @@ should be kept together."
   (setq-local
    sentence-end
    (format
-    "\\(?9:[.?!…‽][]\"'”’)}]*\\(?8:%s\\)?\\(?2:$\\|[	  ]\\)\\|[。．？！]+\\)[
+    "\\(?9:[.?!…‽][]\"'”’)}»›]**\\(?8:%s\\)?\\(?2:$\\|[	  ]\\)\\|[。．？！]+\\)[
 ]*"
     org-link-bracket-re)))
 
@@ -4081,7 +4081,7 @@ Editing abbrevs with ~edit-abbrevs~ and saving them in the abbrev-file doesn’t
                         for ww = (symbol-name w)
                         when (and (string-match "'" ww))
                         append (list ww (replace-match "’" t t ww))))
-             0 'hi-pink prepend)))))
+             0 'show-paren-mismatch prepend)))))
 
 (defvar aj/formal-english-fl-keywords nil)
 
