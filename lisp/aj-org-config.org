@@ -3392,6 +3392,69 @@ Fungerar inte på grund av relativiseringen av sökvägar i slutet av org-insert
 ;;     filepath))
 #+end_src
 
+**** Override ~org-html--wrap-image~ to put classes etc. on figure
+#+begin_src emacs-lisp
+(defvar aj/reveal-wrap-classes
+  '("appear" "grow" "shrink" "fade" "fade-up" "fade-down"
+	"fade-left" "fade-right" "fade-in-then-out"
+	"fade-in-then-semi-out" "highlight-current-blue"
+	"highlight-red" "highlight-green" "highlight-blue"
+    "fragment" "stretch" "fillheight" "fh40" "fh50" "fh60" "fh70" "fh80"
+    "captionasattrib"))
+
+(defvar aj/reveal-wrap-attributes
+  '("style" "data-fragment-index"))
+
+(advice-add 'org-html--wrap-image :override #'aj/org-html--wrap-image)
+
+(defun aj/org-html--wrap-image (contents info &optional caption label)
+  "Wrap CONTENTS string within an appropriate environment for images.
+INFO is a plist used as a communication channel.  When optional
+arguments CAPTION and LABEL are given, use them for caption and
+\"id\" attribute."
+  (let ((html5-fancy (org-html--html5-fancy-p info))
+        attributes
+        classes)
+    (when (libxml-available-p)
+      (with-temp-buffer
+        (insert contents)
+        (let ((img ; wrapped in html -> body
+               (car (dom-children
+                     (car (dom-children
+                           (libxml-parse-html-region
+                            (point-min) (point-max))))))))
+          (cl-loop for (n . v) in (dom-attributes img)
+                   when (member n aj/reveal-wrap-attributes)
+                   do (push (format "%s=\"%s\"" n v) attributes)
+                   (dom-remove-attribute img n))
+          (when-let ((classattr (dom-attr img 'class)))
+            (cl-loop for c in (split-string classattr)
+                     if (member c aj/reveal-wrap-classes)
+                     do (push c classes)
+                     else collect c into saved
+                     finally do (dom-set-attribute img 'class (string-join saved " "))))
+
+          (delete-region (point-min) (point-max))
+          (dom-print img)
+          (setq contents (encode-coding-string (buffer-string) 'utf-8)))))
+    (format (if html5-fancy "\n<figure%s>\n%s%s\n</figure>"
+	          "\n<div%s class=\"figure\">\n%s%s\n</div>")
+	        ;; ID.
+	        (concat (if (org-string-nw-p label) (format " id=\"%s\"" label) "")
+                    (when attributes
+                      (concat " " (string-join attributes " ")))
+                    (when classes
+                      (concat " class=\"" (string-join classes " ") "\"")))
+	        ;; Contents.
+	        (if html5-fancy contents (format "<p>%s</p>" contents))
+	        ;; Caption.
+	        (if (not (org-string-nw-p caption)) ""
+	          (format (if html5-fancy "\n<figcaption>%s</figcaption>"
+			            "\n<p>%s</p>")
+		              caption)))))
+#+end_src
+
+
 **** Empty headline
 #+begin_src emacs-lisp
 (add-hook 'org-export-filter-parse-tree-functions #'aj/org-reveal-empty-headline-title)
