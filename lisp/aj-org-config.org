@@ -1668,25 +1668,33 @@ But I don’t actually use this much at all. Disable it for now
 *** Version of ~org-tree-to-indirect-buffer~ that works as I want it to
 That is, always create a new buffer. (Is there anything more changed?)
 #+begin_src emacs-lisp
-(defun aj/org-tree-to-indirect-buffer ()
+(defun aj/org-tree-to-indirect-buffer (&optional arg)
   "My own simple version of `org-tree-to-indirect-buffer'"
-  (interactive)
+  (interactive "P")
   (let ((cbuf (current-buffer))
         (cwin (selected-window))
         (pos (point))
         beg end heading ibuf)
     (save-excursion
       (org-back-to-heading t)
+      (when (numberp arg)
+	    (setq level (org-outline-level))
+	    (when (< arg 0) (setq arg (+ level arg)))
+	    (while (> (setq level (org-outline-level)) arg)
+	      (org-up-heading-safe)))
       (setq beg (point)
-            heading (org-get-heading 'no-tags))
+	        heading (org-get-heading 'no-tags))
       (org-end-of-subtree t t)
       (when (and (not (eobp)) (org-at-heading-p)) (backward-char 1))
       (setq end (point)))
+    ;; don’t replace old indirect buffers, why would I want that?
     (setq ibuf (org-get-indirect-buffer cbuf heading)
           org-last-indirect-buffer ibuf)
+    ;; always want other-window, disregard ‘org-indirect-buffer-display’
     (pop-to-buffer ibuf)
     (narrow-to-region beg end)
-    (org-fold-show-all '(headings drawers blocks))
+    ;; changed to not unfold blocks and drawers:
+    (org-fold-show-all '(headings))
     (goto-char pos)
     (run-hook-with-args 'org-cycle-hook 'all)
     (and (window-live-p cwin) (select-window cwin))))
