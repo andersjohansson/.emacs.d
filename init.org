@@ -1071,7 +1071,9 @@ Used to preselect nearest headings and imenu items.")
   :defer t
   :after org
   :init (put 'orgqda-csv-dir 'safe-local-variable #'file-directory-p)
-  :hook (orgqda-mode . orgqda-completion-mode)
+  :hook
+  (orgqda-mode . orgqda-completion-mode)
+  (org-mode . orgqda-mode)
   :bind ( :map vertico-map
           ("C-ä" . #'orgqda-completion-cycle-sorting))
   :custom
