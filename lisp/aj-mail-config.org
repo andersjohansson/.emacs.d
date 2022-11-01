@@ -785,7 +785,7 @@ Queries for directory to save in, or just saves to
     (let ((mu4e-get-mail-command aj/mu4e-get-mail-command-quick))
       (mu4e-update-mail-and-index t))))
 
-(bind-key "C-c C-u" #'aj/mu4e-update-mail-and-index mu4e-headers-mode-map)
+(bind-key "C-c C-u" #'aj/mu4e-update-mail-and-index mu4e-update-minor-mode-map)
 #+end_src
 
 ** Composing and sending
@@ -1751,9 +1751,10 @@ true, do *not* update the query history stack."
                   (assq-delete-all :othermaildir headers-fields)
                 headers-fields)))
 
+        ;; kolla https://github.com/djcb/mu/issues/2341
         (setq mu4e-headers-fields
               (append headers-fields
-                      `((,(if mu4e-headers-show-threads
+                      `((,(if mu4e-search-threads
                               :thread-subject
                             :subject))))
 
