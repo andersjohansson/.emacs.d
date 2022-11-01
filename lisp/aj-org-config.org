@@ -168,6 +168,8 @@ Avoid colons for syncing to windows systems (onedrive)"
   :demand t
   :config (global-org-modern-mode)
   :custom
+  ;; otherwise windows with different font sizes will mess it up for each other:
+  (org-modern-label-border 3)
   (org-modern-hide-stars nil)
   (org-modern-star '["❖"])
   (org-modern-table nil)
