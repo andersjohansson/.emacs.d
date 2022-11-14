@@ -4745,16 +4745,15 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
     (cl-case (read-char "Really close pdf? ")
       ((?q ?y) (kill-buffer))))
 
-  ;; advice count-words
+  ;; advise count-words
   (advice-add 'count-words :before-until #'aj/pdf-count-words)
-  (defun aj/pdf-count-words (_start _end)
+  (defun aj/pdf-count-words (&rest _args)
     (when (eq major-mode 'pdf-view-mode)
       (pdf-view-assert-active-region)
       (let ((txt (pdf-view-active-region-text)))
         (with-temp-buffer
           (insert (car txt))
-          (count-words--message "PDF region" (point-min) (point-max))
-          ))
+          (count-words--message "PDF region" (point-min) (point-max))))
       t))
 
   (defun aj/other-window-pdf-next-page (n)
