@@ -3539,6 +3539,7 @@ Needed when starting in a non-interactive shell.
 
 (use-package whitespace-cleanup-mode
   :demand t
+  :custom (whitespace-cleanup-mode-preserve-point  t)
   :config (global-whitespace-cleanup-mode))
 #+end_src
 
