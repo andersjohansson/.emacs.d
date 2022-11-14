@@ -1420,7 +1420,7 @@ For exporting and converting to zotero.
      (funcall origfun))))
 #+end_src
 
-*** Eglot-ltex, for grammarcheck with languagetool and eglot
+*** Eglot-ltex, for grammarcheck with languagetool and eglot :ARCHIVE:
 #+begin_src emacs-lisp
 ;; (use-package flycheck-languagetool
 ;;   :init
@@ -1916,7 +1916,7 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
 
   (advice-add 'password-store-generate :around #'aj/password-store-generate)
 
-  (defun aj/password-store-generate-and-copy ()
+  (defun aj/password-store-generate-and-copy (&optional replace)
     (interactive "P")
     (let ((entry (aj/password-store-get-new-entry-with-completion)))
       (password-store--run-generate entry 37 replace)
@@ -1925,7 +1925,7 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
     ;;  (call-interactively #'password-store-generate))
     )
 
-  (defun aj/password-store-generate-and-copy-simpler ()
+  (defun aj/password-store-generate-and-copy-simpler (&optional replace)
     (interactive "P")
     (let ((entry (aj/password-store-get-new-entry-with-completion)))
       (password-store--run-generate entry 19 replace t)
