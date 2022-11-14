@@ -5263,7 +5263,8 @@ Also runs hook aj/face-definitions-hook."
       (set-face-attribute 'org-column-title nil :inherit 'fixed-pitch)
 
       (set-face-attribute 'org-cite nil :inherit 'package-status-external)
-      (set-face-attribute 'org-cite-key nil :inherit 'org-scheduled)
+      ;; only visible when ‘org-cite-csl-activate’ isn’t active
+      (set-face-attribute 'org-cite-key nil :underline "light grey")
 
       (set-face-attribute 'org-document-title nil :height 1.5 :weight 'bold)
       ;; ;; (set-face-attribute 'org-meta-line nil :inherit 'org-drawer)
