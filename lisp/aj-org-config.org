@@ -592,6 +592,17 @@ have `org-warning' face."
 (advice-add 'org-activate-tags :override #'aj/org-activate-tags)
 #+end_src
 
+** Remove duplicates when setting tags
+#+begin_src emacs-lisp
+(advice-add 'org-set-tags :filter-args #'aj/org-remove-duplicate-tags)
+
+(defun aj/org-remove-duplicate-tags (tags)
+  (let ((tags (pcase tags
+		        ((pred listp) tags)
+		        ((pred stringp) (split-string (org-trim tags) ":" t))
+		        (_ (error "Invalid tag specification: %S" tags)))))
+    (cl-remove-duplicates tags :test #'equal)))
+#+end_src
 ** Sort tags
 #+begin_src emacs-lisp
 (setq org-tags-sort-function #'aj/org-tag-sort-lessp)
