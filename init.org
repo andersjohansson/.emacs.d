@@ -5706,7 +5706,7 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
 
 ** Late file settings
 *** Auto-saving and reverting
-**** Auto-saving of all buffers in visited files :ARCHIVE:
+**** Auto-saving of all buffers in visited files
 I don’t currently use this. It has caused more problems for me than it has solved. Over-eager auto-save interferes with some packages (most notably helm). And I’m kind of used to using unsaved buffers for some parts of my workflow.
 
 Inspired by https://github.com/grettke/lolsmacs, it’s better to not keep inconsistent state in non-saved buffers. Especially since Emacs or my computer crashes from time to time.
@@ -5715,6 +5715,12 @@ Inspired by https://github.com/grettke/lolsmacs, it’s better to not keep incon
 (setq auto-save-default nil)
 (auto-save-visited-mode)
 
+#+end_src
+
+**** Auto-save on hooks :ARCHIVE:
+Some errors, particulary with pdf-tools.
+
+#+begin_src emacs-lisp
 ;; also auto-save on various hooks
 
 (defvar aj/save-all-buffers-hooks
@@ -5746,11 +5752,11 @@ Inspired by https://github.com/grettke/lolsmacs, it’s better to not keep incon
   "Save all file buffers.
 
 When `aj/save-buffers-debug' is non-nil display performance information in
-,*Messages* buffer.
+*Messages* buffer.
 Ignore all _ARGS. "
   (interactive)
   (let ((time (current-time)))
-    (save-some-buffers t nil)
+    (save-some-buffers 'noquery)
     (when aj/save-buffers-debug
       (message "aj/save-bufs completed in: %.06f seconds" (float-time (time-since time))))))
 
@@ -5769,8 +5775,9 @@ Ignore all _ARGS. "
 
 
 (define-key special-event-map [sigusr1] #'aj/save-all-buffers)
-#+end_src
 
+
+#+end_src
 **** Auto reverting
 #+begin_src emacs-lisp
 (use-package autorevert
