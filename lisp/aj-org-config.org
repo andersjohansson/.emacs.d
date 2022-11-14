@@ -19,9 +19,6 @@
 ** Org-roam
 #+begin_src emacs-lisp
 ;; these should be installed by emqcsql-sqlite-builtin...
-(use-package emacsql :demand t)
-(use-package emacsql-sqlite :demand t)
-
 (use-package emacsql-sqlite-builtin :demand t)
 
 (use-package org-roam
