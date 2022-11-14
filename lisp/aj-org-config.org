@@ -2611,11 +2611,12 @@ List of prefix strings or regex."
   (citar-notes-paths '("~/jobb/anteckningar/"))
   (citar-citeproc-csl-styles-dir org-cite-csl-styles-dir)
   (citar-citeproc-csl-locales-dir org-cite-csl-locales-dir)
-
+  (citar-display-currently-cited t)
   (citar-symbols
    `((file ,(all-the-icons-faicon "file-o" :face 'all-the-icons-green :v-adjust -0.1) . " ")
      (note ,(all-the-icons-material "speaker_notes" :face 'all-the-icons-blue :v-adjust -0.3) . " ")
-     (link ,(all-the-icons-octicon "link" :face 'all-the-icons-orange :v-adjust 0.01) . " ")))
+     (link ,(all-the-icons-octicon "link" :face 'all-the-icons-orange :v-adjust 0.01) . " ")
+     (cited ,(all-the-icons-faicon "quote-right" :face 'org-cite) . " ")))
   (citar-symbol-separator "  ")
 
   ;; only the ones I use, no need to do the other work:
@@ -2664,7 +2665,9 @@ List of prefix strings or regex."
 
 (use-package citar-embark
   :after citar embark
-  :config (citar-embark-mode))
+  :config
+  (push 'aj/citar-open-file-externally citar-embark--multitarget-actions)
+  (citar-embark-mode))
 
 (use-package citar-org
   :after (org oc citar)
@@ -2714,8 +2717,15 @@ List of prefix strings or regex."
 
   (advice-add 'citar-org-roam--create-capture-note :override
               #'aj/citar-org-roam--create-capture-note)
-  (citar-org-roam-mode)
-  )
+
+  (advice-add 'citar-org-roam-open-note-from-id :override
+              #'aj/citar-org-roam-open-note-from-id)
+  (defun aj/citar-org-roam-open-note-from-id (node-id)
+    "Open note from NODE-ID, in other window."
+    (let ((ref-node (org-roam-node-from-id node-id)))
+      (org-roam-node-visit ref-node 'other-window)))
+
+  (citar-org-roam-mode))
 
 #+end_src
 *** Add extra group for current refs to citar :ARCHIVE:
