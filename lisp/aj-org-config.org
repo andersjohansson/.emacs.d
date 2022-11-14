@@ -1962,8 +1962,13 @@ https://gitlab.com/andersjohansson/org-archive-hierarchically
 #+begin_src emacs-lisp
 ;; in /lisp
 (use-package org-capture-new-frame
-  :bind ([remap org-capture] . org-capture-new-frame-open)
-  :straight nil)
+  ;; :bind ([remap org-capture] . org-capture-new-frame-open)
+  :straight nil
+  :config
+  (advice-add 'org-roam-capture- :around #'aj/org-capture-new-frame-roam-capture-)
+  (cl-defun aj/org-capture-new-frame-roam-capture- (fun &rest args)
+    (org-capture-new-frame--open
+      (apply fun args))))
 #+end_src
 
 *** Save files after capturing and refiling

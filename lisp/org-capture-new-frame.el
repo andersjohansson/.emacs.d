@@ -24,6 +24,7 @@
 
 ;;; Code:
 
+(require 'org-capture)
 
 ;;;###autoload
 (defvar org-capture-new-frame-parameters
@@ -42,40 +43,72 @@
 
 ;;;###autoload
 (defun org-capture-new-frame-p (&rest _)
-  "Return t if the current frame is an org-capture frame opened by
-`org-capture-new-frame-org-capture/open-frame'."
+  "Return non-nil if current frame is an org capture new frame."
   (and (equal (alist-get 'name org-capture-new-frame-parameters)
               (frame-parameter nil 'name))
        (frame-parameter nil 'transient)))
 
+(defmacro org-capture-new-frame--open (&rest body)
+  "Execute BODY in new capture frame."
+  (declare (indent 0))
+  `(let* ((frame-title-format "")
+          (frame (if (org-capture-new-frame-p)
+                     (selected-frame)
+                   (make-frame org-capture-new-frame-parameters))))
+     ;; (select-frame-set-input-focus frame)
+     ;; fix MacOS not focusing new frames
+     (with-selected-frame frame
+       (condition-case ex
+           (cl-letf (((symbol-function #'pop-to-buffer) #'switch-to-buffer))
+             ,@body)
+         ('error
+          (message "org-capture: %s" (error-message-string ex))
+          (delete-frame frame))))))
+
 ;;;###autoload
-(defun org-capture-new-frame-open (&optional initial-input key)
-  "Opens the org-capture window in a floating frame that cleans itself up once
-you're done. This can be called from an external shell script."
-  (interactive)
-  (when (and initial-input (string-empty-p initial-input))
-    (setq initial-input nil))
-  (when (and key (string-empty-p key))
-    (setq key nil))
-  (let* ((frame-title-format "")
-         (frame (if (org-capture-new-frame-p)
-                    (selected-frame)
-                  (make-frame org-capture-new-frame-parameters))))
-    ;; (select-frame-set-input-focus frame)
-                                        ; fix MacOS not focusing new frames
-    (with-selected-frame frame
-      (require 'org-capture)
-      (condition-case ex
-          (cl-letf (((symbol-function #'pop-to-buffer) #'switch-to-buffer))
-            ;; (switch-to-buffer "*scratch*")
-            (let ((org-capture-initial initial-input)
-                  org-capture-entry)
-              (when (and key (not (string-empty-p key)))
-                (setq org-capture-entry (org-capture-select-template key)))
-              (org-capture)))
-        ('error
-         (message "org-capture: %s" (error-message-string ex))
-         (delete-frame frame))))))
+(advice-add 'org-capture :around #'org-capture-new-frame-override)
+;;;###autoload
+(defun org-capture-new-frame-override (fun &optional goto keys)
+  "Open org capture in new frame.
+FUN (‘org-capture’ callled with GOTO and KEYS."
+  (interactive "P")
+  (org-capture-new-frame--open (funcall fun goto keys)))
+
+
+;; (defun org-capture-new-frame-open (&optional goto keys)
+;;   "Open org capture in new frame.
+;; GOTO and KEYS as in ‘org-capture’."
+;;   (interactive "P")
+;;   (org-capture-new-frame--open (org-capture goto keys)))
+
+
+;; (defun org-capture-new-frame--open (function &rest args)
+;;   "Call FUNCTION with ARGS in new capture frame."
+;;   ;; (when (and initial-input (string-empty-p initial-input))
+;;   ;;   (setq initial-input nil))
+;;   ;; (when (and key (string-empty-p key))
+;;   ;;   (setq key nil))
+;;   (let* ((frame-title-format "")
+;;          (frame (if (org-capture-new-frame-p)
+;;                     (selected-frame)
+;;                   (make-frame org-capture-new-frame-parameters))))
+;;     ;; (select-frame-set-input-focus frame)
+;;     ;; fix MacOS not focusing new frames
+;;     (with-selected-frame frame
+;;       (condition-case ex
+;;           (cl-letf (((symbol-function #'pop-to-buffer) #'switch-to-buffer))
+;;             ;; (switch-to-buffer "*scratch*")
+;;             (apply function args)
+;;             ;; (let ((org-capture-initial initial-input)
+;;             ;;       ;; org-capture-entry
+;;             ;;       )
+;;             ;;   ;; (when (and key (not (string-empty-p key)))
+;;             ;;   ;;   (setq org-capture-entry (org-capture-select-template key)))
+;;             ;;   (funcall function nil key))
+;;             )
+;;         ('error
+;;          (message "org-capture: %s" (error-message-string ex))
+;;          (delete-frame frame))))))
 
 (add-hook 'org-capture-after-finalize-hook #'org-capture-new-frame-cleanup)
 (advice-add 'org-capture-refile :after #'org-capture-new-frame-cleanup)
