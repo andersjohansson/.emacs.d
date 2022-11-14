@@ -2440,7 +2440,8 @@ List of prefix strings or regex."
   (advice-add 'org-annotate-add-note :around #'aj/org-annotate-add-note-advice)
 
   (org-link-set-parameters "note" :follow #'org-insert-link ; following should just edit!
-                           :activate-func #'aj/org-annotate-activate-note ; highlight author as well
+                           :activate-func #'aj/org-annotate-activate-note
+                                        ; highlight author as well
                            )
 
   ;; ascii-export
@@ -2503,18 +2504,17 @@ List of prefix strings or regex."
           (add-face-text-property aend (- (point) 2) 'org-annotate-face)
 
           (when (< (point) end) ; with desc
-            (setq descb (1+ (point))
+            (setq descb (point)
                   desce (- end 2))
 
             ;; description face (already folded correctly?):
             (add-face-text-property descb desce 'org-annotate-text-face)
 
             ;; middle brackets
-            (org-fold-region (- (point 2)) (1- (point)) t 'org-link-description)
+            (org-fold-region (- (point) 2) (1- (point)) t 'org-link-description)
             (add-text-properties (- (point) 2) (1- (point))
                                  `(face org-annotate-bracket-face
-                                        display ,(nth 1 org-annotate-special-brackets))))))))
-  )
+                                        display ,(nth 1 org-annotate-special-brackets)))))))))
 
 
 ;;; NOTES IN MARGINS!!
