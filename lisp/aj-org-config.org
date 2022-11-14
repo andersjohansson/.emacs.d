@@ -1775,7 +1775,8 @@ A local variables comment block that is placed at the end of the file may be los
 (defun aj/org-show-parent-for-demote-promote ()
   (when
       ;; not true for some org-capture cases that we want to avoid.
-      (eq (selected-window) (get-buffer-window))
+      (and (eq (selected-window) (get-buffer-window))
+           (not (string-prefix-p "CAPTURE-" (buffer-name))))
     (when-let ((prev (save-excursion
                        (when (org-up-heading-safe)
                          (cons (point) (org-get-heading t t t t))))))
