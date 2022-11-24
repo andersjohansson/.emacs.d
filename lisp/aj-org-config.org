@@ -3685,18 +3685,37 @@ For my university template, add a final slide with the logo.
 (add-hook 'org-export-filter-parse-tree-functions
           #'aj/org-re-reveal-use-compressed-files)
 
+(defun aj/org-reveal-get-compressed-path (path)
+  (let* ((ext (file-name-extension path))
+         (nonext (file-name-sans-extension path))
+         (comp (concat nonext "_comp." ext)))
+    (if (file-exists-p comp)
+        comp
+      (message "Embedding uncompressed file: %s" path)
+      path)))
+
 (defun aj/org-re-reveal-use-compressed-files (tree backend info)
   (when (and aj/org-re-reveal-compressed
              (org-export-derived-backend-p backend 're-reveal))
+    ;;backgrounds on headlines
+    (org-element-map tree '(headline)
+      (lambda (hl)
+        (if-let ((rea (org-element-property :REVEAL_EXTRA_ATTR hl))
+                 (pm (string-match "data-background-image=\"\\([^\"]+\\)\"" rea)))
+            (org-element-put-property
+             hl :REVEAL_EXTRA_ATTR
+             (replace-match
+              (aj/org-reveal-get-compressed-path (match-string 1 rea))
+              t t rea 1))))
+      info)
+    ;; links
     (org-element-map tree '(link)
       (lambda (link)
         (when (equal "file" (org-element-property :type link))
-          (let* ((path (org-element-property :path link))
-                 (ext (file-name-extension path))
-                 (nonext (file-name-sans-extension path))
-                 (comp (concat nonext "_comp." ext)))
-            (when (file-exists-p comp)
-              (org-element-put-property link :path comp)))))
+          (org-element-put-property
+           link :path
+           (aj/org-reveal-get-compressed-path
+            (org-element-property :path link)))))
       info))
   tree)
 #+end_src
