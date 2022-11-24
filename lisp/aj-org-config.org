@@ -74,7 +74,42 @@ TEMPLATE is the processed template used to format the entry."
       (prog1 (org-id-store-link)
 	    (setq desc (or (plist-get org-store-link-plist
 						          :description)
-					   ""))))))
+					   "")))))
+
+  ;; I often add quotes with citations to page references below inside
+  ;; a note for a reference. These backreferences to the same node
+  ;; will unncessesarily clutter the reflinks section. This small
+  ;; patch avoids this
+
+  (el-patch-defun org-roam-reflinks-get (node)
+    "Return the reflinks for NODE."
+    (let ((refs (org-roam-db-query [:select :distinct [refs:ref links:source links:pos links:properties]
+                                            :from refs
+                                            :left-join links
+                                            :where (= refs:node-id $s1)
+                                            :and (= links:dest refs:ref)
+                                            :union
+                                            :select :distinct [refs:ref citations:node-id
+                                                                        citations:pos citations:properties]
+                                            :from refs
+                                            :left-join citations
+                                            :where (= refs:node-id $s1)
+                                            :and (= citations:cite-key refs:ref)
+                                            (el-patch-add :and :not (= citations:node-id $s1))]
+                                   (org-roam-node-id node)))
+          links)
+      (pcase-dolist (`(,ref ,source-id ,pos ,properties) refs)
+        (push (org-roam-populate
+               (org-roam-reflink-create
+                :source-node (org-roam-node-create :id source-id)
+                :ref ref
+                :point pos
+                :properties properties)) links))
+      links))
+
+
+
+  )
 
 
 (use-package org-roam-ui
