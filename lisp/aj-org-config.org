@@ -4034,6 +4034,25 @@ Use spaced paragraphs in lists")
 #+begin_src emacs-lisp
 (setq org-odt-inline-image-rules '(("file" . "\\.\\(jpeg\\|jpg\\|png\\|gif\\|svg\\|pdf\\)\\'")))
 #+end_src
+
+**** Don’t use stupid textbox for inlinetasks in odt export
+Just use a paragraph style with a background and border, defined in my odt template files.
+#+begin_src emacs-lisp
+(setq org-odt-format-inlinetask-function #'aj/org-odt-format-inlinetask)
+
+(defun aj/org-odt-format-inlinetask
+    (todo todo-type priority name tags contents)
+  (concat
+   (format "\n<text:p text:style-name=\"%s\">%s</text:p>"
+		   "OrgInlineTaskHeading"
+		   (org-odt-format-headline-default-function
+		    todo todo-type priority name tags))
+   (replace-regexp-in-string
+    "text:style-name=\"[^\"]+\""
+    "text:style-name=\"OrgInlineTask\""
+    contents)))
+#+end_src
+
 *** LaTeX-export
 **** Risky variable fix for ~org-latex-title-command~
 ~org-latex-title-command~ is treated as a risky variable since it ends in "-command" (see [[info:elisp#File%20Local%20Variables][info:elisp#File Local Variables]]). This means annoying dialogs in files where it is set (and that appearently can’t be fixed by adding values to ~safe-local-variable-values~ either). This fixes it.
