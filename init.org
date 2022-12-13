@@ -979,7 +979,7 @@ Used to preselect nearest headings and imenu items.")
 (defvar aj/zoterofile-history nil)
 
 (defun aj/open-zoterofile-new-frame ()
-  (aj/run-cmd-in-small-frame 100 20 #'aj/zoterofile "Zotero file" t))
+  (aj/run-cmd-in-small-frame 100 20 "Zotero file" #'aj/zoterofile :force-cleanup t))
 
 (autoload #'consult--multi "consult")
 
@@ -1039,7 +1039,8 @@ Used to preselect nearest headings and imenu items.")
 #+begin_src emacs-lisp
 (defvar aj/running-cmd-in-small-frame nil)
 
-(defun aj/run-cmd-in-small-frame (width height cmd name &optional forcecleanup frame-params face-customizations)
+(cl-defun aj/run-cmd-in-small-frame ( width height name cmd
+                                      &key interactively args force-cleanup frame-params face-customizations)
   (unwind-protect
       (let ((ocframe
              (make-frame
@@ -1052,8 +1053,10 @@ Used to preselect nearest headings and imenu items.")
         (aj/center-frame ocframe)
         (cl-loop for (f . c) in face-customizations
                  do (apply #'set-face-attribute f ocframe c))
-        (funcall cmd))
-    (when forcecleanup
+        (if interactively
+            (call-interactively cmd)
+          (apply cmd args)))
+    (when force-cleanup
       (sit-for 0.01) ;; to allow other commands (for example via embark-act)
       (delete-frame))))
 #+end_src

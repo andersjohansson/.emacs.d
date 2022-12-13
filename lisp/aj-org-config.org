@@ -2687,7 +2687,7 @@ List of prefix strings or regex."
   ;;            (car citar-bibliography))))
 
   (defun aj/citar-copy-references-new-frame ()
-    (aj/run-cmd-in-small-frame 100 20 #'citar-copy-reference "References" t))
+    (aj/run-cmd-in-small-frame 100 20 "References" #'citar-copy-reference :interactively t :force-cleanup t))
   )
 
 
