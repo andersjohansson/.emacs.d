@@ -5741,9 +5741,6 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
 
     (add-hook 'after-init-hook #'aj/frame-to-left))
   )
-
-
-
 #+end_src
 
 ** Late file settings
