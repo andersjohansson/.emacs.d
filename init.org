@@ -3075,11 +3075,12 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
   (define-fringe-bitmap 'aj/diff-hl-bitmap
     [#b00011000] nil nil '(center repeated))
 
-  (add-hook 'aj/face-definitions-hook
-            (lambda (&rest _ignore)
-              (set-face-attribute 'diff-hl-insert nil :inverse-video t :foreground (face-background 'fringe))
-              (set-face-attribute 'diff-hl-delete nil :inverse-video t :foreground (face-background 'fringe))
-              (set-face-attribute 'diff-hl-change nil :inverse-video t :foreground (face-background 'fringe)))))
+  ;; (add-hook 'aj/face-definitions-hook
+  ;;           (lambda (&rest _ignore)
+  ;;             (set-face-attribute 'diff-hl-insert nil :inverse-video t :foreground (face-background 'fringe))
+  ;;             (set-face-attribute 'diff-hl-delete nil :inverse-video t :foreground (face-background 'fringe))
+  ;;             (set-face-attribute 'diff-hl-change nil :inverse-video t :foreground (face-background 'fringe))))
+  )
 #+end_src
 
 ** visible-bookmarks (bm)
@@ -5017,14 +5018,15 @@ fi
   (setq mini-modeline-right-padding 1
         mini-modeline-enhance-visual nil)
 
-  (add-hook 'aj/face-definitions-hook #'aj/mini-modeline-faces)
-  (defun aj/mini-modeline-faces (theme)
-    ;; (set-face-attribute 'mode-line nil :box t)
-    (when (member theme '(modus-operandi modus-vivendi))
-      (set-face-attribute 'mini-modeline-mode-line-inactive nil
-                          :background (modus-themes-color 'bg-active) :height 0.14)
-      (set-face-attribute 'mini-modeline-mode-line-active nil
-                          :background (modus-themes-color 'blue-fringe-bg) :height 0.14))))
+  ;; (add-hook 'aj/face-definitions-hook #'aj/mini-modeline-faces)
+  ;; (defun aj/mini-modeline-faces (theme)
+  ;;   ;; (set-face-attribute 'mode-line nil :box t)
+  ;;   (when (member theme '(modus-operandi modus-vivendi))
+  ;;     (set-face-attribute 'mini-modeline-mode-line-inactive nil
+  ;;                         :background (modus-themes-with-colors bg-active) :height 0.14)
+  ;;     (set-face-attribute 'mini-modeline-mode-line-active nil
+  ;;                         :background (modus-themes-with-colors bg-cyan) :height 0.14)))
+  )
 #+end_src
 
 **** mini-modeline + doom-modeline :ARCHIVE:
@@ -5132,9 +5134,9 @@ fi
     (set-face-attribute 'mode-line nil :box t)
     (when (member theme '(modus-operandi modus-vivendi))
       (set-face-attribute 'mini-modeline-mode-line-inactive nil
-                          :background (modus-themes-color 'bg-active) :height 0.14)
+                          :background (modus-themes-with-colors bg-active) :height 0.14)
       (set-face-attribute 'mini-modeline-mode-line-active nil
-                          :background (modus-themes-color 'blue-fringe-bg) :height 0.14)))
+                          :background (modus-themes-with-colors blue-fringe-bg) :height 0.14)))
 
 
   ;; no need for bars
@@ -5228,7 +5230,125 @@ fi
 #+end_src
 
 *** Themes
-**** My own face definitions
+**** Gruvbox :ARCHIVE:
+#+begin_src emacs-lisp
+(use-package gruvbox
+  :straight (gruvbox-theme
+             :depth nil
+             :fork (:host github :repo "andersjohansson/emacs-theme-gruvbox" :branch "ajfixes2")))
+#+end_src
+
+**** Modus-themes (I almost always use the light modus-operandi theme)
+#+begin_src emacs-lisp
+(use-package modus-themes
+  :init
+  (setq modus-operandi-palette-overrides
+        '((comment yellow)
+          (bg-active "#d7d7d7")
+          (bg-inactive "#efefef")
+          (bg-hl-line "#f2eff3")
+          ;; Used with "accented below"
+          (bg-completion "#def3ff")))
+
+  :custom
+  (modus-themes-headings '((t . (regular))))
+  ;; (modus-themes-syntax '(yellow-comments))
+  (modus-themes-links '(faint neutral-underline))
+  (modus-themes-fringes 'subtle)
+  ;; (modus-themes-diffs 'desaturated)
+  (modus-themes-org-blocks 'gray-background)
+  ;; (modus-themes-mail-citations 'faint)
+  (modus-themes-region '(bg-only no-extend))
+  ;; (modus-themes-org-agenda '((header-date . (bold-all))))
+  (modus-themes-variable-pitch-ui t)
+  (modus-themes-completions '((matches nil)
+                              (selection accented regular)))
+  (modus-themes-mixed-fonts t)
+  :config
+  (setq org-fontify-whole-heading-line t))
+#+end_src
+
+**** Define themes to use for dark and light and load light theme
+#+begin_src emacs-lisp
+(defvar aj/light-theme 'modus-operandi
+  ;; 'gruvbox-light-hard
+  )
+(defvar aj/dark-theme 'modus-vivendi
+  ;; gruvbox-dark-medium
+  )
+
+(load-theme aj/light-theme)
+;; I’m not loading dark theme here, since I seldom use it.
+#+end_src
+
+**** Pdf background for modus themes
+From modus-themes manual
+#+begin_src emacs-lisp
+(defun aj/pdf-tools-backdrop ()
+  (face-remap-add-relative
+   'default
+   `(:background ,(modus-themes-with-colors bg-dim))))
+
+(add-hook 'pdf-tools-enabled-hook #'aj/pdf-tools-backdrop)
+#+end_src
+
+**** Dark-light-switching
+#+begin_src emacs-lisp
+(defun aj/toggle-light-dark ()
+  "Toggles light and dark theme in Emacs and Arc theme in gtk."
+  (interactive)
+  (cond
+   ((custom-theme-enabled-p aj/light-theme)
+    (disable-theme aj/light-theme)
+    (unless (custom-theme-p aj/dark-theme)
+      ;; I seldom use the dark theme, so now is the time to load it
+      (load-theme aj/dark-theme t t))
+    (enable-theme aj/dark-theme)
+    (call-process-shell-command
+     ;; "xfconf-query -c xsettings -p /Net/ThemeName -s \"Arc-Dark\""
+     ;; for gnome:
+     "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc-Dark'\""
+     ))
+   ((custom-theme-enabled-p aj/dark-theme)
+    (disable-theme aj/dark-theme)
+    (enable-theme aj/light-theme)
+    (call-process-shell-command
+     ;; "xfconf-query -c xsettings -p /Net/ThemeName -s \"Arc\""
+     "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc'\""
+     ))
+   (t
+    (enable-theme 'aj/light-theme))))
+
+(bind-key "S-<f11>" #'aj/toggle-light-dark)
+#+end_src
+
+**** My own face customizations and definitions
+Loads ~aj-theme.el~, supposed to be done on top of any of the modus-themes. Also definition of some faces.
+#+begin_src emacs-lisp
+(load-theme 'aj)
+
+(defface aj/goto-address-mail-face '((t :inherit (shadow italic)))
+  "" :group 'aj)
+(setq goto-address-mail-face 'aj/goto-address-mail-face)
+
+(with-eval-after-load 'org-modern
+
+  (defface aj/org-waiting `((t :inherit org-modern-todo :foreground ,(modus-themes-with-colors yellow)))
+    "Face for waiting org-state"
+    :group 'org-faces)
+  (defface aj/org-started `((t :inherit org-modern-todo :foreground ,(modus-themes-with-colors blue)))
+    "Face for started org-state"
+    :group 'org-faces)
+
+  (setq org-modern-todo-faces
+        '(("TODO" . org-modern-todo)
+          ("STARTAD" . aj/org-started)
+          ("VÄNTAR" . aj/org-waiting)
+          ("AVFÖRD" . org-modern-done)
+          ("DONE" . org-modern-done))))
+
+#+end_src
+**** My own face definitions :ARCHIVE:
 Load my own face customizations after enabling a theme.
 #+begin_src emacs-lisp
 (defface aj/goto-address-mail-face '((t :inherit (shadow italic)))
@@ -5262,15 +5382,15 @@ Also runs hook aj/face-definitions-hook."
       (set-face-attribute 'org-column nil :inherit 'fixed-pitch)
       (set-face-attribute 'org-column-title nil :inherit 'fixed-pitch)
 
-      (set-face-attribute 'org-cite nil :inherit 'package-status-external)
+      (set-face-attribute 'org-cite nil :inherit 'modus-themes-prompt)
       ;; only visible when ‘org-cite-csl-activate’ isn’t active
-      (set-face-attribute 'org-cite-key nil :underline "light grey")
+      (set-face-attribute 'org-cite-key nil :inherit 'modus-themes-prompt :underline "light grey")
 
       (set-face-attribute 'org-document-title nil :height 1.5 :weight 'bold)
       ;; ;; (set-face-attribute 'org-meta-line nil :inherit 'org-drawer)
 
-      (set-face-attribute 'org-block-begin-line nil :overline (modus-themes-color 'bg-active) :height 0.9)
-      (set-face-attribute 'org-block-end-line nil :underline `(:color ,(modus-themes-color 'bg-active) :position t) :overline nil :height 0.9)
+      (set-face-attribute 'org-block-begin-line nil :overline (modus-themes-with-colors bg-active) :height 0.9)
+      (set-face-attribute 'org-block-end-line nil :underline `(:color ,(modus-themes-with-colors bg-active) :position t) :overline nil :height 0.9)
 
       ;;(set-face-attribute 'org-quote nil :weight 'light :height 0.95 :background nil)
       (set-face-attribute 'org-quote nil :height 0.95 :background 'unspecified)
@@ -5288,22 +5408,22 @@ Also runs hook aj/face-definitions-hook."
         (set-face-attribute 'org-block nil :background "#f8f8f8")
 
         ;; avoid tags inheriting headline color
-        ;; (set-face-attribute 'org-tag nil :foreground (modus-themes-color 'magenta-nuanced-fg)
+        ;; (set-face-attribute 'org-tag nil :foreground (modus-themes-with-colors magenta-nuanced-fg)
         ;;                     :weight 'light)
 
         ;; (setq org-todo-keyword-faces
-        ;;       `(("TODO" . ,(modus-themes-color 'red))
-        ;;         ("STARTAD" . ,(modus-themes-color 'blue))
-        ;;         ("VÄNTAR" . ,(modus-themes-color 'yellow))
-        ;;         ("AVFÖRD" . ,(modus-themes-color 'green))
-        ;;         ("DONE" . ,(modus-themes-color 'green)))))
+        ;;       `(("TODO" . ,(modus-themes-with-colors red))
+        ;;         ("STARTAD" . ,(modus-themes-with-colors blue))
+        ;;         ("VÄNTAR" . ,(modus-themes-with-colors yellow))
+        ;;         ("AVFÖRD" . ,(modus-themes-with-colors green))
+        ;;         ("DONE" . ,(modus-themes-with-colors green)))))
         ))
 
     (with-eval-after-load 'org-modern
       (set-face-attribute 'org-modern-todo nil :height 1.0)
 
-      (defface aj/org-waiting `((t :inherit org-modern-todo :foreground ,(modus-themes-color 'yellow))) "Face for waiting org-state" :group 'org-faces)
-      (defface aj/org-started `((t :inherit org-modern-todo :foreground ,(modus-themes-color 'blue))) "Face for started org-state" :group 'org-faces)
+      (defface aj/org-waiting `((t :inherit org-modern-todo :foreground ,(modus-themes-with-colors yellow))) "Face for waiting org-state" :group 'org-faces)
+      (defface aj/org-started `((t :inherit org-modern-todo :foreground ,(modus-themes-with-colors blue))) "Face for started org-state" :group 'org-faces)
       ;; (defface aj/org-done `((t :inherit org-modern-done)) "Face for done org-state" :group 'org-faces)
 
       (setq org-modern-todo-faces
@@ -5325,89 +5445,6 @@ Also runs hook aj/face-definitions-hook."
 (advice-add 'enable-theme :after #'aj/apply-face-definitions)
 #+end_src
 
-**** Gruvbox :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package gruvbox
-  :straight (gruvbox-theme
-             :depth nil
-             :fork (:host github :repo "andersjohansson/emacs-theme-gruvbox" :branch "ajfixes2")))
-#+end_src
-
-**** Modus-themes (I almost always use the light modus-operandi theme)
-#+begin_src emacs-lisp
-(use-package modus-themes
-  :custom
-  (modus-themes-headings '((t . (regular))))
-  (modus-themes-syntax '(yellow-comments))
-  (modus-themes-links '(faint neutral-underline))
-  (modus-themes-fringes 'subtle)
-  (modus-themes-diffs 'desaturated)
-  (modus-themes-org-blocks 'gray-background)
-  (modus-themes-mail-citations 'faint)
-  (modus-themes-region '(bg-only no-extend))
-  (modus-themes-org-agenda '((header-date . (bold-all))))
-  (modus-themes-variable-pitch-ui t)
-  (modus-themes-completions '((matches nil)
-                              (selection background regular)))
-  (modus-themes-mixed-fonts t)
-  :config
-  (setq org-fontify-whole-heading-line t))
-#+end_src
-
-**** Pdf background for modus themes
-From modus-themes manual
-#+begin_src emacs-lisp
-(defun aj/pdf-tools-backdrop ()
-  (face-remap-add-relative
-   'default
-   `(:background ,(modus-themes-color 'bg-alt))))
-
-(add-hook 'pdf-tools-enabled-hook #'aj/pdf-tools-backdrop)
-#+end_src
-
-**** Define themes to use for dark and light and load light theme
-#+begin_src emacs-lisp
-(defvar aj/light-theme 'modus-operandi
-  ;; 'gruvbox-light-hard
-  )
-(defvar aj/dark-theme 'modus-vivendi
-  ;; gruvbox-dark-medium
-  )
-
-(load-theme aj/light-theme)
-;; I’m not loading dark theme here, since I seldom use it.
-#+end_src
-
-**** Dark-light-switching
-#+begin_src emacs-lisp
-(defun aj/toggle-light-dark ()
-  "Toggles light and dark theme in Emacs and Arc theme in gtk."
-  (interactive)
-  (cond
-   ((custom-theme-enabled-p aj/light-theme)
-    (disable-theme aj/light-theme)
-    (unless (custom-theme-p aj/dark-theme)
-      ;; I seldom use the dark theme, so now is the time to load it
-      (load-theme aj/dark-theme t t))
-    (enable-theme aj/dark-theme)
-    (call-process-shell-command
-     ;; "xfconf-query -c xsettings -p /Net/ThemeName -s \"Arc-Dark\""
-     ;; for gnome:
-     "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc-Dark'\""
-     ))
-   ((custom-theme-enabled-p aj/dark-theme)
-    (disable-theme aj/dark-theme)
-    (enable-theme aj/light-theme)
-    (call-process-shell-command
-     ;; "xfconf-query -c xsettings -p /Net/ThemeName -s \"Arc\""
-     "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc'\""
-     ))
-   (t
-    (enable-theme 'aj/light-theme))))
-
-(bind-key "S-<f11>" #'aj/toggle-light-dark)
-#+end_src
-
 *** Lin-mode
 More prominent line highlighting where it is suitable.
 #+begin_src emacs-lisp
@@ -5417,10 +5454,11 @@ More prominent line highlighting where it is suitable.
           mu4e-headers-mode
           elfeed-search-mode-hook)
          . lin-mode)
-  :config
-  (set-face-attribute
-   'lin-hl nil
-   :background (modus-themes-color 'cyan-nuanced-bg)))
+  ;;:config
+  ;; (set-face-attribute
+  ;;  'lin-hl nil
+  ;;  :background (modus-themes-with-colors bg-cyan-subtle))
+  )
 #+end_src
 
 *** Hl-line for prog-mode

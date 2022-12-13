@@ -1086,33 +1086,33 @@ all children are done, you can use the following setup:
 
   (advice-add 'org-habit-build-graph :filter-return #'aj/org-agenda-habit-align-right))
 
-(defun aj/org-agenda-fix-faces (&rest _ignore)
-  (with-eval-after-load 'org-habit
-    (cl-loop for f in '(org-habit-alert-face
-                        org-habit-alert-future-face
-                        org-habit-clear-face
-                        org-habit-clear-future-face
-                        org-habit-overdue-face
-                        org-habit-overdue-future-face
-                        org-habit-ready-face
-                        org-habit-ready-future-face)
-             do
-             (set-face-attribute f nil :inherit
-                                 (append (let ((fa (face-attribute f :inherit nil nil)))
-                                           (if (listp fa)
-                                               fa
-                                             (list fa)))
-                                         '(fixed-pitch)))))
-  ;; (with-eval-after-load 'org-faces
-  ;;   (set-face-attribute 'org-agenda-date nil :overline "#CCCCCC")
-  ;;   (set-face-attribute 'org-agenda-date-weekend nil :overline "#CCCCCC"))
-  )
+;; (defun aj/org-agenda-fix-faces (&rest _ignore)
+;;   (with-eval-after-load 'org-habit
+;;     (cl-loop for f in '(org-habit-alert-face
+;;                         org-habit-alert-future-face
+;;                         org-habit-clear-face
+;;                         org-habit-clear-future-face
+;;                         org-habit-overdue-face
+;;                         org-habit-overdue-future-face
+;;                         org-habit-ready-face
+;;                         org-habit-ready-future-face)
+;;              do
+;;              (set-face-attribute f nil :inherit
+;;                                  (append (let ((fa (face-attribute f :inherit nil nil)))
+;;                                            (if (listp fa)
+;;                                                fa
+;;                                              (list fa)))
+;;                                          '(fixed-pitch)))))
+;;   ;; (with-eval-after-load 'org-faces
+;;   ;;   (set-face-attribute 'org-agenda-date nil :overline "#CCCCCC")
+;;   ;;   (set-face-attribute 'org-agenda-date-weekend nil :overline "#CCCCCC"))
+;;   )
 
 
 
-(aj/org-agenda-fix-faces)
+;; (aj/org-agenda-fix-faces)
 
-(add-hook 'aj/face-definitions-hook #'aj/org-agenda-fix-faces)
+;; (add-hook 'aj/face-definitions-hook #'aj/org-agenda-fix-faces)
 #+end_src
 
 **** Hl-line-mode in agenda
@@ -2383,6 +2383,7 @@ Can be passed any ox BACKEND in a non-interactive call"
   :config
   (set-face-attribute 'org-annotate-bracket-face nil :inherit 'font-lock-variable-name-face :weight 'bold)
   (set-face-attribute 'org-annotate-face nil :underline nil :weight 'unspecified :inherit 'font-lock-comment-face)
+  (set-face-attribute 'org-annotate-text-face nil :underline nil :weight 'unspecified :inherit 'modus-themes-subtle-yellow)
 
   (defun aj/org-annotate-extract-author (note)
     (if (string-match "{\\([^}]+\\)} *" note)

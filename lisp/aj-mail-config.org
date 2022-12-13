@@ -107,7 +107,7 @@ for refile folder selection)"
     (mu4e-headers-attach-mark     ("a" . "📎"))
     (mu4e-headers-encrypted-mark  ("x" . "🔐"))
     (mu4e-headers-signed-mark     ("s" . "🔏"))
-    (mu4e-headers-unread-mark     ("u" . "● ") modus-themes-mark-symbol) ;; ★
+    (mu4e-headers-unread-mark     ("u" . "● ") modus-themes-completion-match-2) ;; ★
     (mu4e-headers-list-mark       ("s" . "⚟"))
     (mu4e-headers-personal-mark   ("p" . "👨"))
     (mu4e-headers-calendar-mark   ("c" . "📅"))
