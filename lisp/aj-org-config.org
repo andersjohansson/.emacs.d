@@ -943,7 +943,7 @@ Two prefixes let’s you choose the state."
           (aj/org-add-todo-and-cookie maxlevel state))))))
 
 (defun aj/org-add-todo-and-cookie (maxlevel state)
-  "Add TODO if not in a TODO state and a [/]-cookie if there are children"
+  "Add TODO STATE if not in a TODO state and a [/]-cookie if there are children."
   (let ((level (org-current-level)))
     (unless (or (> level maxlevel)
                 (org-get-todo-state))
