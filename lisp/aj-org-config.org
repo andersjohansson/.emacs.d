@@ -4003,7 +4003,6 @@ not exported."
 
 *** ODT-export
 
-***
 **** noindent-style for odt paragraphs and spaced paragrahs in lists.
 #+begin_src emacs-lisp
 (defvar-local aj/org-export-odt-noindent nil
