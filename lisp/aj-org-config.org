@@ -2764,6 +2764,14 @@ List of prefix strings or regex."
   (citar-org-roam-mode))
 
 #+end_src
+*** Merge consecutive citations
+A simple package for this, available at [[https://git.sr.ht/~andersjohansson/org-cite-merge][sourcehut]].
+#+begin_src emacs-lisp
+(use-package org-cite-merge
+  :straight (org-cite-merge :host sourcehut
+                            :repo "andersjohansson/org-cite-merge"))
+#+end_src
+
 *** Add extra group for current refs to citar :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package citar-current-refs
