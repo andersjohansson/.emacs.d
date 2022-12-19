@@ -4,7 +4,6 @@
 
 ;; Author: Anders Johansson <mejlaandersj@gmail.com>
 
-
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
@@ -76,7 +75,7 @@
 
    ;; modus let’s it inherit `shadow’ for no good reason
    '(mu4e-header-face ((t :inherit nil)))
-
+   '(lin-blue ((t :background "#def3ff"))) ; a bit lighter than default
 
    `(diff-hl-insert ((t :inverse-video t :foreground ,(face-background 'fringe))))
    `(diff-hl-delete ((t :inverse-video t :foreground ,(face-background 'fringe))))

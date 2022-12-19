@@ -5245,19 +5245,20 @@ fi
 #+begin_src emacs-lisp
 (use-package modus-themes
   :init
-  (setq modus-operandi-palette-overrides
-        '((comment yellow)
-          (bg-active "#d7d7d7")
-          (bg-inactive "#efefef")
-          (bg-hl-line "#f2eff3")
-          ;; Used with "accented below"
-          (bg-completion "#def3ff")))
+  (setq
+   modus-themes-common-palette-overrides
+   '((comment yellow))
+   modus-operandi-palette-overrides
+   '((bg-active "#d7d7d7")
+     (bg-inactive "#efefef")
+     (bg-hl-line "#f2eff3")
+     (bg-completion "#def3ff")))
 
   :custom
   (modus-themes-headings '((t . (regular))))
   ;; (modus-themes-syntax '(yellow-comments))
   (modus-themes-links '(faint neutral-underline))
-  (modus-themes-fringes 'subtle)
+  ;; (modus-themes-fringes 'subtle)
   ;; (modus-themes-diffs 'desaturated)
   (modus-themes-org-blocks 'gray-background)
   ;; (modus-themes-mail-citations 'faint)
@@ -5265,7 +5266,7 @@ fi
   ;; (modus-themes-org-agenda '((header-date . (bold-all))))
   (modus-themes-variable-pitch-ui t)
   (modus-themes-completions '((matches nil)
-                              (selection accented regular)))
+                              (selection regular)))
   (modus-themes-mixed-fonts t)
   :config
   (setq org-fontify-whole-heading-line t))
