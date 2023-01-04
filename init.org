@@ -5244,32 +5244,30 @@ fi
 **** Modus-themes (I almost always use the light modus-operandi theme)
 #+begin_src emacs-lisp
 (use-package modus-themes
-  :init
-  (setq
-   modus-themes-common-palette-overrides
-   '((comment yellow))
-   modus-operandi-palette-overrides
-   '((bg-active "#d7d7d7")
-     (bg-inactive "#efefef")
-     (bg-hl-line "#f2eff3")
-     (bg-completion "#def3ff")))
-
   :custom
   (modus-themes-headings '((t . (regular))))
-  ;; (modus-themes-syntax '(yellow-comments))
-  (modus-themes-links '(faint neutral-underline))
-  ;; (modus-themes-fringes 'subtle)
-  ;; (modus-themes-diffs 'desaturated)
   (modus-themes-org-blocks 'gray-background)
-  ;; (modus-themes-mail-citations 'faint)
-  (modus-themes-region '(bg-only no-extend))
-  ;; (modus-themes-org-agenda '((header-date . (bold-all))))
   (modus-themes-variable-pitch-ui t)
   (modus-themes-completions '((matches nil)
                               (selection regular)))
   (modus-themes-mixed-fonts t)
   :config
-  (setq org-fontify-whole-heading-line t))
+  (setq org-fontify-whole-heading-line t)
+
+  (setq
+   modus-themes-common-palette-overrides
+   `((comment yellow)
+     (bg-region bg-ochre)
+     (fringe bg-inactive)
+     ,@modus-themes-preset-overrides-faint)
+
+   ;; modus-operandi-palette-overrides
+   ;; '((bg-active "#d7d7d7")
+   ;;   (bg-inactive "#efefef")
+   ;;   (bg-hl-line "#f2eff3")
+   ;;   (bg-completion "#def3ff"))
+   )
+  )
 #+end_src
 
 **** Define themes to use for dark and light and load light theme
@@ -5345,11 +5343,9 @@ Loads ~aj-theme.el~, supposed to be done on top of any of the modus-themes. Also
     :group 'org-faces)
 
   (setq org-modern-todo-faces
-        '(("TODO" . org-modern-todo)
-          ("STARTAD" . aj/org-started)
+        '(("STARTAD" . aj/org-started)
           ("VÄNTAR" . aj/org-waiting)
-          ("AVFÖRD" . org-modern-done)
-          ("DONE" . org-modern-done))))
+          ("AVFÖRD" . org-modern-done))))
 
 #+end_src
 **** My own face definitions :ARCHIVE:

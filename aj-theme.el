@@ -42,16 +42,15 @@
    ;; only visible when ‘org-cite-csl-activate’ isn’t active
    '(org-cite-key ((t :inherit modus-themes-prompt :underline "light grey")))
    '(org-document-title ((t :height 1.5 :weight bold)))
-   `(org-block-begin-line nil ((t :overline ,bg-active :height 0.9)))
-   `(org-block-end-line ((t :underline (:color ,bg-active) :overline nil :height 0.9)))
-   '(org-block ((t :background "#f8f8f8")))
+   ;; `(org-block-begin-line nil ((t :overline ,bg-active :height 0.9)))
+   ;; `(org-block-end-line ((t :underline (:color ,bg-active) :overline nil :height 0.9)))
    '(org-quote ((t :height 0.95 :background unspecified)))
 
    ;; ;; Use fixed-pitch for checkbox, compressed font for table
    '(org-checkbox ((t :inherit fixed-pitch)))
    '(org-table ((t :family "Input Mono Compressed")))
 
-
+   ;; not prepared for my use of variable-pitch-mode in agenda:
    '(org-habit-alert-face ((t :inherit fixed-pitch)))
    '(org-habit-alert-future-face ((t :inherit fixed-pitch)))
    '(org-habit-clear-face ((t :inherit fixed-pitch)))
@@ -70,8 +69,8 @@
 
    '(mode-line-buffer-id ((t :inherit variable-pitch :weight regular)))
 
-   `(mini-modeline-mode-line-inactive ((t :background ,bg-active :height 0.14)))
-   `(mini-modeline-mode-line-active ((t :background ,bg-cyan :height 0.14)))
+   `(mini-modeline-mode-line-inactive ((t :background ,bg-inactive :height 0.14)))
+   `(mini-modeline-mode-line-active ((t :background ,bg-graph-blue-1 :height 0.14)))
 
    ;; modus let’s it inherit `shadow’ for no good reason
    '(mu4e-header-face ((t :inherit nil)))
@@ -80,6 +79,8 @@
    `(diff-hl-insert ((t :inverse-video t :foreground ,(face-background 'fringe))))
    `(diff-hl-delete ((t :inverse-video t :foreground ,(face-background 'fringe))))
    `(diff-hl-change ((t :inverse-video t :foreground ,(face-background 'fringe))))
+
+   `(scroll-bar ((t :background ,bg-main :foreground ,bg-active)))
    ))
 
 (provide-theme 'aj)
