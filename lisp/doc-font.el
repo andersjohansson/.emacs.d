@@ -30,11 +30,11 @@
 (require 'org-indent nil t)
 
 
-(defgroup doc-font nil "Customizations of ‘doc-font-mode’"
+(defgroup doc-font nil "Customizations of ‘doc-font-mode’."
   :group 'faces)
 
 (defcustom doc-font-attributes
-  '((default . (:family "Crimson" :height 1.25))
+  '((default . (:family "Crimson Pro" :height 1.25))
     (org-document-title . (:height 1.2))
     (org-level-1 . (:height 1.4 :weight normal ))
     (org-level-2 . (:height 1.3 :weight normal :slant italic))
@@ -103,7 +103,7 @@ When ‘vertical’, use small vertical space between paragraphs, when
 (defvar-local doc-font-variable-cookies nil)
 (defvar-local doc-font-variable-cookies-nokill nil)
 
-(defface doc-font-small-parspace '((nil (:height 0.1)))
+(defface doc-font-small-parspace '((t (:height 0.1 :inherit org-hide)))
   "Face for small vertical paragraph spaces.")
 
 (defvar doc-font-parspace-vertical-keyword
@@ -158,13 +158,13 @@ Along with some other changes."
             (org-modern-mode -1)
             (org-modern-mode)))
 
-        (when (eq 'indent doc-font-modify-parspace)
-          (make-local-variable 'font-lock-extra-managed-props)
-          (add-to-list 'font-lock-extra-managed-props 'display)
-          (font-lock-add-keywords nil doc-font-parspace-indent-keyword))
-
-        (when (eq 'vertical doc-font-modify-parspace)
-          (font-lock-add-keywords nil doc-font-parspace-vertical-keyword)))
+        (cond ((eq 'indent doc-font-modify-parspace)
+               (make-local-variable 'font-lock-extra-managed-props)
+               (add-to-list 'font-lock-extra-managed-props 'display)
+               (font-lock-add-keywords nil doc-font-parspace-indent-keyword))
+              ((eq 'vertical doc-font-modify-parspace)
+               (font-lock-add-keywords nil doc-font-parspace-vertical-keyword)))
+        )
 
     ;; DISABLE:
     (cl-loop for c in (append doc-font-cookies doc-font-cookies-def) do
