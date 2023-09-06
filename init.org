@@ -24,7 +24,7 @@ Emacs can only load =.el=-files. We can use =C-c C-v t= to run =org-babel-tangle
 
 To avoid doing this each time a change is made we can add a function to the =after-save-hook= ensuring to always tangle and byte-compile the =org=-document after changes. But this generally annoys me, it’s easier to just choose when it should be done.
 
-These functions possibly create two files from each org-file. When doing org-mode asynchronous exports, a small init file should be loaded, and this is automatically generated through tangling all trees tagged with "org_async". Even more specificity can be achieved with the tag "org_async_exclude" (which means a subtree of an "org_async"-tree can still be excluded). Additionally, "no_default_tangle" excludes trees from the standard init-files, and archived trees are always excluded (I use it for "commenting out" stuff). All to make as small and lean init files as possible.
+These functions possibly create two files from each org-file. When doing org-mode asynchronous exports, a small init file should be loaded, and this is automatically generated through tangling all trees tagged with "org_async". Even more specificity can be achieved with the tag "org_async_exclude" (which means a subtree of an "org_async"-tree can still be excluded). Additionally, "no_default_tangle" excludes trees from the standard init-files, and archived trees are always excluded (I use it for "commenting out" stuff). All to make as small and lean init files as possible.½
 
 #+begin_src emacs-lisp
 (defvar aj/org-init-files
@@ -207,6 +207,13 @@ https://bling.github.io/blog/2016/01/18/why-are-you-changing-gc-cons-threshold/
 
 (aj/set-no-gc)
 (add-hook 'after-init-hook #'aj/set-normal-gc)
+
+(defun aj/wrap-no-gc (fun &rest args)
+  "Advice to use around other functions that could gain from avoiding GC.
+FUN is invoked with ARGS."
+  (aj/set-no-gc)
+  (apply fun args)
+  (aj/set-normal-gc))
 #+end_src
 
 *** Native compilation :ARCHIVE:
@@ -320,7 +327,7 @@ Some variables are not suitable to keep in the init-file, I add these via custom
 (straight-use-package '(mu4e :host github
                              :repo "djcb/mu"
                              :branch "master"
-                             :files ("mu4e/*.el" "mu4e/mu4e.info" "build/mu4e/mu4e-config.el" "build/mu/mu")
+                             :files ("mu4e/*.el" "build/mu4e/mu4e.info" "build/mu4e/mu4e-config.el" "build/mu/mu")
                              ;; straight is too eager rebuilding
                              ;; (every small change), and
                              ;; compiling mu is slow!!! I’ll do it
@@ -438,25 +445,6 @@ of the box `(w h)' inside the box `(cw ch)'."
 #+end_src
 
 
-*** all the icons
-**** Base package
-#+begin_src emacs-lisp
-(use-package all-the-icons)
-#+end_src
-
-**** All the icons dired
-Pretty icons in dired!
-
-Also a hack to make it work with ~dired-subtree~, however this adds double icons when reverting a buffer with inserted subtrees.
-#+begin_src emacs-lisp
-(use-package all-the-icons-dired
-  :init (add-hook 'dired-mode-hook #'all-the-icons-dired-mode)
-  :custom (all-the-icons-dired-monochrome nil)
-  :config
-  (add-hook 'dired-subtree-after-insert-hook #'all-the-icons-dired--refresh)
-  (add-hook 'dired-subtree-after-remove-hook #'all-the-icons-dired--refresh))
-#+end_src
-
 *** Completion
 **** New completion frameworks
 ***** Selectrum for the interface and prescient for matching :ARCHIVE:
@@ -504,9 +492,9 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
                              "extensions/vertico-multiform.el"
                              "extensions/vertico-buffer.el"))
   :bind (("M-r" . #'vertico-repeat)
-         :map vertico-map
-         ("<backspace>" . #'vertico-directory-delete-char)
-         ("C-<backspace>" . #'vertico-directory-delete-word))
+	     :map vertico-map
+	     ("<backspace>" . #'vertico-directory-delete-char)
+	     ("C-<backspace>" . #'vertico-directory-delete-word))
   :init
   (vertico-mode)
   (add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
@@ -551,7 +539,6 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 (use-package prescient
   :after vertico
   :demand t
-  :init (setq completion-styles '(prescient basic))
   :custom
   (prescient-filter-method '(literal initialism prefix regexp))
   (prescient-history-length 500)
@@ -560,19 +547,16 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   (prescient-sort-full-matches-first t) ; Works well with `initialism'.
   (prescient-sort-length-enable t)
   :config
-  ;; Use `prescient-completion-sort' after filtering.
-  (setq vertico-sort-function #'prescient-completion-sort)
-
-  (defun vertico-prescient-remember ()
-    "Remember the chosen candidate with Prescient."
-    (when (>= vertico--index 0)
-      (prescient-remember
-       (substring-no-properties
-        (nth vertico--index vertico--candidates)))))
-  (advice-add #'vertico-insert :after #'vertico-prescient-remember)
-
+  ;; ;; Use `prescient-completion-sort' after filtering.
+  ;; (setq vertico-sort-function #'prescient-completion-sort)
 
   (prescient-persist-mode 1))
+
+(use-package vertico-prescient
+  :after prescient
+  :demand t
+  :config (vertico-prescient-mode))
+
 
 ;; (use-package orderless
 ;;   :custom (orderless-component-separator #'orderless-escapable-split-on-space)
@@ -591,7 +575,7 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 
 ;; Do not allow the cursor in the minibuffer prompt
 (setq minibuffer-prompt-properties
-      '(read-only t cursor-intangible t face minibuffer-prompt))
+	  '(read-only t cursor-intangible t face minibuffer-prompt))
 (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
 #+end_src
 
@@ -620,7 +604,7 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
   (consult-ripgrep-args
    "rga --no-ignore --null --line-buffered --color=never --max-columns=10000 --path-separator / --smart-case --no-heading --line-number .")
 
-  (consult-preview-key (kbd "C-ä"))
+  (consult-preview-key "C-ä")
   :init
 
   ;; gives us completion at point using the ordinary minibuffer
@@ -685,6 +669,7 @@ Also a hack to make it work with ~dired-subtree~, however this adds double icons
 	    (consult-mark)
       (funcall fun)))
 
+  
 
   (setq set-mark-command-repeat-pop t)
 
@@ -718,35 +703,36 @@ https://www.freedesktop.org/wiki/Specifications/desktop-bookmark-spec/"
                             #'xml-parse-region)))
     (if (file-readable-p data-file)
         (thread-last
-            (cl-loop for bookmark-node in
-                     (dom-by-tag
-                      (with-temp-buffer
-                        (insert-file-contents data-file)
+          (cl-loop for bookmark-node in
+                   (dom-by-tag
+                    (with-temp-buffer
+                      (insert-file-contents data-file)
 
-                        (funcall xml-parsing-func
-                                 (point-min)
-                                 (point-max)))
-                      'bookmark)
-                     when (or (not mime-filter)
-                              (and mime-filter
+                      (funcall xml-parsing-func
+                               (point-min)
+                               (point-max)))
+                    'bookmark)
+                   when (or (not mime-filter)
+                            (and mime-filter
+                                 ;; exclude anything without type...
+                                 (when-let
+                                     ((type (dom-attr
+                                             (dom-by-tag bookmark-node 'mime-type)
+                                             'type)))
                                    (xor exclude
-                                        (string-match-p
-                                         mime-filter
-                                         (dom-attr
-                                          (dom-by-tag bookmark-node 'mime-type)
-                                          'type)))))
-                     collect
-                     (when-let ((local-path (string-remove-prefix
-                                             "file://"
-                                             (dom-attr bookmark-node 'href)))
-                                (visited (encode-time
-                                          (iso8601-parse
-                                           (dom-attr bookmark-node 'visited)))))
-                       (let ((full-file-name (decode-coding-string
-                                              (url-unhex-string local-path)
-                                              'utf-8)))
-                         (when (file-exists-p full-file-name)
-                           (cons visited full-file-name)))))
+                                        (string-match-p mime-filter type)))))
+                   collect
+                   (when-let ((local-path (string-remove-prefix
+                                           "file://"
+                                           (dom-attr bookmark-node 'href)))
+                              (visited (encode-time
+                                        (iso8601-parse
+                                         (dom-attr bookmark-node 'visited)))))
+                     (let ((full-file-name (decode-coding-string
+                                            (url-unhex-string local-path)
+                                            'utf-8)))
+                       (when (file-exists-p full-file-name)
+                         (cons visited full-file-name)))))
           (delq nil)
           (seq-sort-by #'car #'time-less-p)
           (mapcar #'cdr))
@@ -935,9 +921,9 @@ Used to preselect nearest headings and imenu items.")
 
   (defun aj/embark-consult-export-grep-org (lines)
     "Create a org mode buffer listing LINES."
-    (let ((buf (generate-new-buffer "*Embark Export Grep Org*"))
+    (let ((buff (generate-new-buffer "*Embark Export Grep Org*"))
           (lastfile))
-      (with-current-buffer buf
+      (with-current-buffer buff
         (insert "* Exported grep results\n")
         (dolist (line lines)
           (if (string-match "^\\([^:]+\\):\\([^:]+\\):\\(.+\\)$" line)
@@ -958,7 +944,7 @@ Used to preselect nearest headings and imenu items.")
         (use-local-map (make-composed-keymap
                         embark-consult-revert-map
                         (current-local-map))))
-      (pop-to-buffer buf)))
+      (pop-to-buffer buff)))
 
   )
 #+end_src
@@ -986,7 +972,7 @@ Used to preselect nearest headings and imenu items.")
 (defun aj/zoterofile-open (file)
   "Open FILE in emacs or externally."
   (if aj/running-cmd-in-small-frame
-      (consult-file-externally file)
+      (embark-open-externally file)
     (find-file file)))
 
 (defvar aj/zoterofile-options
@@ -1111,7 +1097,11 @@ Used to preselect nearest headings and imenu items.")
               "\n#+end_quote")))
 
   ;; some custom fontification,
-  (org-link-set-parameters "otag" :face 'mu4e-header-key-face)
+  (defface aj/orgqda-otag-face '((t :weight semi-bold :inherit (modus-themes-fg-cyan)))
+    "face for otag links.")
+  (defface aj/orgqda-otag-shadow-face '((t :weight regular :inherit shadow))
+    "face for otag links.")
+  (org-link-set-parameters "otag" :face 'aj/orgqda-otag-face)
   (org-link-set-parameters "otag" :activate-func #'aj/orgqda-otag-activate)
 
   (defun aj/orgqda-otag-activate (start end path _br)
@@ -1122,7 +1112,7 @@ Used to preselect nearest headings and imenu items.")
         (when (search-forward "][" end t) ;; we have description
           (when (looking-at (rx (seq (group-n 1 (+ (seq (+ alnum) "_"))))))
             (add-face-text-property (match-beginning 1) (match-end 1)
-                                    'shadow))))))
+                                    'aj/orgqda-otag-shadow-face))))))
 
   ;; Special function for inserting or modifying tags
   (define-key orgqda-mode-map [remap org-set-tags-command] #'orgqda-code-headline-or-paragraph)
@@ -1210,6 +1200,18 @@ For exporting via pandoc and to zotero
     "#+print_bibliography:"))
 #+end_src
 
+
+
+***** ox-weasyprint
+For exporting to pdf through html with the help of weasyprint.
+#+begin_src emacs-lisp
+(use-package ox-weasyprint
+  :straight (:host srht :repo "andersjohanssson/ox-weasyprint")
+  :custom
+  (org-weasyprint-stylesheet '("/home/aj/.emacs.d/org-weasyprint-style.css"))
+  (org-weasyprint-pdf-variant "pdf/ua-1"))
+#+end_src
+
 ***** ox-md-pandoc-zotero :ARCHIVE:
 For exporting and converting to zotero.
 #+begin_src emacs-lisp
@@ -1222,6 +1224,15 @@ For exporting and converting to zotero.
 (use-package citeproc)
 #+end_src
 
+***** org-inline-pdf
+#+begin_src emacs-lisp
+(use-package org-inline-pdf
+  ;; FIXME: For some reason, this implies showing inline pictures at
+  ;; startup... not obvious why from the code.
+  ;; :hook 'org-mode
+  
+  )
+#+end_src
 **** org init
 #+begin_src emacs-lisp
 (use-package org
@@ -1304,6 +1315,10 @@ For exporting and converting to zotero.
   ;;org-capture
   (org-capture-use-agenda-date t)
 
+  ;; some stuff for export
+  (org-latex-to-mathml-convert-command
+   "latex2mathml -t \"%i\" > %o")
+  
   :config
   (load-library "aj-org-config")
 
@@ -1313,6 +1328,7 @@ For exporting and converting to zotero.
 
   )
 #+end_src
+
 **** org init async                             :org_async:no_default_tangle:
 #+begin_src emacs-lisp
 (use-package org
@@ -1423,7 +1439,7 @@ For exporting and converting to zotero.
      (funcall origfun))))
 #+end_src
 
-*** Eglot-ltex, for grammarcheck with languagetool and eglot :ARCHIVE:
+*** Eglot-ltex, for grammarcheck with languagetool and eglot
 #+begin_src emacs-lisp
 ;; (use-package flycheck-languagetool
 ;;   :init
@@ -1566,7 +1582,10 @@ Use mu4e, the extensive config is in an [[file:lisp/aj-mail-config.org][external
            (mu4e-headers-results-limit 500) ; easier on my slow computer
            (mu4e-attachment-dir "~/Hämtningar")
            ;; mu4e-change-filenames-when-moving t ;;for mbsync
-           (mu4e-completing-read-function #'completing-read))
+           (mu4e-completing-read-function #'completing-read)
+           ;; ;; don’t want to see this all the time:
+           ;; (mu4e-modeline-mode nil)
+           )
   :config (require 'aj-mail-config)
   (setq message-kill-buffer-on-exit t)
   (mu4e t) ;; start delayed in background
@@ -1590,6 +1609,15 @@ Disable it for now.
 
 (advice-add 'parse-time-string :around #'aj/parse-time-string)
 #+end_src
+
+** Mastodon
+#+begin_src emacs-lisp
+(use-package mastodon
+  :init
+  (setq mastodon-instance-url "https://emacs.ch"
+        mastodon-active-user "aj"))
+#+end_src
+
 ** Elfeed (feed-reader)
 #+begin_src emacs-lisp
 (use-package elfeed
@@ -1618,6 +1646,7 @@ Disable it for now.
 #+begin_src emacs-lisp
 (setq gnus-select-method '(nntp "news.gmane.io"))
 #+end_src
+
 ** Filetypes etc
 *** Don’t warn about large pdfs
 Patch ~abort-if-file-too-large~ to not complain about pdfs (which are generally handled well by pdf-tools no matter the size).
@@ -1663,6 +1692,26 @@ But why do I need to compress pdf-files this way? Shouldn’t pdf-files have rea
 (jka-compr-update)
 #+end_src
 
+
+** all the icons
+*** Base package
+#+begin_src emacs-lisp
+(use-package all-the-icons)
+#+end_src
+
+*** All the icons dired :ARCHIVE:
+Pretty icons in dired!
+
+Also a hack to make it work with ~dired-subtree~, however this adds double icons when reverting a buffer with inserted subtrees.
+#+begin_src emacs-lisp
+(use-package all-the-icons-dired
+  :init (add-hook 'dired-mode-hook #'all-the-icons-dired-mode)
+  :custom (all-the-icons-dired-monochrome nil)
+  :config
+  (add-hook 'dired-subtree-after-insert-hook #'all-the-icons-dired--refresh)
+  (add-hook 'dired-subtree-after-remove-hook #'all-the-icons-dired--refresh))
+#+end_src
+
 ** File management
 *** Sudo-edit
 #+begin_src emacs-lisp
@@ -1694,7 +1743,61 @@ But why do I need to compress pdf-files this way? Shouldn’t pdf-files have rea
   (dired-dwim-target t))
 #+end_src
 
-**** dired: use ~hl-line-mode~ and hide cursor
+**** Dirvish
+#+begin_src emacs-lisp
+(use-package dirvish
+  :init (dirvish-override-dired-mode)
+  (setq dired-listing-switches "-l --group-directories-first --almost-all --human-readable")
+  :custom
+  (dirvish-mode-line-height  2)
+  (dirvish-attributes
+   '(all-the-icons file-time file-size collapse subtree-state vc-state git-msg))
+  (dirvish-subtree-state-style 'arrow)
+  (dirvish-subtree-always-show-state t)
+  :config
+  ;; My own small library for persisting settings in directories:
+  (require 'dirvish-persist-switches)
+
+
+  ;; Workaround for bug:
+  ;; https://github.com/alexluigit/dirvish/issues/179
+  (advice-add 'dirvish-dired-noselect-a
+              :before-until
+              (defun aj/dirvish-dired-noselect-on-lists (&rest args)
+                (and (listp (cadr args))
+                     (apply (car args) (cdr args)))))
+  
+  :bind
+  (("C-c f" . dirvish-fd)
+   :map dirvish-mode-map ; Dirvish inherits `dired-mode-map'
+   ("a"   . dirvish-quick-access)
+   ("f"   . dirvish-file-info-menu)
+   ("y"   . dirvish-yank-menu)
+   ("N"   . dirvish-narrow)
+   ("^"   . dirvish-history-last)
+   ("h"   . dirvish-history-jump) ; remapped `describe-mode'
+   ("s"   . dirvish-quicksort)    ; remapped `dired-sort-toggle-or-edit'
+   ("v"   . dirvish-vc-menu)      ; remapped `dired-view-file'
+   ("TAB" . dirvish-subtree-toggle)
+   ("M-f" . dirvish-history-go-forward)
+   ("M-b" . dirvish-history-go-backward)
+   ("M-l" . dirvish-ls-switches-menu)
+   ("M-m" . dirvish-mark-menu)
+   ("M-t" . dirvish-layout-toggle)
+   ("M-s" . dirvish-setup-menu)
+   ("M-e" . dirvish-emerge-menu)
+   ("M-j" . dirvish-fd-jump))
+  )
+
+;; (use-package dirvish-subtree
+;;   :straight nil)
+;; (use-package dirvish-icons
+;;   :straight nil)
+
+
+#+end_src
+
+**** dired: use ~hl-line-mode~ and hide cursor :ARCHIVE:
 But show cursor in ~wdired-mode~
 #+begin_src emacs-lisp
 (add-hook 'dired-mode-hook #'hl-line-mode)
@@ -1712,7 +1815,7 @@ But show cursor in ~wdired-mode~
 (advice-add 'wdired-change-to-dired-mode :after #'aj/dired-no-cursor)
 #+end_src
 
-**** De-emphasize dired details
+**** De-emphasize dired details :ARCHIVE:
 #+begin_src emacs-lisp
 (with-eval-after-load 'dired
   (add-to-list 'dired-font-lock-keywords
@@ -1721,26 +1824,26 @@ But show cursor in ~wdired-mode~
                t))
 #+end_src
 
-**** dired-git-info
+**** dired-git-info :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package dired-git-info
     :bind (:map dired-mode-map
                 (")" . dired-git-info-mode)))
 #+end_src
-**** Dired collapse
+**** Dired collapse :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package dired-collapse
   ;; :after dired
   :defer t
   :init (add-hook 'dired-mode-hook #'dired-collapse-mode))
 #+end_src
-**** dired-hide-dotfiles
+**** dired-hide-dotfiles :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package dired-hide-dotfiles
   :bind (:map dired-mode-map
               ("." . dired-hide-dotfiles)))
 #+end_src
-**** Dired subtree
+**** Dired subtree :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package dired-subtree
   :defer t
@@ -1750,13 +1853,13 @@ But show cursor in ~wdired-mode~
               ("TAB" . dired-subtree-cycle)))
 #+end_src
 
-**** Dired-narrow
+**** Dired-narrow :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package dired-narrow
   :commands dired-narrow)
 #+end_src
 
-**** Dired-du
+**** Dired-du :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package dired-du
   :defer t
@@ -1775,7 +1878,7 @@ A simple command to run ~file-roller -h~ for extracting archives in current dire
   )
 #+end_src
 
-**** Sorting and listing-switches (dired-quick-sort)
+**** Sorting and listing-switches (dired-quick-sort) :ARCHIVE:
 https://gitlab.com/xuhdev/dired-quick-sort/
 But also my branch for persistent per-directory options.
 https://gitlab.com/andersjohansson/dired-quick-sort/tree/dir-save
@@ -1807,7 +1910,7 @@ But some of the options for listing-switches doesn’t work with remote sessions
      dired-actual-switches "-al")))
 #+end_src
 
-**** dired-toggle-sudo
+**** dired-toggle-sudo :ARCHIVE:
 #+begin_src emacs-lisp
 (use-package dired-toggle-sudo
   :commands dired-toggle-sudo
@@ -2007,6 +2110,7 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
   (advice-add 'pass-display-header :after #'aj/pass-display-header-extra)
   )
 #+end_src
+
 ** LaTeX
 *** Config variables for latex :org_async:
 #+begin_src emacs-lisp
@@ -2151,8 +2255,9 @@ Last, a few functions to git push, pull and run ~magit~ on the password store.
 *** Use pdf-tools
 #+begin_src emacs-lisp
 (defun th/pdf-view-revert-buffer-maybe (file)
-  (when-let ((buf (find-buffer-visiting file)))
-    (with-current-buffer buf
+  (when-let ((buff (find-buffer-visiting file)))
+    (with-current-buffer buff
+      
       (when (derived-mode-p 'pdf-view-mode)
         (pdf-view-revert-buffer t t)))))
 
@@ -2334,6 +2439,7 @@ https://github.com/andersjohansson/tex-fold-linebreaks
   :config (setq tex-fold-linebreaks-non-sentence-punctuation-regexp
                 "\\([0-9]\\|[[:space:]]\\([[:alpha:]]\\|t\\.ex\\|m\\.fl\\|bl\\|bl\\.a\\|e\\.g\\|i\\.e\\)?\\)$"))
 #+end_src
+
 ** Window management and navigation
 *** Repeat mode
 #+begin_src emacs-lisp
@@ -2341,26 +2447,27 @@ https://github.com/andersjohansson/tex-fold-linebreaks
   :custom (repeat-exit-timeout 5)
   :config (repeat-mode)
 
-  (with-eval-after-load 'org
-    (defvar aj/org-mode-navigation-repeat-map
-      (let ((map (make-sparse-keymap)))
-        (define-key map (kbd "C-b") #'org-backward-heading-same-level)
-        (define-key map (kbd "b") #'org-backward-heading-same-level)
-        (define-key map (kbd "C-f") #'org-forward-heading-same-level)
-        (define-key map (kbd "f") #'org-forward-heading-same-level)
-        (define-key map (kbd "C-n") #'org-next-visible-heading)
-        (define-key map (kbd "n") #'org-next-visible-heading)
-        (define-key map (kbd "C-p") #'org-previous-visible-heading)
-        (define-key map (kbd "p") #'org-previous-visible-heading)
-        (define-key map (kbd "C-u") #'outline-up-heading)
-        (define-key map (kbd "u") #'outline-up-heading)
-        map))
+  ;; (with-eval-after-load 'org
+  ;;   (defvar aj/org-mode-navigation-repeat-map
+  ;;     (let ((map (make-sparse-keymap)))
+  ;;       (define-key map (kbd "C-b") #'org-backward-heading-same-level)
+  ;;       (define-key map (kbd "b") #'org-backward-heading-same-level)
+  ;;       (define-key map (kbd "C-f") #'org-forward-heading-same-level)
+  ;;       (define-key map (kbd "f") #'org-forward-heading-same-level)
+  ;;       (define-key map (kbd "C-n") #'org-next-visible-heading)
+  ;;       (define-key map (kbd "n") #'org-next-visible-heading)
+  ;;       (define-key map (kbd "C-p") #'org-previous-visible-heading)
+  ;;       (define-key map (kbd "p") #'org-previous-visible-heading)
+  ;;       (define-key map (kbd "C-u") #'outline-up-heading)
+  ;;       (define-key map (kbd "u") #'outline-up-heading)
+  ;;       map))
 
-    (dolist (command '(org-backward-heading-same-level
-                       org-forward-heading-same-level
-                       org-next-visible-heading
-                       org-previous-visible-heading))
-      (put command 'repeat-map 'aj/org-mode-navigation-repeat-map))))
+  ;;   (dolist (command '(org-backward-heading-same-level
+  ;;                      org-forward-heading-same-level
+  ;;                      org-next-visible-heading
+  ;;                      org-previous-visible-heading))
+  ;;     (put command 'repeat-map 'aj/org-mode-navigation-repeat-map)))
+  )
 
 
 
@@ -2397,6 +2504,7 @@ https://github.com/andersjohansson/tex-fold-linebreaks
 
 
 #+end_src
+
 *** Bindings for ~other-window~ and ~next/previous-buffer~.
 
 ~other-window~ with ~<C-tab>~ and ~<C-S-tab>~ (like switching tabs in firefox).
@@ -3037,7 +3145,7 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
       (apply #'provided-mode-derived-p mode modes)))
 #+end_src
 
-*** Dired display of untracked git files
+*** Dired display of untracked git files :ARCHIVE:
 #+begin_src emacs-lisp
 (defvar-local aj/dired-untracked-filter nil)
 (put 'aj/dired-untracked-filter 'safe-local-variable #'stringp)
@@ -3128,6 +3236,7 @@ Set to symbol ‘disable’ to prevent activation of visual-line-mode.")
   :straight (aj-custom-commands :host gitlab :repo "andersjohansson/aj-custom-emacs-commands")
   :defer t
   :bind (("C-x C-k" . aj/delete-current-buffer-file)
+         ("C-x K" . aj/kill-buffer-window-frame)
          ("C-x C-r" . rename-visited-file)
          ("C-c m" . aj/message-peek)
          :map prog-mode-map
@@ -3528,6 +3637,17 @@ Needed when starting in a non-interactive shell.
 #+end_src
 
 ** prog-modes
+*** Use treesitter modes
+For the programming modes that I use from time to time (my main language is elisp though...)
+#+begin_src emacs-lisp
+(dolist (m '((css-mode . css-ts-mode)
+             (json-mode . json-ts-mode)
+             (bash-mode . bash-ts-mode)
+             (python-mode . python-ts-mode)
+             (js-mode . js-ts-mode)))
+  (add-to-list 'major-mode-remap-alist m))
+#+end_src
+
 *** Whitespace-mode and whitespace-cleanup-mode
 #+begin_src emacs-lisp
 (use-package whitespace
@@ -4181,9 +4301,18 @@ And for higlighting existing don’t etc."
          "[’'´.0-b:-]" t ("-d" "en_US,sv_SE")
          nil utf-8)))
 #+end_src
-
+**** Flyspell config
+#+begin_src emacs-lisp
+(use-package flyspell
+  :straight nil
+  :custom
+  (flyspell-use-meta-tab nil) ;; interferes with org-completion
+  )
+#+end_src
 **** flyspell-hydra and custom commands
 #+begin_src emacs-lisp
+
+
 (bind-key "C-c l" 'hydra-flyspell/body)
 (defhydra hydra-flyspell (:color blue :hint nil)
   "
@@ -4463,10 +4592,6 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
 (use-package sdcv-mode
   :straight nil
   :commands 'sdcv-search)
-(use-package google-translate
-  :commands 'google-translate-smooth-translate
-  :init (setq google-translate-translation-directions-alist
-              '(("sv" . "en") ("en" . "sv") ("da" . "sv"))))
 
 ;; needs wn, installed with aur package wordnet-cli
 (use-package wordnut)
@@ -4534,16 +4659,16 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
                    (t (google-translate-read-target-language)))))
     (google-translate-translate from to text)))
 
-(embark-define-keymap aj/embark-word-lookup-map
-  "Keymap for ‘define-word’ etc."
-  ;; :parent identifier-symbol-map
-  ("w" sdcv-search)
-  ("RET" (aj/define-word-with wordnik))
-  ("t" (aj/define-word-with tyda))
-  ("b" (aj/define-word-with babla))
-  ("s" (aj/define-word-with thesaurus))
-  ("n" wordnut-search)
-  ("g" aj/google-translate-guess))
+(defvar-keymap aj/embark-word-lookup-map
+  :doc "Keymap for ‘define-word’ etc."
+  :parent embark-symbol-map
+  "w" #'sdcv-search
+  "RET" (aj/define-word-with wordnik)
+  "t" (aj/define-word-with tyda)
+  "b" (aj/define-word-with babla)
+  "s" (aj/define-word-with thesaurus)
+  "n" #'wordnut-search
+  "g" #'aj/google-translate-guess)
 
 (fset 'aj/embark-word-lookup-map aj/embark-word-lookup-map)
 (define-key embark-identifier-map "W" 'aj/embark-word-lookup-map)
@@ -4582,6 +4707,28 @@ Instructions for getting Webster’s dictionary: http://mbork.pl/2017-01-14_I'm_
 
 #+end_src
 
+*** Go-translate
+#+begin_src emacs-lisp
+
+(use-package go-translate
+  :custom
+  (gts-translate-list '(("sv" "en")))
+  (gts-default-translator
+   (gts-translator
+    :picker (gts-prompt-picker)
+    :engines (list (gts-google-engine))
+    :render (gts-buffer-render)))
+  )
+
+
+
+
+;; (use-package google-translate
+;;   :commands 'google-translate-smooth-translate
+;;   :init (setq google-translate-translation-directions-alist
+;;               '(("sv" . "en") ("en" . "sv") ("da" . "sv"))))
+
+#+end_src
 *** pandoc-view-mode: Auto convert files for reading in org mode via pandoc
 https://gist.github.com/imarko/ec8f39550662fcd16908b7ec9d100e7e
 #+begin_src emacs-lisp
@@ -4656,10 +4803,22 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
   :custom
   (pdf-annot-tweak-tooltips nil)
   (pdf-view-use-scaling t)
-  :config
-  ;; I almost never have use for synctex:
-  (setq pdf-tools-enabled-modes
-        (delq 'pdf-sync-minor-mode pdf-tools-enabled-modes)))
+  (pdf-view-bounding-box-margin 0.02)
+  (pdf-tools-enabled-modes
+   '(pdf-history-minor-mode
+     pdf-isearch-minor-mode
+     pdf-links-minor-mode
+     pdf-misc-minor-mode
+     pdf-outline-minor-mode
+     pdf-misc-size-indication-minor-mode
+     pdf-misc-menu-bar-minor-mode
+     pdf-annot-minor-mode
+     pdf-misc-context-menu-minor-mode
+     ;; pdf-cache-prefetch-minor-mode ; memory usage...
+     pdf-occur-global-minor-mode
+     ;; I almost never have use for synctex:
+     pdf-sync-minor-mode
+     )))
 
 (with-eval-after-load 'pdf-view
   (defun pdf-view-current-pagelabel (&optional window)
@@ -4683,7 +4842,8 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
                  aj/pdf-view-midnight-list))
       (pdf-view-midnight-minor-mode 1)))
 
-  (defvar aj/pdf-hl-color "#EDE3FA")
+  (defvar aj/pdf-hl-color "#f5edff";; "#EDE3FA"
+    )
   (defvar aj/pdf-ul-color "#633D91")
   (defvar aj/pdf-ol-color "#9C2F38")
   (defvar aj/pdf-note-color "#77599C")
@@ -4729,6 +4889,8 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
            (if (eq 'image (car-safe (posn-object posn)))
                (pdf-annot-add-text-annotation posn "Comment" `((color . ,aj/pdf-note-color)))
              (user-error "Not image?"))))
+
+
   (bind-keys
    :map pdf-view-mode-map
    ("s a" . pdf-view-auto-slice-minor-mode)
@@ -4742,7 +4904,9 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
    ("\"" . (lambda () (interactive) (aj/pdf-ul t)))
    ("#" . (lambda () (interactive) (aj/pdf-ol t)))
    ("¤" . (lambda () (interactive) (aj/pdf-sq t)))
-   ("<C-S-mouse-1>" . aj/pdf-text))
+   ("<C-S-mouse-1>" . aj/pdf-text)
+   ("M" . pdf-view-multipage-mode)
+   ("O" . pdf-oc-quote-mode))
 
   (defun aj/pdf-quit ()
     (interactive)
@@ -4773,6 +4937,7 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
   (defun aj/other-window-pdf-previous-page (n)
     (interactive "p")
     (aj/other-window-pdf-next-page (- (or n 1))))
+
   (bind-keys ("M-n" . aj/other-window-pdf-next-page)
              ("M-p" . aj/other-window-pdf-previous-page))
 
@@ -4790,7 +4955,7 @@ https://github.com/politza/pdf-tools/issues/74#issuecomment-90224020
 https://gist.github.com/politza/a3339a4f3b3901fcce4c
 #+begin_src emacs-lisp
 (use-package pdf-view-multipage
-  :straight (:host gitlab :repo "andersjohansson/pdf-view-multipage")
+  :straight (:depth full :host gitlab :repo "andersjohansson/pdf-view-multipage")
   :custom
   (pdf-view-multipage-odd-pages-left t)
   (pdf-view-multipage-remap-all t))
@@ -4872,6 +5037,11 @@ Save viewed page, like saveplace
 
 #+end_src
 
+*** csv-mode
+#+begin_src emacs-lisp
+(use-package csv-mode
+  :defer t)
+#+end_src
 ** Display customizations: theme, modeline, etc.
 *** Variable pitch
 I want to use variable pitch for most things. But changing the default face to a variable pitch font is not a good idea, since so many tabular modes etc. depend on a monospace font. Setting it ~text-mode~ and in the modeline is good though.
@@ -5256,16 +5426,51 @@ fi
 
   (setq
    modus-themes-common-palette-overrides
-   `((comment yellow)
+   '((comment yellow)
      (bg-region bg-ochre)
      (fringe bg-inactive)
-     ,@modus-themes-preset-overrides-faint)
+     (bg-hl-line bg-dim)
+     (constant blue)
+     (fg-link blue-faint)
+     (underline-link bg-active)
 
-   ;; modus-operandi-palette-overrides
-   ;; '((bg-active "#d7d7d7")
-   ;;   (bg-inactive "#efefef")
-   ;;   (bg-hl-line "#f2eff3")
-   ;;   (bg-completion "#def3ff"))
+     ;; Choose some of the darker colors for more refined look, and
+     ;; better contrast to background:
+     (err red-faint) ; originally red
+     (info cyan-faint) ; originally cyan-cooler
+     (string blue-faint) ; originally blue-cooler
+
+     ;; these give a little more "faint" look, and worse colour
+     ;; contrast, but more coherent however.
+     (keyword indigo) ; originally magenta-cooler
+     (builtin maroon) ; originally magenta-warmer
+
+     ;; Avoid red, cycle the four best colours
+     (fg-heading-1 fg-main)
+     (fg-heading-2 fg-alt)
+     (fg-heading-3 green-faint)
+     (fg-heading-4 magenta)
+     (fg-heading-5 fg-main)
+     (fg-heading-6 fg-alt)
+     (fg-heading-7 green-faint)
+     (fg-heading-8 magenta)
+
+     ;; this is a kind of heading
+     (mail-subject fg-heading-0)
+
+     (mail-cite-0 fg-alt)
+     (mail-cite-1 magenta)
+     (mail-cite-2 green-faint)
+     (mail-cite-3 yellow-faint)
+
+     ;; better contrast text vs background this way:
+
+     ;; ,@modus-themes-preset-overrides-faint
+     )
+
+   modus-operandi-palette-overrides
+   ;; need this to be fainter, but none of the nuanced or subtle colors work well.
+   '((bg-completion "#def3ff"))
    )
   )
 #+end_src
@@ -5304,7 +5509,7 @@ From modus-themes manual
     (disable-theme aj/light-theme)
     (unless (custom-theme-p aj/dark-theme)
       ;; I seldom use the dark theme, so now is the time to load it
-      (load-theme aj/dark-theme t t))
+      (load-theme aj/dark-theme 'no-confirm 'no-enable))
     (enable-theme aj/dark-theme)
     (call-process-shell-command
      ;; "xfconf-query -c xsettings -p /Net/ThemeName -s \"Arc-Dark\""
@@ -5319,7 +5524,9 @@ From modus-themes manual
      "dconf write /org/gnome/desktop/interface/gtk-theme \"'Arc'\""
      ))
    (t
-    (enable-theme 'aj/light-theme))))
+    (enable-theme 'aj/light-theme)))
+  ;; always load this after:
+  (load-theme 'aj 'no-confirm))
 
 (bind-key "S-<f11>" #'aj/toggle-light-dark)
 #+end_src
@@ -5334,7 +5541,7 @@ Loads ~aj-theme.el~, supposed to be done on top of any of the modus-themes. Also
 (setq goto-address-mail-face 'aj/goto-address-mail-face)
 
 (with-eval-after-load 'org-modern
-
+  
   (defface aj/org-waiting `((t :inherit org-modern-todo :foreground ,(modus-themes-with-colors yellow)))
     "Face for waiting org-state"
     :group 'org-faces)
@@ -5513,10 +5720,10 @@ From: http://stackoverflow.com/questions/4726220/how-to-have-colors-in-the-outpu
 
 (defadvice display-message-or-buffer (before ansi-color activate)
   "Process ANSI color codes in shell output."
-  (let ((buf (ad-get-arg 0)))
-    (and (bufferp buf)
-         (string= (buffer-name buf) "*Shell Command Output*")
-         (with-current-buffer buf
+  (let ((buff (ad-get-arg 0)))
+    (and (bufferp buff)
+         (string= (buffer-name buff) "*Shell Command Output*")
+         (with-current-buffer buff
            (ansi-color-apply-on-region (point-min) (point-max))))))
 #+end_src
 
@@ -5703,10 +5910,8 @@ I want my windows to launch at half screen width, to the left. But on my narrow 
 
   (defun aj/no-minibuffer-scrollbar-or-fringe (&optional frame)
     (set-window-scroll-bars (minibuffer-window frame) nil nil nil nil t)
-    ;; no right fringe in minibuffer
-    ;; disable this, looks bad for too-wide completion candidates
-    ;; ($ instead of fringe marks)
-    ;; (set-window-fringes (minibuffer-window frame) nil 0 nil t)
+    ;; widen fringe instead
+    (set-window-fringes (minibuffer-window frame) nil 20 nil t)
     )
 
   (aj/no-minibuffer-scrollbar-or-fringe)
@@ -5846,8 +6051,8 @@ A function for reverting all opened files, even remote files (because auto-rever
 (defun aj/revert-all-buffers ()
   "Refreshes all open buffers from their respective files."
   (interactive)
-  (dolist (buf (buffer-list))
-	(with-current-buffer buf
+  (dolist (buff (buffer-list))
+	(with-current-buffer buff
 	  (when (and (buffer-file-name) (not (buffer-modified-p)))
 		(revert-buffer t t t) )))
   (message "Refreshed open files."))
@@ -5876,6 +6081,17 @@ A function for reverting all opened files, even remote files (because auto-rever
   (recentf-mode 1))
 #+end_src
 
+
+* GC-stats
+#+begin_src emacs-lisp
+(use-package emacs-gc-stats
+  :custom
+  (emacs-gs-stats-gc-defaults 'emacs-defaults)
+  (emacs-gc-stats-remind 60)
+  :init
+  (emacs-gc-stats-mode 1))
+
+#+end_src
 * Final
 ** Load custom loaddefs :org_async:ARCHIVE:
 #+begin_src emacs-lisp

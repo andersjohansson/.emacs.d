@@ -138,7 +138,7 @@ for refile folder selection)"
   (mu4e-maildirs-extension-load))
 #+end_src
 
-*** mu4e-crm-contacts
+*** mu4e-crm-contacts :ARCHIVE:
 Insert contacts with completing-read-multiple
 https://gitlab.com/andersjohansson/mu4e-crm-contacts
 #+begin_src emacs-lisp
@@ -202,7 +202,7 @@ Only display unread count in modeline
   )
 #+end_src
 
-*** mu4e-query-helper
+*** mu4e-query-helper :ARCHIVE:
 Some completion for searching, more extensive than the recently included completion-at-point functions in mu4e-search.
 Available at: https://gitlab.com/andersjohansson/mu4e-query-helper
 
@@ -306,10 +306,8 @@ This is especially good for avoiding unneccesarily filled quoted original messag
 It is good to be able to see that the address we get an email from is correct, but we don’t need to see the full address. This little patching to ~mu4e~view-construct-contacts-header~  displays the domain name or possibly a short symbol fetched from the list ~aj/mail-domain~.
 
 Secure and economical.
-
-
 #+begin_src emacs-lisp
-(advice-add 'mu4e~view-render-buffer :after #'aj/article-prettify-addresses)
+(advice-add 'mu4e--view-render-buffer :after #'aj/article-prettify-addresses)
 
 (defmacro aj/with-article-narrowed-to-header (header &rest body)
   "If HEADER field is found, execute BODY with buffer narrowed to it."
@@ -362,6 +360,7 @@ Secure and economical.
         ;; is why “Hrvoje Nikšić <hniksic@srce.hr>”, given in the
         ;; example in Info node `(emacs-mime)Interface Functions',
         ;; works.
+        ;; TODO, is this a bug that should be reported?
         (ietf-drums-atext-token (concat ietf-drums-atext-token "[:alpha:]")))
     (string-join
      (cl-loop for (email . name) in (mail-header-parse-addresses addresses)
@@ -379,9 +378,8 @@ Secure and economical.
                 (buffer-string)))
      ", ")))
 
-
 (defun aj/mu4e-mail-domain-symbol (email)
-  (let ((maildomain (cadr (split-string email "@")))
+  (let ((maildomain (cadr (split-string (string-trim email "'" "'") "@")))
         (mailstring (concat "<" email ">")))
     (cl-loop for (d . s) in aj/mail-domains
              when (string-match-p d maildomain)
@@ -731,41 +729,41 @@ Examples:
 Queries for directory to save in, or just saves to
 ‘mu4e-attachment-dir’ if prefix ARG is given."
   (interactive "P")
-  (cl-assert (and (eq major-mode 'mu4e-view-mode)
-                  (derived-mode-p 'gnus-article-mode)))
-  (let* ((parts (mu4e~view-gather-mime-parts))
-         (handles '())
-         (files '())
-         dir)
-    (dolist (part parts)
-      (let ((fname (or (cdr (assoc 'filename (assoc "attachment" (cdr part))))
-                       (cl-loop for item in part
-                                for name = (and (listp item) (assoc-default 'name item))
-                                thereis (and (stringp name) name)))))
-	    (when fname
-	      (push `(,fname . ,(cdr part)) handles)
-	      (push fname files))))
+  (let* ((parts (mu4e-view-mime-parts))
+         (candidates  (seq-map
+                       (lambda (fpart)
+                         (cons ;; (filename . annotation)
+                          (plist-get fpart :filename)
+                          fpart))
+                       (seq-filter
+                        (lambda (part) (plist-get part :attachment-like))
+                        parts)))
+         (candidates (or candidates
+                         (mu4e-warn "No attachments for this message")))
+         (files (mu4e--completing-read "Save file(s): " candidates
+                                       'attachment 'multi))
+         (custom-dir (unless arg (read-directory-name "Save to directory: "))))
     (if files
-        (progn
-          (setq files (if (= 1 (length files)) files (completing-read-multiple "Save part(s): " files))
-                dir (if arg mu4e-attachment-dir (read-directory-name "Save to directory: ")))
-          (cl-loop for (f . h) in handles
-                   when (member f files)
-                   do (let* ((file (expand-file-name f dir))
-                             (file (if (file-exists-p file)
-			                           (let (newname (count 1))
-				                         (while (and
-					                             (setq newname
-					                                   (concat
-						                                (file-name-sans-extension file)
-						                                (format "(%s)" count)
-						                                (file-name-extension file t)))
-					                             (file-exists-p newname))
-				                           (cl-incf count))
-				                         newname)
-			                         file)))
-                        (mm-save-part-to-file h file)
-                        (when open (consult-file-externally file)))))
+        (dolist (fname files)
+          (let* ((part (cdr (assoc fname candidates)))
+                 (path (mu4e--uniqify-file-name
+                        (mu4e-join-paths
+                         (or custom-dir (plist-get part :target-dir))
+                         (plist-get part :filename))))
+                 (path (if (file-exists-p path)
+			               (let (newname (count 1))
+				             (while (and
+					                 (setq newname
+					                       (concat
+						                    (file-name-sans-extension file)
+						                    (format "(%s)" count)
+						                    (file-name-extension file t)))
+					                 (file-exists-p newname))
+				               (cl-incf count))
+				             newname)
+			             path)))
+            (mm-save-part-to-file (plist-get part :handle) path)
+            (when open (embark-open-externally path))))
       (mu4e-message "No attached files found"))))
 
 (defun aj/mu4e-view-open-attachments (arg)
@@ -816,103 +814,14 @@ https://vxlabs.com/2019/08/25/format-flowed-with-long-lines/
 (add-hook 'mu4e-compose-pre-hook #'mu4e--start)
 #+end_src
 
-*** Make header separator a thin line
-The line ~--text follows this line--~ that separaters headers from the message doesn’t look that nice. We can improve on it!
-We set the face for it to a thin line with the same background and foreground.
-Then, we also want it to extend to the end of line, so we’ll have to patch ~mu4e~draft-insert-mail-header-separator~ to insert an extra line break.
-
+*** Remove signature function, used below
 #+begin_src emacs-lisp
-(set-face-attribute 'mu4e-compose-separator-face nil
-                    :background "#e0e0e0" :foreground "#e0e0e0"
-                    :height 0.2 :box nil :extend t)
-(el-patch-feature mu4e-draft)
-(with-eval-after-load 'mu4e-draft
-  (el-patch-defun mu4e~draft-insert-mail-header-separator ()
-    "Insert `mail-header-separator' in the first empty line of the message.
-`message-mode' needs this line to know where the headers end and
-the body starts. Note, in `mu4e-compose-mode', we use
-`before-save-hook' and `after-save-hook' to ensure that this
-separator is never written to the message file. Also see
-`mu4e-remove-mail-header-separator'."
-    ;; we set this here explicitly, since (as it has happened) a wrong
-    ;; value for this (such as "") breaks address completion and other things
-    (set (make-local-variable 'mail-header-separator) "--text follows this line--")
-    (put 'mail-header-separator 'permanent-local t)
-    (save-excursion
-      ;; make sure there's not one already
-      (mu4e~draft-remove-mail-header-separator)
-      (let ((sepa (propertize (el-patch-wrap 1 1 (concat mail-header-separator "\n"))
-                              'intangible t
-                              ;; don't make this read-only, message-mode
-                              ;; seems to require it being writable in some cases
-                              ;;'read-only "Can't touch this"
-                              'rear-nonsticky t
-                              'font-lock-face 'mu4e-compose-separator-face)))
-        (widen)
-        ;; search for the first empty line
-        (goto-char (point-min))
-        (if (search-forward-regexp "^$" nil t)
-            (progn
-              (replace-match sepa)
-              ;; `message-narrow-to-headers` searches for a
-              ;; `mail-header-separator` followed by a new line. Therefore, we
-              ;; must insert a newline if on the last line of the buffer.
-              (when (= (point) (point-max))
-                (insert "\n")))
-          (progn ;; no empty line? then prepend one
-            (goto-char (point-max))
-            (insert "\n" sepa)))))))
-#+end_src
-
-*** KOLLA Allow and handle context change while composing
-I often open a compose buffer without checking the context. The functions below make sure that switching context in a compose buffer works as expected. A function to switch address and signature when switching context is defined. However, several compose buffers may be open at once, and this will only switch for the current buffer (which I believe is the most reasonable behaviour). To ensure that we don’t attempt to send a message with the wrong context active, a function to check if the context matches with the from address is added to ~message-send-hook~.
-#+begin_src emacs-lisp
-(defun aj/mu4e-compose-context-switch (&rest _ignore)
-  "When switching context in a compose buffer, switch “from” and signature."
-  (when (eq major-mode 'mu4e-compose-mode)
-    (message-replace-header "From" (mu4e~draft-from-construct))
-    (message-replace-header "Reply-to" mu4e-compose-reply-to-address)
-    (setq-local message-signature mu4e-compose-signature)
-    (setq aj/message-sig-cycle 0)
-    (aj/message-remove-signature)
-    (save-excursion (message-insert-signature))))
-
-(advice-add 'mu4e-context-switch :after #'aj/mu4e-compose-context-switch)
-
 (defun aj/message-remove-signature ()
   "Find and remove signature."
   (save-excursion
     (when (message-goto-signature)
       (forward-line -1)
       (delete-region (1- (point)) (point-max)))))
-
-(defun aj/message-send-check-context ()
-  "Check that from address and context matches, and ask to change if required.
-
-This is to avoid making mistakes in trying to send the current
-message from the wrong account"
-  ;; this may be a too strict check
-  (when (not
-         (or
-          (null mu4e-contexts)
-          (string= (message-fetch-field "from")
-                   (mu4e~draft-from-construct))))
-    (let ((context (mu4e-context-determine nil nil)))
-      (cond ((and context
-                  (y-or-n-p
-                   (format
-                    "Attempt to send via mismatching context. Switch to [%s] and send? "
-                    (mu4e-context-name context))))
-             (mu4e-context-switch t (mu4e-context-name context)))
-            ((not context)
-             (mu4e-context-switch
-              t
-              (mu4e-context-name  ; throws an error if no context found:
-               (mu4e~context-ask-user
-                "Attempt to send via mismatching context! Send after switching to: "))))
-            (t (signal 'quit nil))))))
-
-(add-hook 'message-send-hook #'aj/message-send-check-context)
 #+end_src
 
 *** Signature cycling
@@ -967,7 +876,51 @@ Set in my private mail config, possibly with mu4e context.")
 ;;      (alist-get lang aj/mu4e-compose-localized-signatures))))
 #+end_src
 
-*** Context cycling
+*** KOLLA Allow and handle context change while composing :ARCHIVE:
+I often open a compose buffer without checking the context. The functions below make sure that switching context in a compose buffer works as expected. A function to switch address and signature when switching context is defined. However, several compose buffers may be open at once, and this will only switch for the current buffer (which I believe is the most reasonable behaviour). To ensure that we don’t attempt to send a message with the wrong context active, a function to check if the context matches with the from address is added to ~message-send-hook~.
+#+begin_src emacs-lisp
+(defun aj/mu4e-compose-context-switch (&rest _ignore)
+  "When switching context in a compose buffer, switch “from” and signature."
+  (when (eq major-mode 'mu4e-compose-mode)
+    (message-replace-header "From" (mu4e~draft-from-construct))
+    (message-replace-header "Reply-to" mu4e-compose-reply-to-address)
+    (setq-local message-signature mu4e-compose-signature)
+    (setq aj/message-sig-cycle 0)
+    (aj/message-remove-signature)
+    (save-excursion (message-insert-signature))))
+
+(advice-add 'mu4e-context-switch :after #'aj/mu4e-compose-context-switch)
+
+(defun aj/message-send-check-context ()
+  "Check that from address and context matches, and ask to change if required.
+
+This is to avoid making mistakes in trying to send the current
+message from the wrong account"
+  ;; this may be a too strict check
+  (when (not
+         (or
+          (null mu4e-contexts)
+          (string= (message-fetch-field "from")
+                   (mu4e~draft-from-construct))))
+    (let ((context (mu4e-context-determine nil nil)))
+      (cond ((and context
+                  (y-or-n-p
+                   (format
+                    "Attempt to send via mismatching context. Switch to [%s] and send? "
+                    (mu4e-context-name context))))
+             (mu4e-context-switch t (mu4e-context-name context)))
+            ((not context)
+             (mu4e-context-switch
+              t
+              (mu4e-context-name  ; throws an error if no context found:
+               (mu4e~context-ask-user
+                "Attempt to send via mismatching context! Send after switching to: "))))
+            (t (signal 'quit nil))))))
+
+(add-hook 'message-send-hook #'aj/message-send-check-context)
+#+end_src
+
+*** Context cycling :ARCHIVE:
 I want to use a single binding to switch (cycle through) contexts when composing.
 #+begin_src emacs-lisp
 (defun aj/mu4e-cycle-contexts ()
@@ -1475,9 +1428,13 @@ attachment - should launch the no-attachment warning.")
 
 ** Headers settings
 
+*** Thread folding
+Introduced in May 2023. For some stupid reason both ~tab~ and ~C-tab~ is bound to ~mu4e-thread-fold-toggle-goto-next~ in the mode-map. (And I use ~C-tab~ for switching windows).
+#+begin_src emacs-lisp
+(keymap-set mu4e-thread-mode-map "C-<tab>" nil)
+#+end_src
 *** Always show the headings buffer when launching with search or bookmarks
 Disregard and remove any other windows where it is shown.
-
 
 #+begin_src emacs-lisp
 ;; I don’t use the main view:
@@ -1492,58 +1449,70 @@ Disregard and remove any other windows where it is shown.
 (advice-add 'mu4e~headers-maybe-auto-update :before
             #'aj/mu4e-headers-set-auto-updating)
 
-(el-patch-defun mu4e--search-execute (expr ignore-history)
-  "Search for query EXPR.
+;; (add-to-list 'display-buffer-alist
+;;              '(("\\*mu4e-headers\\*" (display-buffer-full-frame display-buffer-pop-up-frame))))
 
-Switch to the output buffer for the results. If IGNORE-HISTORY is
-true, do *not* update the query history stack."
-  (let* ((buf (get-buffer-create mu4e-headers-buffer-name))
-         (inhibit-read-only t)
-         (rewritten-expr (funcall mu4e-query-rewrite-function expr))
-         (maxnum (unless mu4e-search-full mu4e-search-results-limit)))
-    (with-current-buffer buf
-      (mu4e-headers-mode)
-      (unless ignore-history
-        ;; save the old present query to the history list
-        (when mu4e--search-last-query
-          (mu4e--search-push-query mu4e--search-last-query 'past)))
-      (setq mu4e--search-last-query rewritten-expr)
-      (mu4e~headers-update-mode-line))
 
-    (el-patch-swap
-      ;; when the buffer is already visible, select it; otherwise,
-      ;; switch to it.
-      (unless (get-buffer-window buf 0)
-        (switch-to-buffer buf))
+;; (el-patch-defun mu4e--search-execute (expr ignore-history)
+;;   "Search for query EXPR.
 
-      ;; if not auto-updating, and not viewing in current frame: Pop up
-      ;; a frame.
-      (progn
-        (unless aj/mu4e-headers-auto-updating
-          (unless (get-buffer-window mu4e-headers-buffer-name) ;; do stuff if not in the current frame
-            (let (win)
-              (while (setq win (get-buffer-window mu4e-headers-buffer-name t))
-                ;; delete that full frame, or only the window
-                (if (window-parent win)
-                    (delete-window win)
-                  (delete-frame (window-frame win)))))
-            ;; pop up a new frame!
-            ;;(make-frame '((full-screen . t)))
-            ;; but fullscreen doesn’t work on pgtk
-            (display-buffer mu4e-headers-buffer-name
-                            '(display-buffer-pop-up-frame))))
-        (setq aj/mu4e-headers-auto-updating nil)))
+;; Switch to the output buffer for the results. If IGNORE-HISTORY is
+;; true, do *not* update the query history stack."
+;;   (let* ((buf (mu4e-get-headers-buffer nil t))
+;;          (view-window mu4e~headers-view-win)
+;;          (inhibit-read-only t)
+;;          (rewritten-expr (funcall mu4e-query-rewrite-function expr))
+;;          (maxnum (unless mu4e-search-full mu4e-search-results-limit)))
+;;     (with-current-buffer buf
+;;       ;; NOTE: this resets all buffer-local variables, including
+;;       ;; `mu4e~headers-view-win', which may have a live window if the
+;;       ;; headers buffer already exists when `mu4e-get-headers-buffer'
+;;       ;; is called.
+;;       (mu4e-headers-mode)
+;;       (setq mu4e~headers-view-win view-window)
+;;       (unless ignore-history
+;;         ;; save the old present query to the history list
+;;         (when mu4e--search-last-query
+;;           (mu4e--search-push-query mu4e--search-last-query 'past)))
+;;       (setq mu4e--search-last-query rewritten-expr)
+;;       (setq list-buffers-directory rewritten-expr)
+;;       (mu4e~headers-update-mode-line))
 
-    (run-hook-with-args 'mu4e-search-hook expr)
-    (mu4e~headers-clear mu4e~search-message)
-    (mu4e--server-find
-     rewritten-expr
-     mu4e-search-threads
-     mu4e-headers-sort-field
-     mu4e-headers-sort-direction
-     maxnum
-     mu4e-headers-skip-duplicates
-     mu4e-headers-include-related)))
+;;     (el-patch-swap
+;;       ;; when the buffer is already visible, select it; otherwise,
+;;       ;; switch to it.
+;;       (unless (get-buffer-window buf 0)
+;;         (switch-to-buffer buf))
+
+;;       ;; if not auto-updating, and not viewing in current frame: Pop up
+;;       ;; a frame.
+;;       (progn
+;;         (unless aj/mu4e-headers-auto-updating
+;;           (unless (get-buffer-window mu4e-headers-buffer-name) ;; do stuff if not in the current frame
+;;             (let (win)
+;;               (while (setq win (get-buffer-window mu4e-headers-buffer-name t))
+;;                 ;; delete that full frame, or only the window
+;;                 (if (window-parent win)
+;;                     (delete-window win)
+;;                   (delete-frame (window-frame win)))))
+;;             ;; pop up a new frame!
+;;             ;;(make-frame '((full-screen . t)))
+;;             ;; but fullscreen doesn’t work on pgtk
+;;             (display-buffer mu4e-headers-buffer-name
+;;                             '(display-buffer-pop-up-frame))))
+;;         (setq aj/mu4e-headers-auto-updating nil)))
+
+;;     (run-hook-with-args 'mu4e-search-hook expr)
+;;     (mu4e~headers-clear mu4e~search-message)
+;;     (setq mu4e~headers-search-start (float-time))
+;;     (mu4e--server-find
+;;      rewritten-expr
+;;      mu4e-search-threads
+;;      mu4e-search-sort-field
+;;      mu4e-search-sort-direction
+;;      maxnum
+;;      mu4e-search-skip-duplicates
+;;      mu4e-search-include-related)))
 
 ;; (defun aj/mu4e-search-show-buffer (&rest _ignore)
 ;;   (unwind-protect
@@ -1665,6 +1634,103 @@ true, do *not* update the query history stack."
 ;;       mu4e-headers-fields))))
 #+end_src
 
+*** Fix for mark targets when using ~mu4e-headers-precise-alignment~
+#+begin_src emacs-lisp
+(el-patch-feature mu4e-mark)
+(with-eval-after-load 'mu4e-mark
+  (el-patch-defun mu4e-mark-at-point (mark target)
+    "Mark (or unmark) message at point.
+MARK specifies the mark-type. For `move'-marks and `trash'-marks
+the TARGET argument is non-nil and specifies to which maildir the
+message is to be moved/trashed. The function works in both
+headers buffers and message buffers.
+
+The following marks are available, and the corresponding props:
+
+   MARK       TARGET    description
+   ----------------------------------------------------------
+   `refile'    y        mark this message for archiving
+   `something' n        mark this message for *something* (decided later)
+   `delete'    n        remove the message
+   `flag'      n        mark this message for flagging
+   `move'      y        move the message to some folder
+   `read'      n        mark the message as read
+   `trash'     y        trash the message to some folder
+   `unflag'    n        mark this message for unflagging
+   `untrash'   n        remove the `trashed' flag from a message
+   `unmark'    n        unmark this message
+   `unread'    n        mark the message as unread
+   `action'    y        mark the message for some action."
+    (interactive)
+    (let* ((msg (mu4e-message-at-point))
+           (docid (mu4e-message-field msg :docid))
+           ;; get a cell with the mark char and the "move" already has a target
+           ;; (the target folder) the other ones get a pseudo "target", as info
+           ;; for the user.
+           (markdesc (cdr (or (assq mark mu4e-marks)
+                              (mu4e-error "Invalid mark %S" mark))))
+           (get-markkar
+            (lambda (char)
+              (if (listp char)
+                  (if mu4e-use-fancy-chars (cdr char) (car char))
+                char)))
+           (markkar (funcall get-markkar (plist-get markdesc :char)))
+           (target (mu4e--mark-get-dyn-target mark target))
+           (show-fct (plist-get markdesc :show-target))
+           (shown-target (if show-fct
+                             (funcall show-fct target)
+                           (if target (format "%S" target)))))
+      (unless docid (mu4e-warn "No message on this line"))
+      (unless (eq major-mode 'mu4e-headers-mode)
+        (mu4e-error "Not in headers-mode"))
+      (save-excursion
+        (when (mu4e~headers-mark docid markkar)
+          ;; update the hash -- remove everything current, and if add the new
+          ;; stuff, unless we're unmarking
+          (remhash docid mu4e--mark-map)
+          ;; remove possible mark overlays
+          (remove-overlays (line-beginning-position) (line-end-position)
+			               'mu4e-mark t)
+          ;; now, let's set a mark (unless we were unmarking)
+          (unless (eql mark 'unmark)
+            (puthash docid (cons mark target) mu4e--mark-map)
+            ;; when we have a target (ie., when moving), show the target folder in
+            ;; an overlay
+            (when (and shown-target mu4e-headers-show-target)
+              (let* ((targetstr (propertize (concat "-> " shown-target " ")
+                                            'face 'mu4e-system-face))
+                     ;; mu4e~headers-goto-docid docid t \will take us just after
+                     ;; the docid cookie and then we skip the mu4e--mark-fringe
+                     (start (+ (length mu4e--mark-fringe)
+                               (mu4e~headers-goto-docid docid t)))
+                     (overlay (make-overlay
+                               start
+                               (el-patch-swap
+                                 (+ start (length targetstr))
+                                 (let ((eol (line-end-position)))
+                                   (or (and mu4e-headers-precise-alignment
+                                            (let ((end-col (cl-loop for (f . w)
+                                                                    in mu4e-headers-fields
+                                                                    while (numberp w)
+                                                                    sum w)))
+                                              (save-excursion
+                                                (when-let ((match
+                                                            (text-property-search-forward
+                                                             'display
+                                                             `(space :align-to ,end-col)
+                                                             t))
+                                                           (beg (prop-match-beginning match)))
+                                                  (when (< beg eol)
+                                                    beg)))))
+                                       (min (line-end-position)
+                                            (+ start (length targetstr)))))))))
+                (overlay-put overlay 'display targetstr)
+                (overlay-put overlay 'mu4e-mark t)
+                (overlay-put overlay 'evaporate t)
+                docid))))))))
+
+
+#+end_src
 *** Set face of subject field to variable-pitch :ARCHIVE:
 #+begin_src emacs-lisp
 (defun aj/mu4e-headers-field-set-subject-face (msg field)
@@ -2210,7 +2276,7 @@ messages “refiled” in gmail accounts from the inbox listing."
                               (mu4e-action-retag-message msg (concat "+" target)))))
 
 (mu4e~headers-defun-mark-for tag)
-(define-key 'mu4e-headers-mode-map (kbd "ö") 'mu4e-headers-mark-for-tag)
+(bind-key "ö" #'mu4e-headers-mark-for-tag mu4e-headers-mode-map)
 ;; (mu4e~view-defun-mark-for tag)
 ;; (define-key 'mu4e-view-mode-map (kbd "C-ö") 'mu4e-headers-mark-for-tag)
 
@@ -2241,7 +2307,8 @@ At times, I can safely refile messages without reading them and at the same time
 
 
 (mu4e~headers-defun-mark-for refile-read)
-(define-key 'mu4e-headers-mode-map "ä" 'mu4e-headers-mark-for-refile-read)
+(bind-key "ä" #'mu4e-headers-mark-for-refile-read mu4e-headers-mode-map)
+
 #+end_src
 
 

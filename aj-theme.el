@@ -1,6 +1,6 @@
 ;;; aj-theme.el --- Custom face settings applied on top of modus themes -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2022  Anders Johansson
+;; Copyright (C) 2022-2023  Anders Johansson
 
 ;; Author: Anders Johansson <mejlaandersj@gmail.com>
 
@@ -30,8 +30,9 @@
 (modus-themes-with-colors
   (custom-theme-set-faces
    'aj
-   '(default ((t (:height 113))))
+   '(default ((t (:height 113 :family "Source Code Pro"))))
    '(variable-pitch ((t (:family "Inter"))))
+   '(fixed-pitch ((t (:family "Source Code Pro"))))
 
    ;; modus-operandi sets it to inherit fixed-pitch, but that is
    ;; bad with the detailed space matching I do!
@@ -42,9 +43,17 @@
    ;; only visible when ‘org-cite-csl-activate’ isn’t active
    '(org-cite-key ((t :inherit modus-themes-prompt :underline "light grey")))
    '(org-document-title ((t :height 1.5 :weight bold)))
-   ;; `(org-block-begin-line nil ((t :overline ,bg-active :height 0.9)))
-   ;; `(org-block-end-line ((t :underline (:color ,bg-active) :overline nil :height 0.9)))
-   '(org-quote ((t :height 0.95 :background unspecified)))
+
+   '(org-block-begin-line ((t (:underline
+                               (:color foreground-color :style line :position line)
+                               :background unspecified
+                               :extend t :inherit
+                               (modus-themes-fixed-pitch)))))
+   '(org-block-end-line ((t (:overline t :extend t :inherit (modus-themes-fixed-pitch)))))
+
+   `(org-quote ((t :background ,bg-main :family "Recursive Sans Casual Static")))
+
+
 
    ;; ;; Use fixed-pitch for checkbox, compressed font for table
    '(org-checkbox ((t :inherit fixed-pitch)))
@@ -60,10 +69,13 @@
    '(org-habit-ready-face ((t :inherit fixed-pitch)))
    '(org-habit-ready-future-face ((t :inherit fixed-pitch)))
 
-   ;; '(org-agenda-date-today ((t :background 'unspecified)))
-   ;;(set-face-attribute 'org-block nil :background "#f8f8f8")
+   `(org-archived ((t :strike-through ,fg-dim :background unspecified)))
 
-   `(org-modern-tag ((t :box (:color ,bg-inactive :line-width (0 . -3)) :background ,bg-inactive :inherit org-modern-label)))
+   ;; I have disabled the pre-display updating in favour of this static definition:
+   `(org-modern-label ((t :box (:color ,bg-main :line-width (1 . 1)) :height 0.9 :weight regular :underline nil :family "Recursive Sans Casual Static")))
+
+   `(org-modern-tag ((t :box (:color ,bg-green-nuanced :line-width (0 . -3)) :background ,bg-green-nuanced :height 1.0 :family "Recursive Sans Casual Static")))
+
 
    '(idle-highlight ((t :inherit nil :underline t)))
 
@@ -74,13 +86,24 @@
 
    ;; modus let’s it inherit `shadow’ for no good reason
    '(mu4e-header-face ((t :inherit nil)))
-   '(lin-blue ((t :background "#def3ff"))) ; a bit lighter than default
+   `(mu4e-compose-separator-face ((t :inherit 'org-hide :overline ,fg-dim :box nil)))
+   '(mu4e-system-face ((t :inherit (variable-pitch italic))))
+   '(mu4e-thread-fold-face ((t :inherit shadow)))
+
+
+   '(lin-blue ((t :background "#def3ff"))) ; a bit lighter than
+                                        ; default, only works for
+                                        ; light background
 
    `(diff-hl-insert ((t :inverse-video t :foreground ,(face-background 'fringe))))
    `(diff-hl-delete ((t :inverse-video t :foreground ,(face-background 'fringe))))
    `(diff-hl-change ((t :inverse-video t :foreground ,(face-background 'fringe))))
 
+   '(consult-file ((t)))
+
    `(scroll-bar ((t :background ,bg-main :foreground ,bg-active)))
+
+   '(dirvish-hl-line ((t :inherit modus-themes-completion-selected)))
    ))
 
 (provide-theme 'aj)
