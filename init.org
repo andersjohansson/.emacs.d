@@ -540,16 +540,13 @@ of the box `(w h)' inside the box `(cw ch)'."
   :after vertico
   :demand t
   :custom
-  (prescient-filter-method '(literal initialism prefix regexp))
-  (prescient-history-length 500)
-  (prescient-use-char-folding t)
+  (prescient-filter-method '(literal regexp))
+  (prescient-history-length 1000)
+  (prescient-use-char-folding 'smart)
   (prescient-use-case-folding 'smart)
   (prescient-sort-full-matches-first t) ; Works well with `initialism'.
   (prescient-sort-length-enable t)
   :config
-  ;; ;; Use `prescient-completion-sort' after filtering.
-  ;; (setq vertico-sort-function #'prescient-completion-sort)
-
   (prescient-persist-mode 1))
 
 (use-package vertico-prescient
@@ -5028,13 +5025,6 @@ Save viewed page, like saveplace
     (copy-file
      file
      (expand-file-name "Sony_Reader/media/books/" prs-pdf-annotations-reader-path))))
-
-
-
-
-
-
-
 #+end_src
 
 *** csv-mode

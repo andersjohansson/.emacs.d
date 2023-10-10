@@ -808,7 +808,8 @@ https://vxlabs.com/2019/08/25/format-flowed-with-long-lines/
 *** Some compose settings
 #+begin_src emacs-lisp
 (setq mail-user-agent 'mu4e-user-agent
-      mu4e-compose-hidden-headers '("^Face:" "^X-Face:" "^X-Draft-From:" "^User-agent:" "References:"))
+      mu4e-compose-hidden-headers '("^Face:" "^X-Face:" "^X-Draft-From:" "^User-agent:" "References:")
+      mu4e-compose-dont-reply-to-self t)
 
 ;; in case write is invoked before mu4e is loaded
 (add-hook 'mu4e-compose-pre-hook #'mu4e--start)

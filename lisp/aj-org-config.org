@@ -1322,7 +1322,9 @@ I want to be able to use emojis \etc. But that doesn’t work with the way ~org-
       '(("^C-.*" ?📅)))
 #+end_src
 
-**** External calendars
+**** COMMENT External calendars :ARCHIVE:
+Had trouble with these, disabling
+
 Currently I need to sync both with my work exchange server and some private google calendars.
 ***** Functions for syncing some or all external calendars
 #+begin_src emacs-lisp
@@ -1340,7 +1342,9 @@ Currently I need to sync both with my work exchange server and some private goog
   (deferred:$
    (deferred:parallel
     (aj/org-cal-sync-maybe "~/org/imp/G.org" 8 "aj-gcal-to-org" force)
-    (aj/org-cal-sync-maybe "~/org/imp/chalmerskalender.org" 3 "aj-sync-exchange-calendar" force))
+    ;; doesn’t work anymore since transition to O365
+    ;; (aj/org-cal-sync-maybe "~/org/imp/chalmerskalender.org" 3 "aj-sync-exchange-calendar" force)
+    )
    (deferred:nextc it
                    (lambda (args)
                      ;; (message "All synced!")
@@ -3338,7 +3342,7 @@ Named with org prefix to be preserved in org exports."
         (buffer-string))
     string))
 
-(defun aj/org-cleanup-html ()
+(defun aj/org2-cleanup-html ()
   "Clean up html in current buffer"
   (interactive)
   (goto-char (point-min))
@@ -3593,54 +3597,54 @@ Named with org prefix to be preserved in org exports."
     "Minor mode with some custom keybindings for help in creating org-reveal presentations"
     :keymap `((,(kbd "C-c C-'") . aj/hydra-org-reveal-templates/body)))
 
-  (defvar aj/org-reveal-classes
-    '(("r-stack")
-      ("r-stretch")
-      ("r-fit-text")
-      ("fillheight")
-      ("large")
-      ("Large")
-      ("LARGE")
-      ("huge")
-      ("small")
-      ("footnotesize")
-      ("tiny")
-      ("larger")
-      ("much-larger")
-      ("very-much-larger")
-      ("smaller")
-      ("much-smaller")
-      ("extratopmargin")
-      ("attrib: picture attributions" )
-      ("whiteoverlay: overlay over background" )
-      ("pic-row: for pictures in row")
-      ("shadow: box shadow")
-      ("shapeshadow: shadow for complex shapes")
-      ( "columns: wrapper for flexing elements")
-      ("vertical-center")
-      ("center-emphasize")
-      ("bottom-note")
-      ("random-container" "container for randomly placed elements")
-      ("absolute-random: elements inside random-container")
-      ("fade-out: Fragment: Start visible, fade out")
-      ("fade-up: Fragment: Slide up while fading in")
-      ("fade-down: Fragment: Slide down while fading in")
-      ("fade-left: Fragment: Slide left while fading in")
-      ("fade-right: Fragment: Slide right while fading in")
-      ("fade-in-then-out: Fragment: Fades in, then out on the next step")
-      ("fade-in-then-semi-out: Fragment: Fades in, then to 50% on the next step")
-      ("grow: Fragment: Scale up")
-      ("shrink: Fragment: Scale down")
-      ("strike: Fragment: Strike through")
-      ("highlight-red: Fragment: Turn text red")
-      ("highlight-green: Fragment: Turn text green")
-      ("highlight-blue: Fragment: Turn text blue")
-      ("highlight-bold: Fragment: Turn text bold")
-      ("highlight-current-red: Fragment: Turn text red, then back to original on next step")
-      ("highlight-current-green: Fragment: Turn text green, then back to original on next step")
-      ("highlight-current-blue: Fragment: Turn text blue, then back to original on next step")
-      ("highlight-current-bold: Fragment: Turn text bold, then back to original on next step"))
-    "Classes for elements in reveal.js presentations")
+  ;; (defvar aj/org-reveal-classes
+  ;;   '(("r-stack")
+  ;;     ("r-stretch")
+  ;;     ("r-fit-text")
+  ;;     ("fillheight")
+  ;;     ("large")
+  ;;     ("Large")
+  ;;     ("LARGE")
+  ;;     ("huge")
+  ;;     ("small")
+  ;;     ("footnotesize")
+  ;;     ("tiny")
+  ;;     ("larger")
+  ;;     ("much-larger")
+  ;;     ("very-much-larger")
+  ;;     ("smaller")
+  ;;     ("much-smaller")
+  ;;     ("extratopmargin")
+  ;;     ("attrib: picture attributions" )
+  ;;     ("whiteoverlay: overlay over background" )
+  ;;     ("pic-row: for pictures in row")
+  ;;     ("shadow: box shadow")
+  ;;     ("shapeshadow: shadow for complex shapes")
+  ;;     ( "columns: wrapper for flexing elements")
+  ;;     ("vertical-center")
+  ;;     ("center-emphasize")
+  ;;     ("bottom-note")
+  ;;     ("random-container" "container for randomly placed elements")
+  ;;     ("absolute-random: elements inside random-container")
+  ;;     ("fade-out: Fragment: Start visible, fade out")
+  ;;     ("fade-up: Fragment: Slide up while fading in")
+  ;;     ("fade-down: Fragment: Slide down while fading in")
+  ;;     ("fade-left: Fragment: Slide left while fading in")
+  ;;     ("fade-right: Fragment: Slide right while fading in")
+  ;;     ("fade-in-then-out: Fragment: Fades in, then out on the next step")
+  ;;     ("fade-in-then-semi-out: Fragment: Fades in, then to 50% on the next step")
+  ;;     ("grow: Fragment: Scale up")
+  ;;     ("shrink: Fragment: Scale down")
+  ;;     ("strike: Fragment: Strike through")
+  ;;     ("highlight-red: Fragment: Turn text red")
+  ;;     ("highlight-green: Fragment: Turn text green")
+  ;;     ("highlight-blue: Fragment: Turn text blue")
+  ;;     ("highlight-bold: Fragment: Turn text bold")
+  ;;     ("highlight-current-red: Fragment: Turn text red, then back to original on next step")
+  ;;     ("highlight-current-green: Fragment: Turn text green, then back to original on next step")
+  ;;     ("highlight-current-blue: Fragment: Turn text blue, then back to original on next step")
+  ;;     ("highlight-current-bold: Fragment: Turn text bold, then back to original on next step"))
+  ;;   "Classes for elements in reveal.js presentations")
 
   (defhydra aj/hydra-org-reveal-templates (:color blue :columns 4)
     "Reveal templates"
@@ -3655,7 +3659,7 @@ Named with org prefix to be preserved in org exports."
                    (lambda (c)
                      (car (split-string c ":" t)))
                    (completing-read-multiple
-                    "Class: " aj/org-reveal-classes)
+                    "Class: " (aj/org-reveal-get-css-classes))
                    " ")))
      "Insert html class for element")
     ("x" (org-set-property "html_headline_class"
@@ -3663,7 +3667,7 @@ Named with org prefix to be preserved in org exports."
                             (lambda (c)
                               (car (split-string c ":" t)))
                             (completing-read-multiple
-                             "Class: " aj/org-reveal-classes)
+                             "Class: " (aj/org-reveal-get-css-classes))
                             " "))
      "Add class on headline")
     ("C" (progn (org-set-property "reveal_data_state" "centered-headline")
@@ -3692,6 +3696,40 @@ Named with org prefix to be preserved in org exports."
     ("z" (insert "#+html: <div id=\"zotxtbibliography\"></div>") "Bibliography")
     ("N" (org-toggle-tag "notitle") "No title headline")
     ("q" nil)))
+
+
+(defvar aj/org-reveal-extra-classes
+  '(("r-stack"
+     "r-stretch"
+     "r-fit-text")))
+
+(defun aj/org-reveal-get-css-classes ()
+  (let ((files '("/home/aj/jobb/presentationer/assets/ajcommon.css"
+                 "/home/aj/jobb/presentationer/assets/ajwhite.css"
+                 "/home/aj/jobb/presentationer/assets/aj-contrast-backgrounds.css"))
+        (filterfiles '("~/lib/reveal.js/css/layout.scss"
+                       "~/lib/reveal.js/css/reveal.scss"
+                       "~/lib/reveal.js/css/theme/source/white.scss")))
+    (append
+     aj/org-reveal-extra-classes
+     aj/reveal-wrap-classes
+     (seq-difference
+      (seq-uniq (mapcan #'aj/org-reveal-get-css-classes-in-file files) #'equal)
+      (seq-uniq (mapcan #'aj/org-reveal-get-css-classes-in-file filterfiles) #'equal)
+      #'equal))))
+
+(defun aj/org-reveal-get-css-classes-in-file (file)
+  (let (clist)
+    (with-temp-buffer
+      (insert-file-contents file)
+      (css-mode)
+      (goto-char (point-min))
+      (cl-loop while (search-forward-regexp
+                      (rx (and symbol-start
+                               (and ?. (group letter (>= 2 word)))
+                               symbol-end))
+                      nil 'noerror)
+               collect (match-string-no-properties 1)))))
 #+end_src
 
 **** COMMENT Fix file paths when inserting links in ~aj-org-reveal-mode~ :ARCHIVE:
