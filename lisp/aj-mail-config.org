@@ -2073,6 +2073,7 @@ The most complex part is for choosing refile folders, depending on account and s
            (setq current-mf folder
                  current-max count)
            finally return
+           ;; Change this to:
            ;; no suggestions + extra choice for refiling. Refiling
            ;; should guess or fall back to default archive. Otherwise
            ;; the user can do a move. More expected to get interaction
@@ -2098,23 +2099,23 @@ The most complex part is for choosing refile folders, depending on account and s
 (defun aj/mu4e-refile-store-history-msg (msg folder)
   "Stores history for sender in MSG and returns FOLDER."
   (when-let ((from (mu4e-msg-field msg :from)))
-    (aj/mu4e-refile-store-history (cdar from) folder))
+    (aj/mu4e-refile-store-history (mu4e-contact-email (car from)) folder))
   folder)
 
 (defun aj/mu4e-refile-store-history-after-move (folder)
   "Stores history for sender in msg at point and returns FOLDER."
   (when-let (from (mu4e-field-at-point :from))
-    (aj/mu4e-refile-store-history (cdar from) folder))
+    (aj/mu4e-refile-store-history (mu4e-contact-email (car from)) folder))
   folder)
 
-(advice-add 'mu4e~mark-get-move-target :filter-return #'aj/mu4e-refile-store-history-after-move)
+(advice-add 'mu4e--mark-get-move-target :filter-return #'aj/mu4e-refile-store-history-after-move)
 
 (add-to-list 'aj/mu4e-refile-fns #'aj/mu4e-refile-guess-by-sender t)
 
 (defun aj/mu4e-refile-folder (msg)
   "Choose a refile folder for MSG.
 Choose depending on account functions in ‘aj/mu4e-refile-fns’ or
-fallbacks to default refile folder."
+fallback to default refile folder."
   (let ((dir (run-hook-with-args-until-success 'aj/mu4e-refile-fns msg)))
     (cond
      ((stringp dir)
