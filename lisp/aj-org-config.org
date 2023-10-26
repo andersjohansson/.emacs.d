@@ -2346,6 +2346,7 @@ Useful for launching a small capture frame from window manager with a call like:
 #+end_src
 
 
+
 ** org-protocol-capture-html: Capture web pages from browser
 #+begin_src emacs-lisp
 (use-package org-protocol-capture-html
@@ -3342,7 +3343,7 @@ Named with org prefix to be preserved in org exports."
         (buffer-string))
     string))
 
-(defun aj/org2-cleanup-html ()
+(defun aj/org-cleanup-html ()
   "Clean up html in current buffer"
   (interactive)
   (goto-char (point-min))
