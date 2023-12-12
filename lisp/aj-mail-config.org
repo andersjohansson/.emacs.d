@@ -1772,7 +1772,7 @@ The following marks are available, and the corresponding props:
          (:flags . 6)
          (:from-or-to . 22)
          (:ajtags . 3)
-         (:othermaildir . 5)
+         (:othermaildir . 12)
          (:ajlists . 8)
          ;; (:thread-subject)
          )
@@ -1783,7 +1783,7 @@ The following marks are available, and the corresponding props:
          (:from-or-to . 22)
          ;; (:ajtags . 3)
          (:gmailtags . 5)
-         (:othermaildir . 10)
+         (:othermaildir . 12)
          (:mailing-list . 7)
          ;; (:thread-subject)
          )))
@@ -1887,8 +1887,24 @@ Returns the empty string if this is the \"current\" maildir."
               ""
             (s-chop-prefix (s-shared-start mmd smd) mmd)))
       ;; only first letter of base maildir, in bold:
-      (replace-regexp-in-string
-       "^/[^/]+" (lambda (s) (propertize (substring s 1 2) 'face 'bold)) mmd))))
+      (setq mmd (replace-regexp-in-string
+                 "^/[^/]+"
+                 (lambda (s) (propertize (substring s 1 2) 'face 'bold))
+                 mmd 'fixed 'literal))
+      (s-replace-all aj/mu4e-maildir-icons mmd)
+      ;; (cl-loop for (find . rep) in aj/mu4e-maildir-icons do
+      ;;          (setq mmd (replace-regexp-in-string find rep mmd 'fixed 'literal t t)))
+      )))
+
+(defvar aj/mu4e-maildir-icons
+  `(("/Archive/undervisning" . "//u")
+    ("/Archive/listor" . "//")
+    ("/Archive" . "/")
+    ("/Deleted Items" . "/")
+    ("/Sent Items" . ,(concat "/" (all-the-icons-material "send")))
+    ("/INBOX" . "/")
+    )
+  )
 
 (add-to-list 'mu4e-header-info-custom
              '(:aj-human-date .
