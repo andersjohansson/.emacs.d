@@ -129,15 +129,6 @@ for refile folder selection)"
   :demand t)
 #+end_src
 
-*** mu4e-maildirs-extension :ARCHIVE:
-#+begin_src emacs-lisp
-(use-package mu4e-maildirs-extension
-  :after mu4e
-  :config (setq mu4e-maildirs-extension-use-bookmarks nil
-                mu4e-maildirs-extension-toggle-maildir-key (kbd "TAB"))
-  (mu4e-maildirs-extension-load))
-#+end_src
-
 *** mu4e-crm-contacts :ARCHIVE:
 Insert contacts with completing-read-multiple
 https://gitlab.com/andersjohansson/mu4e-crm-contacts
@@ -719,7 +710,7 @@ Examples:
 ;;           (gnus-treat-article 'head))))))
 #+end_src
 
-*** Save-attachment, with open function suits me better
+*** Save-attachment, with open function that suits me better
 #+begin_src emacs-lisp
 (define-key mu4e-view-mode-map [remap mu4e-view-save-attachments] #'aj/mu4e-view-save-attachments)
 (define-key mu4e-view-mode-map "o" #'aj/mu4e-view-open-attachments)
