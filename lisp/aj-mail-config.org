@@ -301,7 +301,7 @@ Secure and economical.
 
 (defmacro aj/with-article-narrowed-to-header (header &rest body)
   "If HEADER field is found, execute BODY with buffer narrowed to it."
-  (declare (indent 1))
+  (declare (indent 1) (debug t))
   `(let ((case-fold-search t)
          ;; start end
          )
