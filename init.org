@@ -1567,16 +1567,16 @@ Use mu4e, the extensive config is in an [[file:lisp/aj-mail-config.org][external
            (mu4e-confirm-quit nil)
            (mu4e-context-policy 'pick-first)
            (mu4e-compose-context-policy 'ask-if-none)
-           (mu4e~update-buffer-height 4)
            (mu4e-split-view 'vertical)
            (mu4e-get-mail-command "aj-mailsync") ; bash script
                                         ; running several offlineimap
                                         ; processes for syncing
                                         ; different mailboxes
-           (mu4e-update-interval 600)
+           (mu4e-update-interval 300)
+           (mu4e-mu-allow-temp-file t)
            (mu4e-view-show-images t)
            (mu4e-use-fancy-chars t)
-           (mu4e-headers-results-limit 500) ; easier on my slow computer
+           (mu4e-headers-results-limit 500)
            (mu4e-attachment-dir "~/Hämtningar")
            ;; mu4e-change-filenames-when-moving t ;;for mbsync
            (mu4e-completing-read-function #'completing-read)

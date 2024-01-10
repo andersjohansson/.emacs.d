@@ -86,7 +86,7 @@
 
    ;; modus let’s it inherit `shadow’ for no good reason
    '(mu4e-header-face ((t :inherit nil)))
-   `(mu4e-compose-separator-face ((t :inherit 'org-hide :overline ,fg-dim :box nil)))
+   `(message-separator ((t :inherit 'org-hide :overline ,fg-dim :box nil :background nil)))
    '(mu4e-system-face ((t :inherit (variable-pitch italic))))
    '(mu4e-thread-fold-face ((t :inherit shadow)))
 
