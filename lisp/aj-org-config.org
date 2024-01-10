@@ -3323,7 +3323,7 @@ Mostly for html and reveal
 *** Html-export cleanup
 An option for "cleaning up" exported html from some org markup. Good for generating clean html for pasting into systems.
 #+begin_src emacs-lisp
-(defcustom aj/org-export-html-cleanup nil
+(defcustom org-aj-export-html-cleanup nil
   "If non-nil, cleanup html from org classes etc.
 
 Named with org prefix to be preserved in org exports."
@@ -3336,7 +3336,7 @@ Named with org prefix to be preserved in org exports."
 
 (defun aj/org-export-html-cleanup (string backend _info)
   (if (and (eq backend 'html)
-           aj/org-export-html-cleanup)
+           org-aj-export-html-cleanup)
       (with-temp-buffer
         (insert string)
         (aj/org-cleanup-html)
