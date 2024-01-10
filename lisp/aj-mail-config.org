@@ -2169,7 +2169,7 @@ fallback to default refile folder."
 
 (defun aj/mu4e-default-refile-folder (msg)
   (aj/mu4e-msg-account msg
-    :chalmers "/chalmers/Archive"
+    :chalmers (concat "/chalmers/Archive/" (format-time-string "%Y" (mu4e-message-field msg :date)))
     ;; Only for show, they get changed labels via custom action
     :mejla "/mejla/Alla mail"
     :ajf "/ajf/Alla mail"))
