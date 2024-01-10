@@ -793,7 +793,14 @@ As most clients (outlook etc.) don’t support format=flowed correctly anyway. S
 https://vxlabs.com/2019/08/25/format-flowed-with-long-lines/
 #+begin_src emacs-lisp
 (setq mu4e-compose-format-flowed t
-      fill-flowed-encode-column 998)
+      fill-flowed-encode-column 998
+      ;; because we use visual-fill-column-mode
+      fill-flowed-display-column most-positive-fixnum)
+
+;; Better behaviour with use-hard-newlines?
+(defun aj/use-hard-newlines ()
+  (use-hard-newlines t t))
+(add-hook 'mu4e-compose-mode-hook #'aj/use-hard-newlines)
 #+end_src
 
 *** Some compose settings
