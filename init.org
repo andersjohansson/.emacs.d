@@ -4814,7 +4814,7 @@ pdf-loader handles deferred loading. Then settings are applied after loading pdf
      ;; pdf-cache-prefetch-minor-mode ; memory usage...
      pdf-occur-global-minor-mode
      ;; I almost never have use for synctex:
-     pdf-sync-minor-mode
+     ;; pdf-sync-minor-mode
      )))
 
 (with-eval-after-load 'pdf-view
