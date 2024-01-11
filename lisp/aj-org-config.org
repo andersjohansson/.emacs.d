@@ -166,11 +166,9 @@ TEMPLATE is the processed template used to format the entry."
   "Find citar file of entry under point, or reference for current headline."
   (interactive)
   (when-let ((k (or
-                 (citar-org--key-at-point)
-                 (citar-org--prop-key-at-point)
-                 (when-let ((node (org-roam-node-at-point))
-                            (key (car (org-roam-node-refs node))))
-                   (cons key nil)))))
+                 (citar-key-at-point)
+                 (when-let ((node (org-roam-node-at-point)))
+                   (car (org-roam-node-refs node))))))
     (citar-open-files k)))
 #+end_src
 
