@@ -504,8 +504,7 @@ https://vxlabs.com/2019/08/25/format-flowed-with-long-lines/
 *** Some compose settings
 #+begin_src emacs-lisp
 (setq mail-user-agent #'mu4e-user-agent
-      mu4e-compose-hidden-headers '("^Face:" "^X-Face:" "^X-Draft-From:" "^User-agent:" "References:")
-      mu4e-compose-dont-reply-to-self t)
+      mu4e-compose-hidden-headers '("^Face:" "^X-Face:" "^X-Draft-From:" "^User-agent:" "References:" "In-Reply-To" "Message-ID:" "Fcc:"))
 
 ;; in case write is invoked before mu4e is loaded
 (add-hook 'mu4e-compose-pre-hook #'mu4e--start)
@@ -850,7 +849,7 @@ If not at beginning of body, insert “Best, NN” greeting."
 (bind-key "C-c C-å" #'aj/mail-insert-greeting 'mu4e-compose-mode-map)
 #+end_src
 
-*** KOLLA Customize cite string
+*** Customize cite string
 #+begin_src emacs-lisp
 
 ;; customize the reply-quote-string
