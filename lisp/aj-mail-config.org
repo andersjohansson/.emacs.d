@@ -1660,37 +1660,42 @@ Like ‘mu4e-user-mailing-lists’."
 
 *** Load next 500 messages
 #+begin_src emacs-lisp
-(defvar aj/mu-page 1)
+(defvar aj/mu4e-page 1
+  "Current page in mu4e search")
 
-(defun aj/mu-reset-page (&rest _r)
-  (setq aj/mu-page 1))
+(defun aj/mu4e-reset-page (&rest _r)
+  (setq aj/mu4e-page 1))
 
 ;; We need to reset it for the "standard searches", but also when
 ;; invoking an interactive search
-(add-hook 'mu4e-headers-search-bookmark-hook #'aj/mu-reset-page)
-(advice-add 'mu4e~headers-jump-to-maildir :before #'aj/mu-reset-page)
+(add-hook 'mu4e-search-bookmark-hook #'aj/mu4e-reset-page)
+(advice-add 'mu4e-search-maildir :before #'aj/mu4e-reset-page)
 
-(defun aj/mu-next-messages-for-query ()
+(defun aj/mu4e-next-messages-for-query ()
+  "Fetch the next number of messages for current mu4e query.
+Move to last message in current view so that newly fetched
+messages are visible."
   (interactive)
-  (when (and (buffer-live-p mu4e-headers-buffer-name) (not mu4e-headers-full-search))
-    (with-current-buffer mu4e-headers-buffer-name
-      (when-let ((query (mu4e-last-query)))
-        (cl-incf aj/mu-page)
-        (let ((mu4e-headers-results-limit
-               (* aj/mu-page mu4e-headers-results-limit))
-              (last-msg (save-excursion
-                          (goto-char (point-max))
-                          (forward-line -1)
-                          (plist-get
-                           (mu4e-message-at-point)
-                           :message-id))))
-          (mu4e-headers-search query nil nil t last-msg)
-          ;; (mu4e-mark-handle-when-leaving)
-          ;;(mu4e~headers-search-execute expr ignore-history)
-          ;; (run-hook-with-args 'mu4e-headers-search-hook expr)
-          )))))
+  (when (and (mu4e-current-buffer-type-p 'headers)
+             (not mu4e-headers-full-search))
+    (when-let ((query (mu4e-last-query)))
+      (cl-incf aj/mu4e-page)
+      (let ((mu4e-search-results-limit
+             (* aj/mu4e-page mu4e-search-results-limit))
+            (last-msg (save-excursion
+                        (goto-char (point-max))
+                        (forward-line -1)
+                        (plist-get
+                         (mu4e-message-at-point)
+                         :message-id))))
+        (mu4e-search query nil nil t last-msg)
+        ;; (mu4e-mark-handle-when-leaving)
+        ;;(mu4e~headers-search-execute expr ignore-history)
+        ;; (run-hook-with-args 'mu4e-headers-search-hook expr)
+        ))))
 
-(bind-key "N" #'aj/mu-next-messages-for-query mu4e-headers-mode-map)
+(keymap-set mu4e-headers-mode-map "N" #'aj/mu4e-next-messages-for-query)
+
 #+end_src
 
 
