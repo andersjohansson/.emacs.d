@@ -2127,6 +2127,16 @@ These two actions which doesn’t move the message from the folder is good to be
   (unless (string-match-p aj/mu4e-contacts-exclude-pattern c)
     c))
 #+end_src
+
+** Empty old messages in trash
+#+begin_src emacs-lisp
+(use-package mu4e-purge-trash
+  :straight ( :host sourcehut
+              :repo "andersjohansson/mu4e-purge-trash")
+  :custom (mu4e-purge-trash-query "maildir:\"/chalmers/Deleted Items\" date:..6m")
+  :hook '(midnight-mode . mu4e-purge-trash))
+#+end_src
+
 * Provide statement
 #+begin_src emacs-lisp
 (provide 'aj-mail-config)
