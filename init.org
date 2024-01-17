@@ -6076,17 +6076,6 @@ A function for reverting all opened files, even remote files (because auto-rever
   (recentf-mode 1))
 #+end_src
 
-
-* GC-stats
-#+begin_src emacs-lisp
-(use-package emacs-gc-stats
-  :custom
-  (emacs-gs-stats-gc-defaults 'emacs-defaults)
-  (emacs-gc-stats-remind 60)
-  :init
-  (emacs-gc-stats-mode 1))
-
-#+end_src
 * Final
 ** Load custom loaddefs :org_async:ARCHIVE:
 #+begin_src emacs-lisp
