@@ -466,6 +466,7 @@ Queries for directory to save in, or just saves to
 (defvar aj/mu4e-get-mail-command-quick "aj-mailsync-quick")
 
 (defun aj/mu4e-update-mail-and-index (full?)
+  "Quickly update inbox. Arg FULL? for full sync."
   (interactive "P")
   (if full?
       (mu4e-update-mail-and-index t)
@@ -853,11 +854,12 @@ If not at beginning of body, insert “Best, NN” greeting."
 #+begin_src emacs-lisp
 
 ;; customize the reply-quote-string
-(setq message-citation-line-format "On %A %-e %b %Y at %R, %f wrote:\n")
+(setq message-citation-line-format "\n\nOn %A %-e %b %Y at %R, %f wrote:\n")
 ;; choose to use the formatted string, with some language guessing
 (setq message-citation-line-function #'aj/message-insert-formatted-citation-line)
 
 (autoload #'guess-language-buffer "guess-language")
+
 (defun aj/message-insert-formatted-citation-line (&rest args)
   "Guess language and maybe force date formats to Swedish, else English"
   (let* ((sv (eq 'sv (guess-language-buffer)))
@@ -888,7 +890,7 @@ If not at beginning of body, insert “Best, NN” greeting."
               ;;                       ())
 
 
-              "%A %-e %B %Y %R, skrev %f:\n"
+              "\n\n%-e %B %Y %R, skrev %f:\n"
             message-citation-line-format)))
     (apply #'message-insert-formatted-citation-line args)
     ))
