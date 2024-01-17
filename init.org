@@ -70,7 +70,11 @@ org mode async exports, using only trees tagged with “org_async”."
            (ofile (make-temp-file "org-init-tangle" nil ".org"))
            (ofb (find-file-noselect ofile t))
            (byte-compile-warnings '(not free-vars)))
-	  (with-current-buffer ofb
+
+      (when (file-exists-p target-file)
+        (rename-file target-file (concat target-file "-old") 'overwrite))
+
+      (with-current-buffer ofb
         (with-silent-modifications ;; TODO, could we do it in a
           ;; temp-buffer? org-babel-tangle expects a file for
           ;; reporting, but only there.
@@ -93,6 +97,7 @@ org mode async exports, using only trees tagged with “org_async”."
         ;; The solution would be to move all kind of defuns out to
         ;; packages, or make it less of a problem to reload init. (now
         ;; it reloads custom.el etc. and that’s not good)
+        ;; was avoiding compilation the solution for this? Don’t remember...
 
         ;; (byte-compile-file target-file)
         ))))
