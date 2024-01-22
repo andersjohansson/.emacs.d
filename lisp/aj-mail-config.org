@@ -2128,13 +2128,13 @@ These two actions which doesn’t move the message from the folder is good to be
     c))
 #+end_src
 
-** Empty old messages in trash
+** Empty old messages in trash (mu4e-purge-trash)
 #+begin_src emacs-lisp
 (use-package mu4e-purge-trash
   :straight ( :host sourcehut
               :repo "andersjohansson/mu4e-purge-trash")
   :custom (mu4e-purge-trash-query "maildir:\"/chalmers/Deleted Items\" date:..6m")
-  :hook '(midnight-mode . mu4e-purge-trash))
+  :hook (midnight . mu4e-purge-trash))
 #+end_src
 
 * Provide statement
